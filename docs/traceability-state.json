@@ -21,14 +21,16 @@
     "status": "DONE",
     "services": [
       "src/server/core/state-machine.ts",
-      "src/server/modules/approval/service.ts (TRANSITIONS)"
+      "src/server/modules/approval/service.ts (TRANSITIONS)",
+      "src/server/modules/documents/service.ts (confirmBusinessDocument, cancelBusinessDocument)"
     ],
     "tests": [
       "tests/unit/state-machine.test.ts",
-      "tests/integration/approval.test.ts"
+      "tests/integration/approval.test.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "결재문서 상태 전이표 준수 확인",
-    "notes": "업무전표 적용은 STEP 7~10"
+    "notes": "PENDING_APPROVAL 전표는 결재 경로로만 확정된다"
   },
   "INT-03": {
     "status": "DONE",
@@ -60,14 +62,16 @@
     "status": "DONE",
     "services": [
       "src/server/core/context.ts (withTransaction)",
-      "src/server/modules/approval/service.ts (approve)"
+      "src/server/modules/approval/service.ts (approve)",
+      "src/server/modules/documents/service.ts (confirmBusinessDocument, cancelBusinessDocument)"
     ],
     "tests": [
       "tests/integration/transaction.test.ts",
-      "tests/integration/approval.test.ts"
+      "tests/integration/approval.test.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "B-08 장애주입 시 결재·원장·근태·알림 전체 롤백 확인",
-    "notes": "전표 확정 결합은 STEP 10에서 확장"
+    "notes": "상위 서비스가 트랜잭션을 열지 않고 호출자의 tx를 그대로 넘긴다. 재고 성공 후 회계 실패 시 전량 롤백 확인"
   },
   "INT-09": {
     "status": "DONE",
@@ -105,10 +109,11 @@
       "NotificationDelivery"
     ],
     "tests": [
-      "tests/integration/transaction.test.ts"
+      "tests/integration/transaction.test.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "SMTP 미설정 시 로그만 남고 아웃박스가 비워지는지 확인",
-    "notes": "ADR-0010/0012. FOR UPDATE SKIP LOCKED, 백오프 5회 후 FAILED + 관리자 알림"
+    "notes": "커밋 후 전송 실패는 아웃박스 행에만 남고 업무 데이터는 유지된다. 워커 tick 시험 추가"
   },
   "INT-11": {
     "status": "DONE",
@@ -478,7 +483,10 @@
     "status": "DONE",
     "services": [
       "src/server/modules/approval/matrix.ts",
-      "src/server/modules/inventory/stock-document.ts (confirm 게이트)"
+      "src/server/modules/inventory/stock-document.ts (confirm 게이트)",
+      "src/server/modules/documents/service.ts (confirmBusinessDocument, cancelBusinessDocument)",
+      "src/server/modules/documents/submit.ts (submitForApproval, submitCancellation)",
+      "src/server/modules/approval/handlers/accounting.ts"
     ],
     "api": [
       "inventory.confirmDocument"
@@ -490,16 +498,19 @@
       "PolicyVersion (approval.matrix)"
     ],
     "tests": [
-      "tests/integration/inventory.test.ts"
+      "tests/integration/inventory.test.ts",
+      "tests/integration/integration.test.ts"
     ],
-    "manual": "STOCK_OUT 1,000,000원 이상 전표가 직접 확정되지 않고 결재를 요구하는지 확인"
+    "manual": "STOCK_OUT 1,000,000원 이상 전표가 직접 확정되지 않고 결재를 요구하는지 확인",
+    "notes": "기본안 임시승인. 매트릭스의 모든 전표유형에 실제 경로가 있다"
   },
   "DEC-04": {
     "status": "DONE",
     "services": [
       "src/server/modules/accounting/period.ts",
       "src/server/modules/accounting/closing.ts",
-      "src/server/modules/inventory/valuation.ts (재고 기간)"
+      "src/server/modules/inventory/valuation.ts (재고 기간)",
+      "src/server/modules/documents/reversal.ts (reversalDate)"
     ],
     "api": [
       "accounting.closeMonth",
@@ -513,9 +524,11 @@
     ],
     "tests": [
       "tests/integration/accounting.test.ts",
-      "tests/e2e/accounting.spec.ts"
+      "tests/e2e/accounting.spec.ts",
+      "tests/integration/integration.test.ts"
     ],
-    "manual": "역분개 전표일이 원전표일 기간 마감 시 최초 열린 기간의 첫날로 이동하는지 확인"
+    "manual": "역분개 전표일이 원전표일 기간 마감 시 최초 열린 기간의 첫날로 이동하는지 확인",
+    "notes": "기본안 임시승인. 마감 판정과 역분개 일자를 회계·재고 두 달력으로 통일"
   },
   "DEC-05": {
     "status": "DONE",
@@ -1075,27 +1088,44 @@
     "status": "DONE",
     "services": [
       "src/server/modules/approval/handlers/index.ts",
-      "src/server/modules/approval/service.ts (onApproved)"
+      "src/server/modules/approval/service.ts (onApproved)",
+      "src/server/modules/documents/service.ts (confirmBusinessDocument, cancelBusinessDocument)",
+      "src/server/modules/documents/submit.ts (submitForApproval, submitCancellation)",
+      "src/server/modules/approval/handlers/accounting.ts"
     ],
     "tables": [
       "ApprovalLink(targetType,targetId,targetVersion) UNIQUE"
     ],
     "tests": [
-      "tests/integration/approval.test.ts"
+      "tests/integration/approval.test.ts",
+      "tests/integration/integration.test.ts"
     ],
-    "manual": "승인 콜백이 같은 트랜잭션에서 실행되고 실패 시 전체 롤백되는지 확인",
-    "notes": "전표 핸들러는 STEP 10에서 등록. 현재는 인사 2종"
+    "manual": "결재 대상 전표에는 확정 버튼이 없고 상신 버튼만 보이는지, 결재 진행 중에는 정책이 바뀌어도 직접 확정되지 않는지 확인",
+    "notes": "STEP 10. 소유권은 정책이 아니라 ApprovalLink로 판정한다. 승인 콜백은 결재가 부여한 권한으로 수행되므로 결재자에게 업무 권한이 없어도 된다",
+    "api": [
+      "sales.submitSalesDocumentForApproval",
+      "sales.submitPurchaseDocumentForApproval",
+      "inventory.submitForApproval",
+      "accounting.submitEntryForApproval"
+    ],
+    "screens": [
+      "src/components/documents/approval-actions.tsx"
+    ]
   },
   "APV-09": {
     "status": "DONE",
     "services": [
-      "src/server/modules/approval/handlers/hrm.ts"
+      "src/server/modules/approval/handlers/hrm.ts",
+      "src/server/modules/approval/handlers/sales.ts",
+      "src/server/modules/approval/handlers/inventory.ts",
+      "src/server/modules/approval/handlers/accounting.ts"
     ],
     "tests": [
-      "tests/integration/approval.test.ts"
+      "tests/integration/approval.test.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "휴가 승인 → 연차 사용원장·근태 반영, 근태정정 승인 → Attendance 정정 확인",
-    "notes": "E2E-03 통과. 구매요청→발주는 STEP 10"
+    "notes": "E2E-01~04 통과. 매출·매입·재고·수동전표 대상 핸들러까지 등록 완료"
   },
   "APV-10": {
     "status": "DONE",
@@ -1135,19 +1165,25 @@
   "APV-12": {
     "status": "DONE",
     "services": [
-      "src/server/modules/approval/service.ts (requestCancel, applyCancellation)"
+      "src/server/modules/approval/service.ts (requestCancel, applyCancellation)",
+      "src/server/modules/documents/submit.ts (submitForApproval, submitCancellation)"
     ],
     "api": [
-      "approval.requestCancel"
+      "approval.requestCancel",
+      "sales.submitSalesDocumentCancellation",
+      "sales.submitPurchaseDocumentCancellation",
+      "inventory.submitCancellation",
+      "accounting.submitEntryCancellation"
     ],
     "tables": [
       "ApprovalDocument.cancelsDocumentId",
       "ApprovalActionLog"
     ],
     "tests": [
-      "tests/integration/approval.test.ts"
+      "tests/integration/approval.test.ts",
+      "tests/integration/integration.test.ts"
     ],
-    "manual": "완료문서 수정 차단, 취소문서 승인 시 원문서 CANCELED와 반대원장 확인",
+    "manual": "결재로 확정한 전표는 직접 취소가 거부되고 취소 결재로만 취소되는지 확인",
     "notes": "ApprovalActionLog는 append-only"
   },
   "APV-13": {
@@ -1352,6 +1388,55 @@
         "INT-01",
         "SLS-05",
         "SLS-06"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-16",
+      "step": "STEP 10",
+      "text": "DEC-03 결재 매트릭스에 수동전표(JOURNAL) 규칙이 시드부터 들어 있었지만 회계전표 확정이 그 규칙을 읽지 않아, 기준금액을 넘는 수동전표도 그냥 확정됐다. 결정등록부와 시스템이 서로 다른 말을 하고 있던 셈이다. 확정에 매트릭스 검증을 추가하고 JOURNAL_ENTRY 결재 대상 핸들러와 양식을 만들어 규칙에 실제 통로를 붙였다. 업무전표에서 생성된 분개는 원천 전표가 이미 결재를 거쳤으므로 대상에서 제외한다.",
+      "related": [
+        "ACC-02",
+        "ACC-03",
+        "DEC-03",
+        "APV-08"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-17",
+      "step": "STEP 10",
+      "text": "결재 대상으로 지정된 매출·매입·재고 전표를 결재로 올릴 방법이 아예 없었다. 해당 targetType을 가진 결재양식이 없었고 화면에도 상신 경로가 없어서, 기준금액을 넘는 전표는 확정도 상신도 못 하고 멈춘다. 사용자가 스스로 빠져나올 수 없는 상태다. 양식 4종을 추가하고, 전표 화면에서 한 번에 기안·상신하는 경로와 취소 상신 경로를 만들었다.",
+      "related": [
+        "APV-08",
+        "APV-12",
+        "DEC-03",
+        "SLS-05",
+        "SLS-06",
+        "INV-01"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-18",
+      "step": "STEP 10",
+      "text": "승인 콜백이 업무 부작용을 결재자의 권한으로 수행하고 있어, 매출전표를 결재하려면 결재자가 sales.confirm 권한을 따로 가져야 했다. 결재선에 올라간 부서장이나 재무 담당이 정작 승인을 못 하는 상황이 된다. 확정·취소의 권한 검사를 직접 호출일 때만 수행하도록 바꿨다. 결재선이 이미 그 문서에 대한 승인 권한을 판정했고, 감사로그에는 여전히 결재자가 행위자로 남는다.",
+      "related": [
+        "APV-08",
+        "NFR-SEC-01",
+        "INT-06"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-19",
+      "step": "STEP 10",
+      "text": "취소 역분개 일자 규칙이 모듈마다 달랐다. 매출·매입은 회계 달력만 보고, 재고는 재고평가 달력만 본 뒤 원전표 일자가 아니라 오늘 날짜를 썼다. 확정 매출 취소는 두 원장을 모두 건드리므로 어느 쪽 규칙이든 상대 달력이 마감된 달에 행을 넣을 수 있었다. 두 달력이 모두 여는 첫 달로 결정하는 하나의 규칙으로 통일했다. 재고전표 등록·확정에도 빠져 있던 회계기간 검증을 추가했다.",
+      "related": [
+        "INT-07",
+        "DEC-04",
+        "INV-01",
+        "SLS-05"
       ],
       "status": "FIXED"
     }
@@ -1572,7 +1657,8 @@
     "tests": [
       "tests/integration/inventory.test.ts",
       "tests/e2e/inventory.spec.ts",
-      "tests/unit/item-match.test.ts"
+      "tests/unit/item-match.test.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "수동 입고에 사유가 강제되는지, 확정 시점에만 원장이 생성되는지 확인"
   },
@@ -1801,16 +1887,18 @@
       "StockSnapshot"
     ],
     "tests": [
-      "tests/integration/inventory.test.ts"
+      "tests/integration/inventory.test.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "캐시를 훼손한 뒤 대조가 검출하고 재생성이 원장과 일치시키는지 확인",
-    "notes": "회계 분개 원장은 STEP 8에서 같은 방식으로 추가한다"
+    "notes": "결재 확정 후에도 원장과 캐시 대조에 불일치가 없다"
   },
   "INT-07": {
     "status": "DONE",
     "services": [
       "src/server/modules/inventory/ledger.ts (reverse, sourceVersion)",
-      "src/server/modules/inventory/stock-document.ts (cancel)"
+      "src/server/modules/inventory/stock-document.ts (cancel)",
+      "src/server/modules/documents/reversal.ts (reversalDate)"
     ],
     "api": [
       "inventory.cancelDocument"
@@ -1824,10 +1912,11 @@
     ],
     "tests": [
       "tests/integration/inventory.test.ts",
-      "tests/e2e/inventory.spec.ts"
+      "tests/e2e/inventory.spec.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "취소 후 원래 행이 남아 있고 반대 행이 추가되는지, 원장 UPDATE가 트리거로 거부되는지 확인",
-    "notes": "채권채무 원복·회계 역분개는 STEP 8·9에서 같은 트랜잭션에 추가한다"
+    "notes": "역분개 일자는 회계·재고 두 달력이 모두 여는 첫 달로 결정한다"
   },
   "INT-08": {
     "status": "DONE",
@@ -1904,7 +1993,8 @@
     "status": "DONE",
     "services": [
       "src/server/modules/accounting/posting-rule.ts (DEFAULT_TEMPLATES, versionFor, publish, post, preview)",
-      "src/server/modules/accounting/account.ts (MAPPING_SLOTS, resolveSlot)"
+      "src/server/modules/accounting/account.ts (MAPPING_SLOTS, resolveSlot)",
+      "src/server/modules/approval/handlers/accounting.ts"
     ],
     "api": [
       "accounting.postingRules",
@@ -1924,9 +2014,11 @@
     "tests": [
       "tests/unit/accounting-journal.test.ts",
       "tests/integration/accounting.test.ts",
-      "tests/e2e/accounting.spec.ts"
+      "tests/e2e/accounting.spec.ts",
+      "tests/integration/integration.test.ts"
     ],
-    "manual": "규칙 새 버전을 발행해도 기존 분개가 그대로인지, 부가세 0인 매출이 빈 라인을 만들지 않는지 확인"
+    "manual": "규칙 새 버전을 발행해도 기존 분개가 그대로인지, 부가세 0인 매출이 빈 라인을 만들지 않는지 확인",
+    "notes": "DEC-03 수동전표 규칙이 실제로 적용된다"
   },
   "ACC-04": {
     "status": "DONE",
@@ -2206,7 +2298,8 @@
     "tests": [
       "tests/integration/sales.test.ts",
       "tests/e2e/sales.spec.ts",
-      "tests/unit/item-match.test.ts"
+      "tests/unit/item-match.test.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "B-02 확정 한 번에 재고·채권·분개·감사로그가 함께 남고, 어느 하나가 실패하면 전부 남지 않는지 확인",
     "notes": "E2E-01. 확정은 멱등키 뒤에서 한 트랜잭션으로 수행되며 여신한도와 DEC-03 결재 게이트를 통과해야 한다"
@@ -2237,7 +2330,8 @@
     "tests": [
       "tests/integration/sales.test.ts",
       "tests/e2e/sales.spec.ts",
-      "tests/unit/item-match.test.ts"
+      "tests/unit/item-match.test.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "E2E-02 발주에서 입고까지 재고 수량과 이동평균 단가, 미지급금이 함께 반영되는지 확인"
   },
@@ -2417,7 +2511,8 @@
     "tests": [
       "tests/integration/sales.test.ts",
       "tests/e2e/sales.spec.ts",
-      "tests/unit/item-match.test.ts"
+      "tests/unit/item-match.test.ts",
+      "tests/integration/integration.test.ts"
     ],
     "manual": "결재 완료 전 구매요청이 발주로 전환되지 않는지, 공급처별로 발주가 나뉘는지 확인",
     "notes": "결재 대상 핸들러로 등록되어 승인 시점에 요청 상태가 바뀐다"

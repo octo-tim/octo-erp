@@ -3,6 +3,7 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { api, newRequestId } from '@/lib/trpc';
+import { ApprovalActions } from '@/components/documents/approval-actions';
 import { Button, Card, EmptyState, Input, Spinner, StatusBadge } from '@/components/ui/primitives';
 import { InternalNotice } from '@/components/accounting/internal-notice';
 import { fmt } from '@/lib/format';
@@ -24,6 +25,8 @@ export default function JournalDetailPage({ params }: { params: Promise<{ id: st
   const detail = api.accounting.entry.useQuery({ id });
   const confirm = api.accounting.confirmEntry.useMutation(refresh);
   const cancel = api.accounting.cancelEntry.useMutation(refresh);
+  const submitApproval = api.accounting.submitEntryForApproval.useMutation(refresh);
+  const submitCancellation = api.accounting.submitEntryCancellation.useMutation(refresh);
 
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -150,8 +153,36 @@ export default function JournalDetailPage({ params }: { params: Promise<{ id: st
       </Card>
 
       <Card title="처리">
+        <div className="mb-3 flex flex-col gap-2">
+          <ApprovalActions
+            idPrefix="je-apv"
+            status={e.status}
+            approvalRequired={e.approvalRequired}
+            approvalReason={e.approvalReason}
+            approval={e.approval}
+            cancellationApproval={e.cancellationApproval}
+            onSubmitForApproval={(note) =>
+              run(
+                () =>
+                  submitApproval.mutateAsync({
+                    id,
+                    version: e.version,
+                    ...(note ? { note } : {}),
+                    requestId: newRequestId(),
+                  }),
+                '결재를 상신했습니다. 승인되면 전표가 확정됩니다.',
+              )
+            }
+            onSubmitCancellation={(reason) =>
+              run(
+                () => submitCancellation.mutateAsync({ id, reason, requestId: newRequestId() }),
+                '취소 결재를 상신했습니다. 승인되면 전표가 취소됩니다.',
+              )
+            }
+          />
+        </div>
         <div className="flex flex-wrap gap-1.5">
-          {e.status === 'DRAFT' || e.status === 'PENDING_APPROVAL' ? (
+          {(e.status === 'DRAFT' || e.status === 'PENDING_APPROVAL') && !e.approvalRequired ? (
             <Button
               variant="primary"
               size="sm"
@@ -165,7 +196,7 @@ export default function JournalDetailPage({ params }: { params: Promise<{ id: st
               확정
             </Button>
           ) : null}
-          {e.status !== 'CANCELED' && !e.isClosingEntry ? (
+          {e.status !== 'CANCELED' && !e.isClosingEntry && e.approval?.status !== 'APPROVED' ? (
             <Button size="sm" variant="danger" onClick={() => setCancelling((v) => !v)}>
               {cancelling ? '취소 닫기' : '전표 취소'}
             </Button>

@@ -4,6 +4,8 @@ import * as quotation from '@/server/modules/sales/quotation';
 import * as salesOrder from '@/server/modules/sales/sales-order';
 import * as salesDocument from '@/server/modules/sales/sales-document';
 import * as purchase from '@/server/modules/sales/purchase';
+import * as documents from '@/server/modules/documents/service';
+import * as documentSubmit from '@/server/modules/documents/submit';
 import * as receivable from '@/server/modules/sales/receivable';
 import * as settlement from '@/server/modules/sales/settlement';
 import * as taxInvoice from '@/server/modules/sales/tax-invoice';
@@ -276,13 +278,79 @@ export const salesRouter = router({
   confirmSalesDocument: permissionProcedure('sales.confirm')
     .input(z.object({ id: cuid, version: z.number().int(), requestId }))
     .mutation(({ ctx, input }) =>
-      tx(ctx, (t) => salesDocument.confirm(t, input.id, input.version), input.requestId),
+      tx(
+        ctx,
+        (t) => documents.confirmBusinessDocument(t, { type: 'SALES_DOCUMENT', ...input }),
+        input.requestId,
+      ),
     ),
 
   cancelSalesDocument: permissionProcedure('sales.cancel')
     .input(z.object({ id: cuid, reason: z.string().min(2).max(200), version: z.number().int(), requestId }))
     .mutation(({ ctx, input }) =>
-      tx(ctx, (t) => salesDocument.cancel(t, input.id, input.reason, input.version), input.requestId),
+      tx(
+        ctx,
+        (t) => documents.cancelBusinessDocument(t, { type: 'SALES_DOCUMENT', ...input }),
+        input.requestId,
+      ),
+    ),
+
+  // ── APV-08: putting a business document into approval ──
+
+  submitSalesDocumentForApproval: permissionProcedure('sales.write')
+    .input(
+      z.object({
+        id: cuid,
+        version: z.number().int(),
+        note: z.string().max(500).optional(),
+        lineTemplateId: cuid.optional(),
+        requestId,
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      tx(
+        ctx,
+        (t) => documentSubmit.submitForApproval(t, { type: 'SALES_DOCUMENT', ...input }),
+        input.requestId,
+      ),
+    ),
+
+  submitSalesDocumentCancellation: permissionProcedure('sales.cancel')
+    .input(z.object({ id: cuid, reason: z.string().min(2).max(200), requestId }))
+    .mutation(({ ctx, input }) =>
+      tx(
+        ctx,
+        (t) => documentSubmit.submitCancellation(t, { type: 'SALES_DOCUMENT', ...input }),
+        input.requestId,
+      ),
+    ),
+
+  submitPurchaseDocumentForApproval: permissionProcedure('purchase.write')
+    .input(
+      z.object({
+        id: cuid,
+        version: z.number().int(),
+        note: z.string().max(500).optional(),
+        lineTemplateId: cuid.optional(),
+        requestId,
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      tx(
+        ctx,
+        (t) => documentSubmit.submitForApproval(t, { type: 'PURCHASE_DOCUMENT', ...input }),
+        input.requestId,
+      ),
+    ),
+
+  submitPurchaseDocumentCancellation: permissionProcedure('purchase.cancel')
+    .input(z.object({ id: cuid, reason: z.string().min(2).max(200), requestId }))
+    .mutation(({ ctx, input }) =>
+      tx(
+        ctx,
+        (t) => documentSubmit.submitCancellation(t, { type: 'PURCHASE_DOCUMENT', ...input }),
+        input.requestId,
+      ),
     ),
 
   // ── SLS-07 tax invoice ──
@@ -455,13 +523,21 @@ export const salesRouter = router({
   confirmPurchaseDocument: permissionProcedure('purchase.confirm')
     .input(z.object({ id: cuid, version: z.number().int(), requestId }))
     .mutation(({ ctx, input }) =>
-      tx(ctx, (t) => purchase.confirmDocument(t, input.id, input.version), input.requestId),
+      tx(
+        ctx,
+        (t) => documents.confirmBusinessDocument(t, { type: 'PURCHASE_DOCUMENT', ...input }),
+        input.requestId,
+      ),
     ),
 
   cancelPurchaseDocument: permissionProcedure('purchase.cancel')
     .input(z.object({ id: cuid, reason: z.string().min(2).max(200), version: z.number().int(), requestId }))
     .mutation(({ ctx, input }) =>
-      tx(ctx, (t) => purchase.cancelDocument(t, input.id, input.reason, input.version), input.requestId),
+      tx(
+        ctx,
+        (t) => documents.cancelBusinessDocument(t, { type: 'PURCHASE_DOCUMENT', ...input }),
+        input.requestId,
+      ),
     ),
 
   // ── SLS-08/SLS-09 receivables and payables ──

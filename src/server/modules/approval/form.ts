@@ -180,7 +180,7 @@ export async function endDelegation(ctx: TransactionContext, delegationId: strin
   return { ok: true };
 }
 
-/** APV-02: the six seeded forms, published as version 1. */
+/** APV-02: the seeded forms, each published as version 1. */
 export const DEFAULT_FORMS: {
   code: string;
   name: string;
@@ -268,6 +268,61 @@ export const DEFAULT_FORMS: {
       { key: 'startDate', label: '시작일', type: 'date', required: true },
       { key: 'endDate', label: '종료일', type: 'date', required: true },
       { key: 'reason', label: '사유', type: 'text', max: 200 },
+    ],
+  },
+  /**
+   * APV-08 / STEP 10. A document over the DEC-03 threshold can only be confirmed by an
+   * approval, so it needs a form to be submitted on. Without these three, that gate was a
+   * dead end: an over-threshold sales document could be neither confirmed nor submitted.
+   * The fields are deliberately thin — the figures live on the business document, and the
+   * approval carries only what an approver reads before deciding.
+   */
+  {
+    code: 'SALES_DOCUMENT',
+    name: '매출전표 결재',
+    category: 'SALES',
+    targetType: 'SALES_DOCUMENT',
+    fields: [
+      { key: 'docNo', label: '전표번호', type: 'text', required: true, max: 30 },
+      { key: 'partner', label: '거래처', type: 'text', required: true, max: 100 },
+      { key: 'amount', label: '합계금액', type: 'money', required: true },
+      { key: 'note', label: '상신사유', type: 'textarea', max: 500 },
+    ],
+  },
+  {
+    code: 'PURCHASE_DOCUMENT',
+    name: '매입전표 결재',
+    category: 'PURCHASE',
+    targetType: 'PURCHASE_DOCUMENT',
+    fields: [
+      { key: 'docNo', label: '전표번호', type: 'text', required: true, max: 30 },
+      { key: 'partner', label: '매입처', type: 'text', required: true, max: 100 },
+      { key: 'amount', label: '합계금액', type: 'money', required: true },
+      { key: 'note', label: '상신사유', type: 'textarea', max: 500 },
+    ],
+  },
+  {
+    code: 'STOCK_DOCUMENT',
+    name: '재고전표 결재',
+    category: 'INVENTORY',
+    targetType: 'STOCK_DOCUMENT',
+    fields: [
+      { key: 'docNo', label: '전표번호', type: 'text', required: true, max: 30 },
+      { key: 'warehouse', label: '창고', type: 'text', required: true, max: 100 },
+      { key: 'amount', label: '금액', type: 'money', required: true },
+      { key: 'note', label: '상신사유', type: 'textarea', max: 500 },
+    ],
+  },
+  {
+    code: 'JOURNAL_ENTRY',
+    name: '수동전표 결재',
+    category: 'ACCOUNTING',
+    targetType: 'JOURNAL_ENTRY',
+    fields: [
+      { key: 'entryNo', label: '전표번호', type: 'text', required: true, max: 30 },
+      { key: 'entryDate', label: '전표일자', type: 'date', required: true },
+      { key: 'amount', label: '차변합계', type: 'money', required: true },
+      { key: 'note', label: '상신사유', type: 'textarea', max: 500 },
     ],
   },
   {

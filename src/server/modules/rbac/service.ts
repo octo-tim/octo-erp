@@ -11,6 +11,25 @@ export function requirePermission(actor: Actor, permission: string): void {
   }
 }
 
+/**
+ * APV-08. A confirmation reached through an approval is authorised by that approval, not by
+ * the approver's own module permissions. Without this, approving a sales document would
+ * require the approver to hold `sales.confirm` — so a department head or a finance approver,
+ * who is exactly the person the approval line puts there, could not approve one. The
+ * approval line already decided who may authorise this specific document; the audit log
+ * still records the approver as the actor.
+ *
+ * `viaApproval` is set only by the approval module when it invokes a target handler. It is
+ * never read from a request, so this cannot be asked for from outside.
+ */
+export function requirePermissionUnlessApproval(
+  ctx: { actor: Actor; viaApproval?: boolean },
+  permission: string,
+): void {
+  if (ctx.viaApproval) return;
+  requirePermission(ctx.actor, permission);
+}
+
 export function requireAnyPermission(actor: Actor, permissions: string[]): void {
   if (!permissions.some((p) => has(actor, p))) {
     throw new AppError('FORBIDDEN', '이 기능을 사용할 권한이 없습니다.', { permissions });

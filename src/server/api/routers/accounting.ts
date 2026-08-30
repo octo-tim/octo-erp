@@ -6,6 +6,8 @@ import * as period from '@/server/modules/accounting/period';
 import * as postingRule from '@/server/modules/accounting/posting-rule';
 import * as report from '@/server/modules/accounting/report';
 import * as closing from '@/server/modules/accounting/closing';
+import * as documents from '@/server/modules/documents/service';
+import * as documentSubmit from '@/server/modules/documents/submit';
 import {
   amountString,
   cuid,
@@ -206,13 +208,49 @@ export const accountingRouter = router({
   confirmEntry: permissionProcedure('accounting.confirm')
     .input(z.object({ id: cuid, version: z.number().int(), requestId }))
     .mutation(({ ctx, input }) =>
-      tx(ctx, (t) => journal.confirm(t, input.id, input.version), input.requestId),
+      tx(
+        ctx,
+        (t) => documents.confirmBusinessDocument(t, { type: 'JOURNAL_ENTRY', ...input }),
+        input.requestId,
+      ),
     ),
 
   cancelEntry: permissionProcedure('accounting.cancel')
     .input(z.object({ id: cuid, reason: z.string().min(2).max(200), version: z.number().int(), requestId }))
     .mutation(({ ctx, input }) =>
-      tx(ctx, (t) => journal.cancel(t, input.id, input.reason, input.version), input.requestId),
+      tx(
+        ctx,
+        (t) => documents.cancelBusinessDocument(t, { type: 'JOURNAL_ENTRY', ...input }),
+        input.requestId,
+      ),
+    ),
+
+  submitEntryForApproval: permissionProcedure('accounting.write')
+    .input(
+      z.object({
+        id: cuid,
+        version: z.number().int(),
+        note: z.string().max(500).optional(),
+        lineTemplateId: cuid.optional(),
+        requestId,
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      tx(
+        ctx,
+        (t) => documentSubmit.submitForApproval(t, { type: 'JOURNAL_ENTRY', ...input }),
+        input.requestId,
+      ),
+    ),
+
+  submitEntryCancellation: permissionProcedure('accounting.cancel')
+    .input(z.object({ id: cuid, reason: z.string().min(2).max(200), requestId }))
+    .mutation(({ ctx, input }) =>
+      tx(
+        ctx,
+        (t) => documentSubmit.submitCancellation(t, { type: 'JOURNAL_ENTRY', ...input }),
+        input.requestId,
+      ),
     ),
 
   // ── ACC-04 ledgers ──

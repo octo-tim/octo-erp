@@ -1,8 +1,10 @@
 import type { TransactionContext } from '@/server/core/context';
 import { AppError } from '@/server/core/errors';
-import { requirePermission } from '@/server/modules/rbac/service';
+import { requirePermission, requirePermissionUnlessApproval } from '@/server/modules/rbac/service';
 import * as audit from '@/server/modules/audit/service';
 import * as period from './period';
+import * as matrix from '@/server/modules/approval/matrix';
+import * as approvalState from '@/server/modules/documents/approval-state';
 import { nextDocNo, DOC_TYPES } from '@/server/modules/numbering/service';
 import { idempotent } from '@/server/core/idempotency';
 import { assertVersion } from '@/server/core/state-machine';
@@ -198,7 +200,7 @@ export async function update(ctx: TransactionContext, id: string, input: EntryIn
 }
 
 export async function confirm(ctx: TransactionContext, id: string, version: number) {
-  requirePermission(ctx.actor, 'accounting.confirm');
+  requirePermissionUnlessApproval(ctx, 'accounting.confirm');
 
   return idempotent(ctx, `journal.confirm:${id}`, async () => {
     await ctx.tx.$queryRawUnsafe('SELECT id FROM "JournalEntry" WHERE id = $1 FOR UPDATE', id);
@@ -214,6 +216,23 @@ export async function confirm(ctx: TransactionContext, id: string, version: numb
 
     const entryDate = entry.entryDate.toISOString().slice(0, 10);
     await period.assertOpen(ctx, entryDate);
+
+    /**
+     * DEC-03. The approval matrix has carried a JOURNAL rule since the seed, but nothing
+     * read it: a manual entry over the threshold confirmed straight through, so the policy
+     * said one thing and the system did another. Manual entries are exactly the ones the
+     * rule is for — an automatic entry comes from a business document that was itself
+     * approved, and carries a source.
+     */
+    if (!entry.sourceType) {
+      const total = entry.lines.reduce((acc, l) => acc.plus(D(l.debit)), ZERO);
+      const req = await matrix.requirement(ctx, 'JOURNAL', amount(total), entryDate);
+      if (req.required && !ctx.viaApproval) {
+        throw new AppError('APPROVAL_REQUIRED', `${req.reason}. 결재 상신 후 승인되면 확정됩니다.`, {
+          policyVersionId: req.policyVersionId,
+        });
+      }
+    }
 
     // the balance is re-checked at confirmation: the lines may have been edited since
     validateLines(
@@ -250,7 +269,7 @@ export async function confirm(ctx: TransactionContext, id: string, version: numb
  * writes a reversing entry whose lines are the original's with the sides swapped.
  */
 export async function cancel(ctx: TransactionContext, id: string, reason: string, version: number) {
-  requirePermission(ctx.actor, 'accounting.cancel');
+  requirePermissionUnlessApproval(ctx, 'accounting.cancel');
   if (reason.trim().length < 2) throw new AppError('VALIDATION', '취소 사유를 입력하세요.');
 
   return idempotent(ctx, `journal.cancel:${id}`, async () => {
@@ -562,7 +581,21 @@ export async function detail(ctx: TransactionContext, id: string) {
     },
   });
   if (!entry) throw new AppError('NOT_FOUND', '회계전표를 찾을 수 없습니다.');
-  return entry;
+
+  // DEC-03: a manual entry over the threshold is confirmed by its approval, so the screen
+  // has to know that before it offers a confirm button
+  const total = amount(entry.lines.reduce((acc, l) => acc.plus(D(l.debit)), ZERO));
+  const req = entry.sourceType
+    ? null
+    : await matrix.requirement(ctx, 'JOURNAL', total, entry.entryDate.toISOString().slice(0, 10));
+  const approvalInfo = await approvalState.approvalStateOf(ctx, 'JOURNAL_ENTRY', id);
+
+  return {
+    ...entry,
+    approvalRequired: req?.required ?? false,
+    approvalReason: req?.reason ?? '',
+    ...approvalInfo,
+  };
 }
 
 // ── helpers ──

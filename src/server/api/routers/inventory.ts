@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { permissionProcedure, readTx, router, tx } from '@/server/api/trpc';
 import * as stockDocument from '@/server/modules/inventory/stock-document';
+import * as documents from '@/server/modules/documents/service';
+import * as documentSubmit from '@/server/modules/documents/submit';
 import * as stockCount from '@/server/modules/inventory/stock-count';
 import * as report from '@/server/modules/inventory/stock-report';
 import * as safetyStock from '@/server/modules/inventory/safety-stock';
@@ -100,13 +102,49 @@ export const inventoryRouter = router({
   confirmDocument: permissionProcedure('inventory.confirm')
     .input(z.object({ id: cuid, version: z.number().int(), requestId }))
     .mutation(({ ctx, input }) =>
-      tx(ctx, (t) => stockDocument.confirm(t, input.id, input.version), input.requestId),
+      tx(
+        ctx,
+        (t) => documents.confirmBusinessDocument(t, { type: 'STOCK_DOCUMENT', ...input }),
+        input.requestId,
+      ),
     ),
 
   cancelDocument: permissionProcedure('inventory.cancel')
     .input(z.object({ id: cuid, reason: z.string().min(2).max(200), version: z.number().int(), requestId }))
     .mutation(({ ctx, input }) =>
-      tx(ctx, (t) => stockDocument.cancel(t, input.id, input.reason, input.version), input.requestId),
+      tx(
+        ctx,
+        (t) => documents.cancelBusinessDocument(t, { type: 'STOCK_DOCUMENT', ...input }),
+        input.requestId,
+      ),
+    ),
+
+  submitForApproval: permissionProcedure('inventory.write')
+    .input(
+      z.object({
+        id: cuid,
+        version: z.number().int(),
+        note: z.string().max(500).optional(),
+        lineTemplateId: cuid.optional(),
+        requestId,
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      tx(
+        ctx,
+        (t) => documentSubmit.submitForApproval(t, { type: 'STOCK_DOCUMENT', ...input }),
+        input.requestId,
+      ),
+    ),
+
+  submitCancellation: permissionProcedure('inventory.cancel')
+    .input(z.object({ id: cuid, reason: z.string().min(2).max(200), requestId }))
+    .mutation(({ ctx, input }) =>
+      tx(
+        ctx,
+        (t) => documentSubmit.submitCancellation(t, { type: 'STOCK_DOCUMENT', ...input }),
+        input.requestId,
+      ),
     ),
 
   shipTransfer: permissionProcedure('inventory.write')

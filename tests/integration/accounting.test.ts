@@ -45,10 +45,16 @@ beforeEach(async () => {
 
 afterAll(() => prisma.$disconnect());
 
-/** A confirmed manual entry, the way a router would make one. */
+/**
+ * A confirmed manual entry, the way a router would make one. Confirmation carries
+ * `viaApproval` because a manual entry over the DEC-03 threshold is confirmed by its
+ * approval, and several of these fixtures are deliberately large. The gate itself is
+ * tested in tests/integration/integration.test.ts; here the entry stands in for one that
+ * has already been approved.
+ */
 async function post(lines: journal.LineInput[], entryDate = '2026-06-15', description = '시험 전표') {
   const entry = await runTx(admin, (t) => journal.create(t, { entryDate, description, lines }));
-  await runTx(admin, (t) => journal.confirm(t, entry.id, entry.version));
+  await runTx(admin, (t) => journal.confirm({ ...t, viaApproval: true }, entry.id, entry.version));
   return entry;
 }
 

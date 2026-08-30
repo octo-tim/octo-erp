@@ -1,9 +1,12 @@
 import type { TransactionContext } from '@/server/core/context';
 import { AppError } from '@/server/core/errors';
-import { requirePermission } from '@/server/modules/rbac/service';
+import { requirePermission, requirePermissionUnlessApproval } from '@/server/modules/rbac/service';
 import * as audit from '@/server/modules/audit/service';
 import * as matrix from '@/server/modules/approval/matrix';
 import { nextDocNo, DOC_TYPES } from '@/server/modules/numbering/service';
+import * as accountingPeriod from '@/server/modules/accounting/period';
+import * as reversal from '@/server/modules/documents/reversal';
+import * as approvalState from '@/server/modules/documents/approval-state';
 import { idempotent } from '@/server/core/idempotency';
 import { assertTransition, assertVersion, type DocStatus } from '@/server/core/state-machine';
 import * as ledger from './ledger';
@@ -145,6 +148,8 @@ export async function create(ctx: TransactionContext, input: DocumentInput) {
   await validateLines(ctx, input.docType, input.lines);
 
   const docDate = input.docDate ?? businessDate(ctx.now);
+  // DEC-04: a closed period refuses creation and editing as well as confirmation
+  await accountingPeriod.assertOpen(ctx, docDate);
   await valuation.assertPeriodOpen(ctx, docDate);
 
   if ((input.docType === 'RECEIPT' || input.docType === 'ISSUE') && !input.reasonCode) {
@@ -206,6 +211,8 @@ export async function update(ctx: TransactionContext, id: string, input: Documen
   await validateLines(ctx, before.docType as StockDocType, input.lines);
 
   const docDate = input.docDate ?? businessDate(ctx.now);
+  // DEC-04: a closed period refuses creation and editing as well as confirmation
+  await accountingPeriod.assertOpen(ctx, docDate);
   await valuation.assertPeriodOpen(ctx, docDate);
   const totals = totalsOf(input.lines);
 
@@ -255,7 +262,7 @@ export async function update(ctx: TransactionContext, id: string, input: Documen
  * is in the caller's transaction (INT-06), so a failure anywhere leaves no ledger rows.
  */
 export async function confirm(ctx: TransactionContext, id: string, version: number) {
-  requirePermission(ctx.actor, 'inventory.confirm');
+  requirePermissionUnlessApproval(ctx, 'inventory.confirm');
 
   return idempotent(ctx, `stock.confirm:${id}`, async () => {
     // lock the document itself so two confirms cannot interleave
@@ -279,6 +286,9 @@ export async function confirm(ctx: TransactionContext, id: string, version: numb
     );
 
     const docDate = doc.docDate.toISOString().slice(0, 10);
+    // both calendars, because confirming a stock document also values it: a month that is
+    // closed for accounting must not gain movements any more than a closed valuation month
+    await accountingPeriod.assertOpen(ctx, docDate);
     await valuation.assertPeriodOpen(ctx, docDate);
 
     // DEC-03: an approval-required document may only be confirmed by the approval module
@@ -335,7 +345,7 @@ export async function confirm(ctx: TransactionContext, id: string, version: numb
 
 /** INT-07: cancellation posts opposite rows; nothing is deleted. */
 export async function cancel(ctx: TransactionContext, id: string, reason: string, version: number) {
-  requirePermission(ctx.actor, 'inventory.confirm');
+  requirePermissionUnlessApproval(ctx, 'inventory.confirm');
   if (reason.trim().length < 2) throw new AppError('VALIDATION', '취소 사유를 입력하세요.');
 
   return idempotent(ctx, `stock.cancel:${id}`, async () => {
@@ -350,10 +360,8 @@ export async function cancel(ctx: TransactionContext, id: string, reason: string
       throw new AppError('INVALID_TRANSITION', '이미 취소된 전표입니다.');
     }
 
-    const docDate = doc.docDate.toISOString().slice(0, 10);
-    // the reversal belongs to the day it is made when the original month is closed (DEC-04)
-    const reversalDate =
-      (await valuation.periodStatus(ctx, docDate.slice(0, 7))) === 'CLOSED' ? ctx.now : doc.docDate;
+    // one rule for every reversal: the original date when both calendars accept it (DEC-04)
+    const reversalDate = await reversal.reversalDate(ctx, doc.docDate, ['ACCOUNTING', 'INVENTORY']);
 
     if (doc.status === 'CONFIRMED') {
       // check the reversal itself does not drive stock negative (a transfer already moved on)
@@ -675,7 +683,15 @@ export async function detail(ctx: TransactionContext, id: string) {
     include: { warehouse: { select: { name: true } }, item: { select: { code: true, name: true } } },
   });
 
-  return { ...doc, approvalRequired: req.required, approvalReason: req.reason, ledgerRows };
+  const approvalInfo = await approvalState.approvalStateOf(ctx, 'STOCK_DOCUMENT', id);
+
+  return {
+    ...doc,
+    approvalRequired: req.required,
+    approvalReason: req.reason,
+    ...approvalInfo,
+    ledgerRows,
+  };
 }
 
 // ── helpers ──

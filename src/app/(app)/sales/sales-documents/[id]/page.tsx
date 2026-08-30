@@ -4,6 +4,7 @@ import { use, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
+import { ApprovalActions } from '@/components/documents/approval-actions';
 import { Button, Card, EmptyState, Input, Spinner, StatusBadge } from '@/components/ui/primitives';
 import { fmt } from '@/lib/format';
 
@@ -30,6 +31,8 @@ export default function SalesDocumentDetailPage({ params }: { params: Promise<{ 
   const confirm = api.sales.confirmSalesDocument.useMutation(refresh);
   const cancel = api.sales.cancelSalesDocument.useMutation(refresh);
   const issueInvoice = api.sales.issueTaxInvoice.useMutation(refresh);
+  const submitApproval = api.sales.submitSalesDocumentForApproval.useMutation(refresh);
+  const submitCancellation = api.sales.submitSalesDocumentCancellation.useMutation(refresh);
 
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,12 +80,6 @@ export default function SalesDocumentDetailPage({ params }: { params: Promise<{ 
       {error ? (
         <p role="alert" className="whitespace-pre-line rounded bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
-        </p>
-      ) : null}
-
-      {d.approvalRequired && d.status !== 'CONFIRMED' ? (
-        <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          {d.approvalReason}. 전자결재에서 상신·승인되면 확정됩니다.
         </p>
       ) : null}
 
@@ -161,8 +158,36 @@ export default function SalesDocumentDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       <Card title="처리">
+        <div className="mb-3 flex flex-col gap-2">
+          <ApprovalActions
+            idPrefix="sd-apv"
+            status={d.status}
+            approvalRequired={d.approvalRequired}
+            approvalReason={d.approvalReason}
+            approval={d.approval}
+            cancellationApproval={d.cancellationApproval}
+            onSubmitForApproval={(note) =>
+              run(
+                () =>
+                  submitApproval.mutateAsync({
+                    id,
+                    version: d.version,
+                    ...(note ? { note } : {}),
+                    requestId: newRequestId(),
+                  }),
+                '결재를 상신했습니다. 승인되면 전표가 확정됩니다.',
+              )
+            }
+            onSubmitCancellation={(reason) =>
+              run(
+                () => submitCancellation.mutateAsync({ id, reason, requestId: newRequestId() }),
+                '취소 결재를 상신했습니다. 승인되면 전표가 취소됩니다.',
+              )
+            }
+          />
+        </div>
         <div className="flex flex-wrap gap-1.5">
-          {d.status === 'DRAFT' || d.status === 'PENDING_APPROVAL' ? (
+          {(d.status === 'DRAFT' || d.status === 'PENDING_APPROVAL') && !d.approvalRequired ? (
             <Button
               variant="primary"
               size="sm"
@@ -176,7 +201,7 @@ export default function SalesDocumentDetailPage({ params }: { params: Promise<{ 
               확정
             </Button>
           ) : null}
-          {d.status !== 'CANCELED' ? (
+          {d.status !== 'CANCELED' && d.approval?.status !== 'APPROVED' ? (
             <Button size="sm" variant="danger" onClick={() => setCancelling((v) => !v)}>
               {cancelling ? '취소 닫기' : '전표 취소'}
             </Button>

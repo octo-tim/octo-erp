@@ -1,6 +1,6 @@
 import type { TransactionContext } from '@/server/core/context';
 import { AppError } from '@/server/core/errors';
-import { requirePermission } from '@/server/modules/rbac/service';
+import { requirePermission, requirePermissionUnlessApproval } from '@/server/modules/rbac/service';
 import * as audit from '@/server/modules/audit/service';
 import * as matrix from '@/server/modules/approval/matrix';
 import * as ledger from '@/server/modules/inventory/ledger';
@@ -13,6 +13,8 @@ import * as receivables from './receivable';
 import * as conversion from './conversion';
 import { priceLines, type PricedLineInput } from './pricing';
 import { nextDocNo, DOC_TYPES } from '@/server/modules/numbering/service';
+import * as reversal from '@/server/modules/documents/reversal';
+import * as approvalState from '@/server/modules/documents/approval-state';
 import { idempotent } from '@/server/core/idempotency';
 import { assertVersion } from '@/server/core/state-machine';
 import { amount, D, floorTo, quantity, ZERO } from '@/lib/money';
@@ -223,7 +225,7 @@ export async function update(ctx: TransactionContext, id: string, input: Documen
  * stock ledger, receivable, journal entry, audit, notification.
  */
 export async function confirm(ctx: TransactionContext, id: string, version: number) {
-  requirePermission(ctx.actor, 'sales.confirm');
+  requirePermissionUnlessApproval(ctx, 'sales.confirm');
 
   return idempotent(ctx, `sales.confirm:${id}`, async () => {
     await ctx.tx.$queryRawUnsafe('SELECT id FROM "SalesDocument" WHERE id = $1 FOR UPDATE', id);
@@ -315,7 +317,7 @@ export async function confirm(ctx: TransactionContext, id: string, version: numb
  * ledger gets opposite rows, the receivable is reversed, and the journal is reversed.
  */
 export async function cancel(ctx: TransactionContext, id: string, reason: string, version: number) {
-  requirePermission(ctx.actor, 'sales.cancel');
+  requirePermissionUnlessApproval(ctx, 'sales.cancel');
   if (reason.trim().length < 2) throw new AppError('VALIDATION', '취소 사유를 입력하세요.');
 
   return idempotent(ctx, `sales.cancel:${id}`, async () => {
@@ -334,7 +336,8 @@ export async function cancel(ctx: TransactionContext, id: string, reason: string
       // a receivable that has been settled cannot simply vanish
       await receivables.assertReversible(ctx, doc.id);
 
-      const reversalDate = await accountingPeriod.reversalDate(ctx, doc.docDate);
+      // the reversal touches the stock ledger and the journal, so it needs a month both accept
+      const reversalDate = await reversal.reversalDate(ctx, doc.docDate, ['ACCOUNTING', 'INVENTORY']);
 
       await ledger.reverse(ctx, doc.docType, doc.id, {
         occurredAt: reversalDate,
@@ -655,19 +658,21 @@ export async function detail(ctx: TransactionContext, id: string) {
   });
   if (!doc) throw new AppError('NOT_FOUND', '매출전표를 찾을 수 없습니다.');
 
-  const [req, receivable, entry] = await Promise.all([
+  const [req, receivable, entry, approvalInfo] = await Promise.all([
     matrix.requirement(ctx, doc.docType, doc.totalAmount.toString(), doc.docDate.toISOString().slice(0, 10)),
     ctx.tx.receivable.findUnique({ where: { documentId: id }, include: { matches: true } }),
     ctx.tx.journalEntry.findFirst({
       where: { sourceType: doc.docType, sourceId: id, sourceVersion: 1 },
       select: { id: true, entryNo: true, status: true },
     }),
+    approvalState.approvalStateOf(ctx, 'SALES_DOCUMENT', id),
   ]);
 
   return {
     ...doc,
     approvalRequired: req.required,
     approvalReason: req.reason,
+    ...approvalInfo,
     receivable,
     journalEntry: entry,
   };
