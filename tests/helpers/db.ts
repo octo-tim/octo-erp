@@ -33,6 +33,13 @@ export async function truncateBusinessData(): Promise<void> {
       "EmployeeChangeRequest", "CertificateIssue", "EmployeeDocument", "Assignment",
       "DepartmentHistory", "EmployeeSensitive"
     RESTART IDENTITY CASCADE`);
+  // Employee cannot be truncated with CASCADE without wiping the seeded users that
+  // reference it, so detach and delete instead.
+  await prisma.$executeRawUnsafe(`UPDATE "User" SET "employeeId" = NULL`);
+  await prisma.$executeRawUnsafe(`DELETE FROM "Employee"`);
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "Department" WHERE "code" NOT IN ('HQ', 'MGT', 'SAL', 'PUR', 'ACC')`,
+  );
   await prisma.$executeRawUnsafe(`UPDATE "NumberingCounter" SET "lastSeq" = 0`);
 }
 

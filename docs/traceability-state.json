@@ -125,11 +125,21 @@
     "notes": "Origin 기반 CSRF·보안헤더·Prisma 파라미터 바인딩 적용. 의존성 취약점 점검과 XSS 전수는 STEP 13"
   },
   "NFR-SEC-06": {
-    "status": "IN_PROGRESS",
-    "services": ["src/server/core/crypto.ts (AES-256-GCM)", "src/server/core/redact.ts"],
+    "status": "DONE",
+    "services": [
+      "src/server/core/crypto.ts",
+      "src/server/core/redact.ts",
+      "src/server/modules/hrm/employee.ts"
+    ],
     "tables": ["EmployeeSensitive", "SensitiveAccessLog"],
-    "tests": ["tests/unit/crypto.test.ts", "tests/unit/redact.test.ts"],
-    "notes": "암호화·마스킹 기반 구현. 실제 인사 민감정보 적용은 STEP 4"
+    "tests": [
+      "tests/unit/crypto.test.ts",
+      "tests/unit/redact.test.ts",
+      "tests/integration/hrm.test.ts",
+      "tests/e2e/hrm.spec.ts"
+    ],
+    "manual": "화면·감사로그·응답에 원문 없음 확인",
+    "notes": "AES-256-GCM, 키/데이터 분리, keyVersion으로 회전 지원"
   },
   "NFR-SEC-07": {
     "status": "DONE",
@@ -333,6 +343,141 @@
     "screens": ["src/components/ui/primitives.tsx (EmptyState, ErrorState, Field)"],
     "tests": ["tests/e2e/components.spec.ts"],
     "notes": "빈 상태·오류에 다음 행동 안내. 업무 용어 전수 점검은 STEP 11"
+  },
+  "HRM-01": {
+    "status": "DONE",
+    "services": ["src/server/modules/hrm/employee.ts"],
+    "api": ["hrm.list", "hrm.detail", "hrm.create", "hrm.update"],
+    "screens": ["src/app/(app)/hr/employees/page.tsx", "src/app/(app)/hr/employees/[id]/page.tsx"],
+    "tables": ["Employee"],
+    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "manual": "사원 등록·수정·자동채번·낙관적 잠금 확인"
+  },
+  "HRM-02": {
+    "status": "DONE",
+    "services": ["src/server/modules/hrm/organization.ts"],
+    "api": ["hrm.orgChart", "hrm.createDepartment", "hrm.reorganize", "hrm.departmentHistory"],
+    "screens": ["src/app/(app)/hr/org/page.tsx"],
+    "tables": ["Department", "DepartmentHistory"],
+    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "manual": "기준일 변경 시 개편 전후 조직도 재현 확인 (B-15)"
+  },
+  "HRM-03": {
+    "status": "DONE",
+    "services": ["src/server/modules/hrm/organization.ts (assign, positionAt)"],
+    "api": ["hrm.assign", "hrm.assignmentHistory", "hrm.positionAt"],
+    "screens": ["src/app/(app)/hr/employees/[id]/page.tsx"],
+    "tables": ["Assignment"],
+    "tests": ["tests/integration/hrm.test.ts"],
+    "manual": "발령 시 이전 발령 종료·현재값 동기화 확인"
+  },
+  "HRM-04": {
+    "status": "DONE",
+    "services": ["src/server/modules/hrm/attendance.ts"],
+    "api": [
+      "hrm.checkIn",
+      "hrm.checkOut",
+      "hrm.attendanceUpload",
+      "hrm.requestCorrection",
+      "hrm.listCorrections"
+    ],
+    "screens": ["src/app/(app)/hr/attendance/page.tsx", "src/app/(app)/hr/me/page.tsx"],
+    "tables": ["Attendance", "AttendanceCorrectionRequest"],
+    "tests": ["tests/integration/hrm.test.ts"],
+    "manual": "체크인·아웃, 엑셀 업로드 행별 오류, 정정신청 확인",
+    "notes": "정정 승인 콜백 연결은 STEP 5"
+  },
+  "HRM-05": {
+    "status": "DONE",
+    "services": ["src/server/modules/hrm/leave-policy.ts", "src/server/modules/hrm/leave.ts"],
+    "api": ["hrm.grantAnnual", "hrm.grantManual", "hrm.leaveBalance", "hrm.expireGrants"],
+    "screens": ["src/app/(app)/hr/leave/page.tsx"],
+    "tables": ["LeaveGrant", "LeaveUsage", "PolicyVersion(leave)"],
+    "tests": ["tests/unit/leave-policy.test.ts", "tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "manual": "ADR-0007 승인 계산 예시 전건, 소멸 처리 확인",
+    "notes": "DEC-05 정책 버전 기반. 상수 하드코딩 없음"
+  },
+  "HRM-06": {
+    "status": "DONE",
+    "services": ["src/server/modules/hrm/leave.ts (requestLeave, applyApprovedLeave, cancelApprovedLeave)"],
+    "api": ["hrm.requestLeave", "hrm.listLeaveRequests", "hrm.cancelLeave"],
+    "screens": ["src/app/(app)/hr/leave/page.tsx"],
+    "tables": ["LeaveRequest", "LeaveUsage", "Attendance"],
+    "tests": ["tests/integration/hrm.test.ts"],
+    "manual": "승인 시 사용원장·근태 반영, 취소 시 반대행 확인",
+    "notes": "결재 연동은 STEP 5에서 콜백으로 연결(E2E-03)"
+  },
+  "HRM-07": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/hrm/leave-policy.ts (classifyWork, overtimeWarning)",
+      "src/server/modules/hrm/attendance.ts (monthly)"
+    ],
+    "api": ["hrm.attendanceMonthly"],
+    "screens": ["src/app/(app)/hr/attendance/page.tsx"],
+    "tests": ["tests/unit/leave-policy.test.ts", "tests/integration/hrm.test.ts"],
+    "manual": "연장·야간·휴일 구분과 한도 경고 확인"
+  },
+  "HRM-08": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/hrm/employee.ts (scheduleContractExpiryNotice)",
+      "src/server/modules/storage/attachment.ts"
+    ],
+    "api": ["attachment.*"],
+    "screens": ["src/app/(app)/hr/employees/[id]/page.tsx"],
+    "tables": ["EmployeeDocument", "Attachment", "OutboxEvent"],
+    "tests": ["tests/integration/storage.test.ts", "tests/integration/hrm.test.ts"],
+    "manual": "인사서류 권한 접근통제, 계약만료 아웃박스 생성 확인"
+  },
+  "HRM-09": {
+    "status": "DONE",
+    "services": ["src/server/modules/hrm/employee.ts (issueCertificate)"],
+    "api": ["hrm.issueCertificate"],
+    "tables": ["CertificateIssue"],
+    "tests": ["tests/integration/hrm.test.ts"],
+    "manual": "발급이력 기록과 민감정보 미포함 확인",
+    "notes": "PDF 렌더는 STEP 11 출력 공통화에서 연결"
+  },
+  "HRM-10": {
+    "status": "DONE",
+    "services": ["src/server/modules/hrm/employee.ts (overview)"],
+    "api": ["hrm.overview"],
+    "screens": ["src/app/(app)/hr/overview/page.tsx"],
+    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "manual": "부서·고용형태·근속 분포와 입퇴사 집계 확인"
+  },
+  "HRM-11": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/hrm/employee.ts (resign)",
+      "src/server/modules/auth/service.ts (deactivateUserForEmployee)"
+    ],
+    "api": ["hrm.resign"],
+    "tables": ["Employee", "User", "Session"],
+    "tests": ["tests/integration/hrm.test.ts"],
+    "manual": "퇴사 시 계정 비활성·세션 폐기 원자성, 롤백 시 둘 다 원복 확인"
+  },
+  "HRM-12": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/hrm/employee.ts (setSensitive, revealSensitive)",
+      "src/server/core/crypto.ts"
+    ],
+    "api": ["hrm.setSensitive", "hrm.revealSensitive", "hrm.sensitiveAccessLog"],
+    "screens": ["src/app/(app)/hr/employees/[id]/page.tsx"],
+    "tables": ["EmployeeSensitive", "SensitiveAccessLog"],
+    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "manual": "마스킹 기본, 사유 필수, 접근이력 기록, 감사로그 원문 없음 확인"
+  },
+  "HRM-13": {
+    "status": "DONE",
+    "services": ["src/server/modules/hrm/employee.ts (me, requestChange, reviewChange)"],
+    "api": ["hrm.me", "hrm.requestChange", "hrm.reviewChange"],
+    "screens": ["src/app/(app)/hr/me/page.tsx"],
+    "tables": ["EmployeeChangeRequest"],
+    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "manual": "본인 정보·근태·연차 조회와 연락처 변경신청 확인"
   },
   "__changeRequests": [
     {

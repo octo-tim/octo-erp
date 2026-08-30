@@ -4,6 +4,7 @@ import { adminRouter } from './routers/admin';
 import { notificationRouter } from './routers/notification';
 import { attachmentRouter } from './routers/attachment';
 import { preferenceRouter } from './routers/preference';
+import { hrmRouter } from './routers/hrm';
 
 export const appRouter = router({
   auth: authRouter,
@@ -11,6 +12,7 @@ export const appRouter = router({
   notification: notificationRouter,
   attachment: attachmentRouter,
   preference: preferenceRouter,
+  hrm: hrmRouter,
 });
 
 export type AppRouter = typeof appRouter;

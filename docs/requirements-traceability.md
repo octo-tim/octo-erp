@@ -2,7 +2,7 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T16:30:25.848Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T16:49:26.773Z
 
 ## 집계
 
@@ -13,14 +13,14 @@
 | INV 재고 | 9 | 1 | 10 | 0 | 0 | 0 | 0 | 9 | 1 |
 | ACC 회계 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | APV 전자결재 | 15 | 1 | 16 | 0 | 0 | 0 | 0 | 15 | 1 |
-| HRM 인사 | 13 | 1 | 14 | 0 | 0 | 0 | 0 | 13 | 1 |
+| HRM 인사 | 13 | 1 | 14 | 13 | 0 | 0 | 0 | 0 | 1 |
 | RPT 보고서 | 10 | 1 | 11 | 0 | 0 | 0 | 0 | 10 | 1 |
 | UIX 공통 UI | 8 | 1 | 9 | 7 | 1 | 0 | 0 | 0 | 1 |
 | INT 공통 데이터 정합성 | 12 | 0 | 12 | 5 | 4 | 0 | 0 | 3 | 0 |
-| NFR 비기능 | 22 | 0 | 22 | 7 | 7 | 0 | 0 | 8 | 0 |
+| NFR 비기능 | 22 | 0 | 22 | 8 | 6 | 0 | 0 | 8 | 0 |
 | MIG 데이터 이관 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | DEC 착수 시 확정 정책 | 0 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| **합계** | **128** | **6** | **143** | 28 | 13 | 0 | 0 | 96 | 6 |
+| **합계** | **128** | **6** | **143** | 42 | 12 | 0 | 0 | 83 | 6 |
 
 기능 요구사항(BAS·SLS·INV·ACC·APV·HRM·RPT·UIX): M 85개, O 6개 (RFP 5장 선언: 필수 85 / 선택 6).
 
@@ -110,19 +110,19 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| HRM-01 | M | **사원정보** — 사번·성명·생년월일·연락처·주소·입사일·조직·고용형태·재직상태 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-02 | M | **조직** — 계층·부서장·조직도·개편이력·시점조회 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-03 | M | **발령** — 입사·승진·이동·휴직·복직·퇴사 이력과 시점조회 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-04 | M | **근태** — 웹·모바일 체크인 또는 엑셀 업로드, 지각·조퇴·결근, 정정결재 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-05 | M | **휴가** — 확정된 취업규칙에 따른 부여·소멸, 휴가유형, 잔여일수 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-06 | M | **휴가신청** — 신청·결재·승인 시 사용원장과 근태 반영 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-07 | M | **근로시간** — 주·월 집계, 연장·야간·휴일 구분, 설정된 한도 경고 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-08 | M | **인사서류** — 첨부, 계약 만료·갱신 알림, 접근통제 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-09 | M | **증명서** — 재직·경력증명서 PDF와 발급이력 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-10 | M | **인사현황** — 부서·고용형태·입퇴사·근속 분포 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-11 | M | **계정연동** — 사원-계정 1:1, 조직변경 반영, 퇴사 즉시 비활성 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-12 | M | **개인정보** — 민감정보 분리·암호화·마스킹·복호화 접근이력 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-13 | M | **본인조회** — 본인 정보·근태·연차 조회와 변경신청 | — | — | — | — | — | — | NOT_STARTED | — |
+| HRM-01 | M | **사원정보** — 사번·성명·생년월일·연락처·주소·입사일·조직·고용형태·재직상태 | `src/app/(app)/hr/employees/page.tsx`<br>`src/app/(app)/hr/employees/[id]/page.tsx` | `hrm.list`<br>`hrm.detail`<br>`hrm.create`<br>`hrm.update` | `src/server/modules/hrm/employee.ts` | `Employee` | `tests/integration/hrm.test.ts`<br>`tests/e2e/hrm.spec.ts` | 사원 등록·수정·자동채번·낙관적 잠금 확인 | DONE | — |
+| HRM-02 | M | **조직** — 계층·부서장·조직도·개편이력·시점조회 | `src/app/(app)/hr/org/page.tsx` | `hrm.orgChart`<br>`hrm.createDepartment`<br>`hrm.reorganize`<br>`hrm.departmentHistory` | `src/server/modules/hrm/organization.ts` | `Department`<br>`DepartmentHistory` | `tests/integration/hrm.test.ts`<br>`tests/e2e/hrm.spec.ts` | 기준일 변경 시 개편 전후 조직도 재현 확인 (B-15) | DONE | — |
+| HRM-03 | M | **발령** — 입사·승진·이동·휴직·복직·퇴사 이력과 시점조회 | `src/app/(app)/hr/employees/[id]/page.tsx` | `hrm.assign`<br>`hrm.assignmentHistory`<br>`hrm.positionAt` | `src/server/modules/hrm/organization.ts (assign, positionAt)` | `Assignment` | `tests/integration/hrm.test.ts` | 발령 시 이전 발령 종료·현재값 동기화 확인 | DONE | — |
+| HRM-04 | M | **근태** — 웹·모바일 체크인 또는 엑셀 업로드, 지각·조퇴·결근, 정정결재 | `src/app/(app)/hr/attendance/page.tsx`<br>`src/app/(app)/hr/me/page.tsx` | `hrm.checkIn`<br>`hrm.checkOut`<br>`hrm.attendanceUpload`<br>`hrm.requestCorrection`<br>`hrm.listCorrections` | `src/server/modules/hrm/attendance.ts` | `Attendance`<br>`AttendanceCorrectionRequest` | `tests/integration/hrm.test.ts` | 체크인·아웃, 엑셀 업로드 행별 오류, 정정신청 확인 | DONE | 정정 승인 콜백 연결은 STEP 5 |
+| HRM-05 | M | **휴가** — 확정된 취업규칙에 따른 부여·소멸, 휴가유형, 잔여일수 | `src/app/(app)/hr/leave/page.tsx` | `hrm.grantAnnual`<br>`hrm.grantManual`<br>`hrm.leaveBalance`<br>`hrm.expireGrants` | `src/server/modules/hrm/leave-policy.ts`<br>`src/server/modules/hrm/leave.ts` | `LeaveGrant`<br>`LeaveUsage`<br>`PolicyVersion(leave)` | `tests/unit/leave-policy.test.ts`<br>`tests/integration/hrm.test.ts`<br>`tests/e2e/hrm.spec.ts` | ADR-0007 승인 계산 예시 전건, 소멸 처리 확인 | DONE | DEC-05 정책 버전 기반. 상수 하드코딩 없음 |
+| HRM-06 | M | **휴가신청** — 신청·결재·승인 시 사용원장과 근태 반영 | `src/app/(app)/hr/leave/page.tsx` | `hrm.requestLeave`<br>`hrm.listLeaveRequests`<br>`hrm.cancelLeave` | `src/server/modules/hrm/leave.ts (requestLeave, applyApprovedLeave, cancelApprovedLeave)` | `LeaveRequest`<br>`LeaveUsage`<br>`Attendance` | `tests/integration/hrm.test.ts` | 승인 시 사용원장·근태 반영, 취소 시 반대행 확인 | DONE | 결재 연동은 STEP 5에서 콜백으로 연결(E2E-03) |
+| HRM-07 | M | **근로시간** — 주·월 집계, 연장·야간·휴일 구분, 설정된 한도 경고 | `src/app/(app)/hr/attendance/page.tsx` | `hrm.attendanceMonthly` | `src/server/modules/hrm/leave-policy.ts (classifyWork, overtimeWarning)`<br>`src/server/modules/hrm/attendance.ts (monthly)` | — | `tests/unit/leave-policy.test.ts`<br>`tests/integration/hrm.test.ts` | 연장·야간·휴일 구분과 한도 경고 확인 | DONE | — |
+| HRM-08 | M | **인사서류** — 첨부, 계약 만료·갱신 알림, 접근통제 | `src/app/(app)/hr/employees/[id]/page.tsx` | `attachment.*` | `src/server/modules/hrm/employee.ts (scheduleContractExpiryNotice)`<br>`src/server/modules/storage/attachment.ts` | `EmployeeDocument`<br>`Attachment`<br>`OutboxEvent` | `tests/integration/storage.test.ts`<br>`tests/integration/hrm.test.ts` | 인사서류 권한 접근통제, 계약만료 아웃박스 생성 확인 | DONE | — |
+| HRM-09 | M | **증명서** — 재직·경력증명서 PDF와 발급이력 | — | `hrm.issueCertificate` | `src/server/modules/hrm/employee.ts (issueCertificate)` | `CertificateIssue` | `tests/integration/hrm.test.ts` | 발급이력 기록과 민감정보 미포함 확인 | DONE | PDF 렌더는 STEP 11 출력 공통화에서 연결 |
+| HRM-10 | M | **인사현황** — 부서·고용형태·입퇴사·근속 분포 | `src/app/(app)/hr/overview/page.tsx` | `hrm.overview` | `src/server/modules/hrm/employee.ts (overview)` | — | `tests/integration/hrm.test.ts`<br>`tests/e2e/hrm.spec.ts` | 부서·고용형태·근속 분포와 입퇴사 집계 확인 | DONE | — |
+| HRM-11 | M | **계정연동** — 사원-계정 1:1, 조직변경 반영, 퇴사 즉시 비활성 | — | `hrm.resign` | `src/server/modules/hrm/employee.ts (resign)`<br>`src/server/modules/auth/service.ts (deactivateUserForEmployee)` | `Employee`<br>`User`<br>`Session` | `tests/integration/hrm.test.ts` | 퇴사 시 계정 비활성·세션 폐기 원자성, 롤백 시 둘 다 원복 확인 | DONE | — |
+| HRM-12 | M | **개인정보** — 민감정보 분리·암호화·마스킹·복호화 접근이력 | `src/app/(app)/hr/employees/[id]/page.tsx` | `hrm.setSensitive`<br>`hrm.revealSensitive`<br>`hrm.sensitiveAccessLog` | `src/server/modules/hrm/employee.ts (setSensitive, revealSensitive)`<br>`src/server/core/crypto.ts` | `EmployeeSensitive`<br>`SensitiveAccessLog` | `tests/integration/hrm.test.ts`<br>`tests/e2e/hrm.spec.ts` | 마스킹 기본, 사유 필수, 접근이력 기록, 감사로그 원문 없음 확인 | DONE | — |
+| HRM-13 | M | **본인조회** — 본인 정보·근태·연차 조회와 변경신청 | `src/app/(app)/hr/me/page.tsx` | `hrm.me`<br>`hrm.requestChange`<br>`hrm.reviewChange` | `src/server/modules/hrm/employee.ts (me, requestChange, reviewChange)` | `EmployeeChangeRequest` | `tests/integration/hrm.test.ts`<br>`tests/e2e/hrm.spec.ts` | 본인 정보·근태·연차 조회와 연락처 변경신청 확인 | DONE | — |
 | HRM-14 | O | **급여대장** — 외부 결과 업로드와 개인별 명세서 배포, 계산 제외 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항 |
 
 ## RPT — 보고서
@@ -185,7 +185,7 @@
 | NFR-SEC-03 | M | **인증·세션** — HTTPS, 안전한 해시, Secure·HttpOnly·SameSite 쿠키, 세션 만료·회전·폐기 | — | `src/app/api/auth/login/route.ts`<br>`src/app/api/auth/logout/route.ts` | `src/server/core/crypto.ts`<br>`src/server/modules/auth/service.ts` | `Session`<br>`User` | `tests/unit/crypto.test.ts`<br>`tests/integration/auth.test.ts`<br>`tests/e2e/auth.spec.ts` | 쿠키 HttpOnly·SameSite=Lax, document.cookie 미노출 E2E 확인 | DONE | scrypt, 세션 토큰 해시 저장, 절대 12h·유휴 2h, 로그인 시 회전 |
 | NFR-SEC-04 | M | **로그인 보호** — 실패 제한, 잠금·해제, 비밀번호 초기화, 보안이벤트 감사 | — | `src/server/api/routers/auth.ts (unlockUser, resetPassword)` | `src/server/modules/auth/service.ts` | `LoginAttempt`<br>`SecurityEvent`<br>`User.lockedUntil` | `tests/integration/auth.test.ts` | 5회 실패 잠금 → 관리자 해제 → 정상 로그인 확인 | DONE | B-14 통과 |
 | NFR-SEC-05 | M | **웹 취약점 방어** — CSRF·XSS·SQLi·권한우회 방어, 의존성 취약점 점검 | — | `src/app/api/auth/login/route.ts` | `src/server/api/trpc.ts (csrfGuard)`<br>`next.config.ts (보안 헤더)` | — | `tests/integration/rbac.test.ts` | — | IN_PROGRESS | Origin 기반 CSRF·보안헤더·Prisma 파라미터 바인딩 적용. 의존성 취약점 점검과 XSS 전수는 STEP 13 |
-| NFR-SEC-06 | M | **민감정보 암호화** — 키·데이터 분리 암호화, 화면·로그·내보내기 마스킹 | — | — | `src/server/core/crypto.ts (AES-256-GCM)`<br>`src/server/core/redact.ts` | `EmployeeSensitive`<br>`SensitiveAccessLog` | `tests/unit/crypto.test.ts`<br>`tests/unit/redact.test.ts` | — | IN_PROGRESS | 암호화·마스킹 기반 구현. 실제 인사 민감정보 적용은 STEP 4 |
+| NFR-SEC-06 | M | **민감정보 암호화** — 키·데이터 분리 암호화, 화면·로그·내보내기 마스킹 | — | — | `src/server/core/crypto.ts`<br>`src/server/core/redact.ts`<br>`src/server/modules/hrm/employee.ts` | `EmployeeSensitive`<br>`SensitiveAccessLog` | `tests/unit/crypto.test.ts`<br>`tests/unit/redact.test.ts`<br>`tests/integration/hrm.test.ts`<br>`tests/e2e/hrm.spec.ts` | 화면·감사로그·응답에 원문 없음 확인 | DONE | AES-256-GCM, 키/데이터 분리, keyVersion으로 회전 지원 |
 | NFR-SEC-07 | M | **첨부 보안** — 크기·형식·권한 검증, 안전한 파일명, 비공개 저장, 만료형 URL | — | `src/server/api/routers/attachment.ts`<br>`src/app/api/files/[key]/route.ts` | `src/server/modules/storage/service.ts`<br>`src/server/modules/storage/attachment.ts` | `Attachment` | `tests/integration/storage.test.ts` | 만료된 서명 URL 거부, 확장자·매직바이트 불일치 거부 확인 | DONE | 20MB 제한, MIME 허용목록+매직바이트, 비공개 저장, 5분 만료 URL |
 | NFR-SEC-08 | M | **개인정보 파기** — 보유기간 도래 시 승인된 파기·익명화와 결과 기록 | — | — | — | — | — | — | NOT_STARTED | — |
 | NFR-OPS-01 | M | **환경 분리** — 개발·스테이징·운영 환경과 데이터·비밀값 분리 | — | — | `src/server/env.ts`<br>`.env.example` | — | `tests/unit/crypto.test.ts` | 환경변수 누락 시 부팅 실패 확인 | DONE | APP_ENV로 development/test/staging/production 분리, zod 검증 |
