@@ -1,0 +1,599 @@
+// Octo ERP — Prisma schema
+// Rules: docs/engineering-rules.md §3. Money = Decimal(18,0) KRW, qty = Decimal(18,3), unit price = Decimal(18,4).
+// Ledger tables are append-only (DB triggers in migrations forbid UPDATE/DELETE).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime  = "nodejs"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────── Organization / Identity ─────────────────────────
+
+model Department {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  parentId      String?
+  parent        Department? @relation("DeptTree", fields: [parentId], references: [id])
+  children      Department[] @relation("DeptTree")
+  headEmployeeId String?
+  validFrom     DateTime @db.Date
+  validTo       DateTime? @db.Date
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  employees     Employee[]
+  histories     DepartmentHistory[]
+  assignments   Assignment[]
+
+  @@index([parentId])
+}
+
+model Division {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userScopes UserDivisionScope[]
+}
+
+model Employee {
+  id             String   @id @default(cuid())
+  employeeNo     String   @unique
+  name           String
+  birthDate      DateTime? @db.Date
+  phone          String?
+  email          String?
+  address        String?
+  hireDate       DateTime @db.Date
+  leaveDate      DateTime? @db.Date
+  departmentId   String?
+  department     Department? @relation(fields: [departmentId], references: [id])
+  positionCode   String?  // 직위 공통코드
+  jobTitle       String?
+  employmentType String   @default("REGULAR") // REGULAR | CONTRACT | PARTTIME | INTERN
+  status         String   @default("ACTIVE")  // ACTIVE | ON_LEAVE | RESIGNED
+  contractEndDate DateTime? @db.Date
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User?
+  sensitive      EmployeeSensitive?
+  assignments    Assignment[]
+  departmentHistories DepartmentHistory[]
+  attendances    Attendance[]
+  attendanceCorrections AttendanceCorrectionRequest[]
+  leaveGrants    LeaveGrant[]
+  leaveUsages    LeaveUsage[]
+  leaveRequests  LeaveRequest[]
+  documents      EmployeeDocument[]
+  certificates   CertificateIssue[]
+  changeRequests EmployeeChangeRequest[]
+  sensitiveAccessLogs SensitiveAccessLog[]
+
+  @@index([departmentId])
+  @@index([status])
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  username           String    @unique
+  passwordHash       String
+  displayName        String
+  email              String?
+  employeeId         String?   @unique
+  employee           Employee? @relation(fields: [employeeId], references: [id])
+  isActive           Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  roles           UserRole[]
+  divisionScopes  UserDivisionScope[]
+  warehouseScopes UserWarehouseScope[]
+  sessions        Session[]
+  loginAttempts   LoginAttempt[]
+  notifications   Notification[]
+  preferences     UserPreference[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id          String @id @default(cuid())
+  code        String @unique // module.action
+  module      String
+  description String?
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model UserDivisionScope {
+  userId     String
+  divisionId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  division   Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, divisionId])
+}
+
+model UserWarehouseScope {
+  userId      String
+  warehouseId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@id([userId, warehouseId])
+}
+
+model Session {
+  id         String    @id // opaque 256-bit token hash
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime  @default(now())
+  ip         String?
+  userAgent  String?
+  revokedAt  DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  username  String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  success   Boolean
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([username, createdAt])
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  type      String   // LOGIN_FAILED | ACCOUNT_LOCKED | ACCOUNT_UNLOCKED | PASSWORD_RESET | FORBIDDEN | SENSITIVE_ACCESS | SESSION_REVOKED
+  userId    String?
+  actorId   String?
+  ip        String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([type, createdAt])
+}
+
+// ───────────────────────── Cross-cutting infrastructure ─────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorName  String?
+  action     String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  meta       Json?
+  ip         String?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+}
+
+model IdempotencyRecord {
+  id           String   @id @default(cuid())
+  scope        String
+  requestId    String
+  status       String   @default("IN_PROGRESS") // IN_PROGRESS | DONE
+  responseJson Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([scope, requestId])
+}
+
+model OutboxEvent {
+  id            String    @id @default(cuid())
+  topic         String
+  payload       Json
+  dedupKey      String?
+  status        String    @default("PENDING") // PENDING | PROCESSING | DONE | FAILED
+  attempt       Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+  lockedBy      String?
+  lockedAt      DateTime?
+  processedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([topic, dedupKey])
+  @@index([status, nextAttemptAt])
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category   String    // APPROVAL | STOCK | CREDIT | HR | SYSTEM
+  title      String
+  body       String?
+  linkUrl    String?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  deliveries NotificationDelivery[]
+
+  @@index([userId, readAt, createdAt])
+}
+
+model NotificationDelivery {
+  id             String       @id @default(cuid())
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  channel        String       // EMAIL | MESSENGER
+  status         String       @default("PENDING") // PENDING | SENT | FAILED
+  attempt        Int          @default(0)
+  lastError      String?
+  sentAt         DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([notificationId])
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  storageKey   String   @unique
+  originalName String
+  mimeType     String
+  size         Int
+  ownerType    String   // SALES_DOC | PARTNER | APPROVAL_DOC | EMPLOYEE_DOC | ITEM | ...
+  ownerId      String
+  accessScope  String   @default("OWNER") // OWNER | DIVISION | HR | PUBLIC_INTERNAL
+  uploadedById String?
+  sha256       String?
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([ownerType, ownerId])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+model PolicyVersion {
+  id            String   @id @default(cuid())
+  policyKey     String   // inventory.valuation | money | approval.matrix | period | leave | retention | notification
+  version       Int
+  effectiveFrom DateTime @db.Date
+  config        Json
+  note          String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  @@unique([policyKey, version])
+  @@index([policyKey, effectiveFrom])
+}
+
+model UserPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String   // GRID_COLUMNS | SEARCH_FILTER | DASHBOARD
+  key       String
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, kind, key])
+}
+
+model NumberingRule {
+  id         String   @id @default(cuid())
+  docType    String   @unique
+  prefix     String
+  periodKind String   @default("MONTH") // NONE | YEAR | MONTH
+  seqLength  Int      @default(4)
+  version    Int      @default(1)
+  updatedAt  DateTime @updatedAt
+
+  counters NumberingCounter[]
+}
+
+model NumberingCounter {
+  ruleId    String
+  periodKey String
+  lastSeq   Int      @default(0)
+  rule      NumberingRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@id([ruleId, periodKey])
+}
+
+// ───────────────────────── Master data (BAS) — base tables needed by scopes ─────────────────────────
+
+model Warehouse {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  type       String   @default("NORMAL") // NORMAL | DEFECT | CONSIGNED
+  managerEmployeeId String?
+  address    String?
+  isActive   Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  userScopes UserWarehouseScope[]
+}
+
+// ───────────────────────── HRM (STEP 4) ─────────────────────────
+
+model EmployeeSensitive {
+  employeeId     String   @id
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  residentNoEnc  String?
+  residentNoLast4 String?
+  bankName       String?
+  bankAccountEnc String?
+  bankAccountLast4 String?
+  keyVersion     Int      @default(1)
+  updatedAt      DateTime @updatedAt
+}
+
+model SensitiveAccessLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  field      String
+  reason     String
+  ip         String?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId, createdAt])
+}
+
+model DepartmentHistory {
+  id           String     @id @default(cuid())
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  employeeId   String?
+  employee     Employee?  @relation(fields: [employeeId], references: [id])
+  changeType   String     // CREATED | RENAMED | MOVED | HEAD_CHANGED | CLOSED | REORG
+  snapshot     Json
+  effectiveDate DateTime  @db.Date
+  note         String?
+  createdAt    DateTime   @default(now())
+
+  @@index([departmentId, effectiveDate])
+}
+
+model Assignment {
+  id            String     @id @default(cuid())
+  employeeId    String
+  employee      Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type          String     // HIRE | PROMOTION | TRANSFER | LEAVE_OF_ABSENCE | RETURN | RESIGN
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  positionCode  String?
+  jobTitle      String?
+  employmentType String?
+  effectiveFrom DateTime   @db.Date
+  effectiveTo   DateTime?  @db.Date
+  note          String?
+  approvalDocId String?
+  createdById   String?
+  createdAt     DateTime   @default(now())
+
+  @@index([employeeId, effectiveFrom])
+}
+
+model Attendance {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  workDate     DateTime @db.Date
+  checkIn      DateTime?
+  checkOut     DateTime?
+  status       String   @default("NORMAL") // NORMAL | LATE | EARLY_LEAVE | ABSENT | LEAVE | HALF_LEAVE | HOLIDAY | BUSINESS_TRIP
+  workMinutes  Int      @default(0)
+  overtimeMinutes Int   @default(0)
+  nightMinutes Int      @default(0)
+  holidayMinutes Int    @default(0)
+  source       String   @default("WEB") // WEB | MOBILE | UPLOAD | CORRECTION | LEAVE
+  note         String?
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([employeeId, workDate])
+}
+
+model AttendanceCorrectionRequest {
+  id           String   @id @default(cuid())
+  docNo        String   @unique
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  workDate     DateTime @db.Date
+  requestedCheckIn  DateTime?
+  requestedCheckOut DateTime?
+  requestedStatus   String?
+  reason       String
+  status       String   @default("DRAFT") // DRAFT | PENDING_APPROVAL | APPROVED | REJECTED | CANCELED
+  approvalDocId String?
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([employeeId, workDate])
+}
+
+model LeaveGrant {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType     String   @default("ANNUAL")
+  days          Decimal  @db.Decimal(6, 2)
+  grantDate     DateTime @db.Date
+  expiresAt     DateTime @db.Date
+  policyVersionId String?
+  reason        String?
+  sourceType    String?  // POLICY | MANUAL | MIGRATION | EXPIRY
+  sourceId      String?
+  createdAt     DateTime @default(now())
+
+  @@index([employeeId, leaveType, expiresAt])
+}
+
+model LeaveUsage {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType     String   @default("ANNUAL")
+  days          Decimal  @db.Decimal(6, 2) // positive = use, negative = reversal
+  usageDate     DateTime @db.Date
+  leaveRequestId String?
+  leaveRequest  LeaveRequest? @relation(fields: [leaveRequestId], references: [id])
+  reversalOfId  String?  @unique
+  sourceType    String   // REQUEST | REVERSAL | MIGRATION
+  sourceId      String?
+  createdAt     DateTime @default(now())
+
+  @@unique([sourceType, sourceId, usageDate])
+  @@index([employeeId, usageDate])
+}
+
+model LeaveRequest {
+  id           String   @id @default(cuid())
+  docNo        String   @unique
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType    String   @default("ANNUAL")
+  startDate    DateTime @db.Date
+  endDate      DateTime @db.Date
+  days         Decimal  @db.Decimal(6, 2)
+  halfDay      String?  // AM | PM
+  reason       String?
+  status       String   @default("DRAFT") // DRAFT | PENDING_APPROVAL | APPROVED | REJECTED | CANCELED
+  approvalDocId String?
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  usages LeaveUsage[]
+
+  @@index([employeeId, startDate])
+}
+
+model EmployeeDocument {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  docType      String   // CONTRACT | ID_COPY | CERTIFICATE | OTHER
+  title        String
+  attachmentId String?
+  issuedAt     DateTime? @db.Date
+  expiresAt    DateTime? @db.Date
+  note         String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([expiresAt])
+}
+
+model CertificateIssue {
+  id          String   @id @default(cuid())
+  issueNo     String   @unique
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  certType    String   // EMPLOYMENT | CAREER
+  purpose     String?
+  issuedById  String
+  attachmentId String?
+  createdAt   DateTime @default(now())
+
+  @@index([employeeId])
+}
+
+model EmployeeChangeRequest {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  changes      Json     // { field: {before, after} } — non-sensitive only
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewerId   String?
+  reviewNote   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([employeeId, status])
+}
+
+model RetentionRun {
+  id          String   @id @default(cuid())
+  policyKey   String
+  status      String   @default("PLANNED") // PLANNED | APPROVED | EXECUTED | FAILED
+  targetCount Int      @default(0)
+  processedCount Int   @default(0)
+  approvedById String?
+  executedAt  DateTime?
+  result      Json?
+  createdAt   DateTime @default(now())
+}

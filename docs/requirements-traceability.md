@@ -2,25 +2,25 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T14:46:02.668Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T15:35:30.560Z
 
 ## 집계
 
 | 모듈 | M | O | 합계 | DONE | IN_PROGRESS | NOT_VERIFIED | BLOCKED | NOT_STARTED | OPTION_NOT_APPROVED |
 |---|---|---|---|---|---|---|---|---|---|
-| BAS 기초정보 | 8 | 1 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
+| BAS 기초정보 | 8 | 1 | 9 | 0 | 1 | 0 | 0 | 8 | 0 |
 | SLS 매출·매입·발주 | 13 | 0 | 13 | 0 | 0 | 0 | 0 | 13 | 0 |
 | INV 재고 | 9 | 1 | 10 | 0 | 0 | 0 | 0 | 10 | 0 |
 | ACC 회계 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | APV 전자결재 | 15 | 1 | 16 | 0 | 0 | 0 | 0 | 16 | 0 |
 | HRM 인사 | 13 | 1 | 14 | 0 | 0 | 0 | 0 | 14 | 0 |
 | RPT 보고서 | 10 | 1 | 11 | 0 | 0 | 0 | 0 | 11 | 0 |
-| UIX 공통 UI | 8 | 1 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
-| INT 공통 데이터 정합성 | 12 | 0 | 12 | 0 | 0 | 0 | 0 | 12 | 0 |
-| NFR 비기능 | 22 | 0 | 22 | 0 | 0 | 0 | 0 | 22 | 0 |
+| UIX 공통 UI | 8 | 1 | 9 | 0 | 4 | 0 | 0 | 5 | 0 |
+| INT 공통 데이터 정합성 | 12 | 0 | 12 | 5 | 4 | 0 | 0 | 3 | 0 |
+| NFR 비기능 | 22 | 0 | 22 | 7 | 6 | 0 | 0 | 9 | 0 |
 | MIG 데이터 이관 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
-| DEC 착수 시 확정 정책 | 0 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
-| **합계** | **128** | **6** | **143** | 0 | 0 | 0 | 0 | 143 | 0 |
+| DEC 착수 시 확정 정책 | 0 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
+| **합계** | **128** | **6** | **143** | 21 | 15 | 0 | 0 | 107 | 0 |
 
 기능 요구사항(BAS·SLS·INV·ACC·APV·HRM·RPT·UIX): M 85개, O 6개 (RFP 5장 선언: 필수 85 / 선택 6).
 
@@ -35,7 +35,7 @@
 | BAS-05 | O | **거래처별 단가** — 거래처-품목 단가표와 전표 입력 시 자동 적용 | — | — | — | — | — | — | NOT_STARTED | — |
 | BAS-06 | M | **창고 관리** — 정상·불량·위탁 유형, 담당자, 사용여부 | — | — | — | — | — | — | NOT_STARTED | — |
 | BAS-07 | M | **공통코드** — 단위·품목분류·사업부·결제수단 등을 관리자가 유지 | — | — | — | — | — | — | NOT_STARTED | — |
-| BAS-08 | M | **변경 이력** — 변경자·시각·변경 전후 값 조회, 민감정보 원문은 감사로그 미저장 | — | — | — | — | — | — | NOT_STARTED | — |
+| BAS-08 | M | **변경 이력** — 변경자·시각·변경 전후 값 조회, 민감정보 원문은 감사로그 미저장 | — | `src/server/api/routers/admin.ts (auditLog)` | `src/server/modules/audit/service.ts` | — | `tests/integration/transaction.test.ts` | — | IN_PROGRESS | 변경 전후 이력 조회 기반 완료. 마스터 화면 연결은 STEP 6 |
 | BAS-09 | M | **삭제 정책** — 사용된 마스터 물리삭제 금지, 사용중지 처리 | — | — | — | — | — | — | NOT_STARTED | — |
 
 ## SLS — 매출·매입·발주
@@ -145,32 +145,32 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| UIX-01 | M | **홈** — 위젯 배치·표시 저장과 주요 기능 진입 | — | — | — | — | — | — | NOT_STARTED | — |
-| UIX-02 | M | **표준 조회** — 조건·그리드 구조, 컬럼 표시·순서·너비 저장 | — | — | — | — | — | — | NOT_STARTED | — |
+| UIX-01 | M | **홈** — 위젯 배치·표시 저장과 주요 기능 진입 | — | `src/server/api/routers/preference.ts` | — | `UserPreference` | — | — | IN_PROGRESS | 사용자별 위젯·컬럼·조회조건 저장소 완료. 홈 화면은 STEP 3/11 |
+| UIX-02 | M | **표준 조회** — 조건·그리드 구조, 컬럼 표시·순서·너비 저장 | — | `src/server/api/routers/preference.ts` | — | — | — | — | IN_PROGRESS | 컬럼 표시·순서·너비 저장 API 완료. StandardListPage는 STEP 3 |
 | UIX-03 | M | **그리드** — 정렬·필터·페이징/가상스크롤·다중선택·합계·엑셀 | — | — | — | — | — | — | NOT_STARTED | — |
 | UIX-04 | M | **전표 입력** — 라인 추가·복사·삭제, Tab/Enter, 자동완성 | — | — | — | — | — | — | NOT_STARTED | — |
 | UIX-05 | M | **입력검증** — 오류 위치 표시, 저장 실패 시 입력값 보존 | — | — | — | — | — | — | NOT_STARTED | — |
 | UIX-06 | M | **반응형** — PC 우선, 태블릿·모바일 조회·대시보드·결재 | — | — | — | — | — | — | NOT_STARTED | — |
-| UIX-07 | M | **첨부파일** — 전표·거래처·결재·인사파일의 권한 기반 업로드·미리보기 | — | — | — | — | — | — | NOT_STARTED | — |
-| UIX-08 | M | **알림센터** — 재고·여신·결재·인사 알림 통합 | — | — | — | — | — | — | NOT_STARTED | — |
+| UIX-07 | M | **첨부파일** — 전표·거래처·결재·인사파일의 권한 기반 업로드·미리보기 | — | `src/server/api/routers/attachment.ts` | `src/server/modules/storage/attachment.ts` | — | `tests/integration/storage.test.ts` | — | IN_PROGRESS | 권한 기반 업로드·다운로드 서비스 완료. AttachmentPanel UI는 STEP 3 |
+| UIX-08 | M | **알림센터** — 재고·여신·결재·인사 알림 통합 | — | `src/server/api/routers/notification.ts` | `src/server/modules/notification/service.ts` | `Notification`<br>`NotificationDelivery` | `tests/integration/transaction.test.ts` | — | IN_PROGRESS | 알림 생성·읽음 처리 서비스 완료. NotificationCenter UI는 STEP 3 |
 | UIX-09 | O | **즐겨찾기** — 즐겨찾기와 최근메뉴 | — | — | — | — | — | — | NOT_STARTED | — |
 
 ## INT — 공통 데이터 정합성
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| INT-01 | M | **정밀 숫자** — 금액·수량에 부동소수점 미사용, DB 정밀 숫자와 문자열 API 계약 | — | — | — | — | — | — | NOT_STARTED | — |
-| INT-02 | M | **전표 상태머신** — DRAFT·PENDING_APPROVAL·CONFIRMED·CANCELED 상태와 허용 전이 | — | — | — | — | — | — | NOT_STARTED | — |
-| INT-03 | M | **확정 후 수정 금지** — 확정 전표는 취소와 재작성으로 정정 | — | — | — | — | — | — | NOT_STARTED | — |
+| INT-01 | M | **정밀 숫자** — 금액·수량에 부동소수점 미사용, DB 정밀 숫자와 문자열 API 계약 | — | `src/server/api/schemas/common.ts`<br>`src/server/api/transformer.ts` | `src/lib/money.ts` | `Decimal(18,0) 금액 / (18,3) 수량 / (18,4) 단가` | `tests/unit/money.test.ts` | eslint no-restricted-syntax 로 parseFloat 차단 확인 | DONE | ADR-0011. API는 정밀 문자열 직렬화(superjson 미사용) |
+| INT-02 | M | **전표 상태머신** — DRAFT·PENDING_APPROVAL·CONFIRMED·CANCELED 상태와 허용 전이 | — | — | `src/server/core/state-machine.ts` | — | `tests/unit/state-machine.test.ts` | — | IN_PROGRESS | 공통 상태머신·전이표 구현. 각 전표 적용은 STEP 7~10 |
+| INT-03 | M | **확정 후 수정 금지** — 확정 전표는 취소와 재작성으로 정정 | — | — | `src/server/core/state-machine.ts (assertMutable)` | — | `tests/unit/state-machine.test.ts` | — | IN_PROGRESS | 규칙 구현 완료, 전표별 적용은 STEP 7~10 |
 | INT-04 | M | **원장이 진실** — 재고는 원장 합계, 회계는 분개 원장, 캐시는 재생성 가능 | — | — | — | — | — | — | NOT_STARTED | — |
-| INT-05 | M | **멱등성** — 승인·확정·취소·수금배분 재실행 시 중복 결과 없음 | — | — | — | — | — | — | NOT_STARTED | — |
-| INT-06 | M | **단일 트랜잭션 확정** — 재고·채권채무·회계·감사기록이 하나의 DB 트랜잭션 공유 | — | — | — | — | — | — | NOT_STARTED | — |
+| INT-05 | M | **멱등성** — 승인·확정·취소·수금배분 재실행 시 중복 결과 없음 | — | — | `src/server/core/idempotency.ts` | `IdempotencyRecord(scope,requestId) UNIQUE` | `tests/integration/transaction.test.ts` | 동일 requestId 재호출·동시호출 시 부작용 1건 확인 | DONE | ADR-0012. B-03 통과 |
+| INT-06 | M | **단일 트랜잭션 확정** — 재고·채권채무·회계·감사기록이 하나의 DB 트랜잭션 공유 | — | — | `src/server/core/context.ts (withTransaction)` | — | `tests/integration/transaction.test.ts` | — | IN_PROGRESS | 단일 트랜잭션 헬퍼와 롤백 원자성 검증 완료. 업무 확정 결합은 STEP 10 |
 | INT-07 | M | **취소 원복** — 재고 반대원장·채권채무 원복·회계 역분개를 동일 트랜잭션, 원장행 미삭제 | — | — | — | — | — | — | NOT_STARTED | — |
 | INT-08 | M | **동시 출고 잠금** — 품목·창고별 일관된 잠금 순서로 마이너스 재고 방지 | — | — | — | — | — | — | NOT_STARTED | — |
-| INT-09 | M | **감사 기록** — actor·action·entity·before·after·시각·IP·요청ID, 민감정보 제거 | — | — | — | — | — | — | NOT_STARTED | — |
-| INT-10 | M | **아웃박스** — 외부 이메일·메신저 부작용은 트랜잭셔널 아웃박스 | — | — | — | — | — | — | NOT_STARTED | — |
-| INT-11 | M | **유일성 제약** — 문서번호·원천문서 연결·외부 요청ID에 DB 유일성 제약 | — | — | — | — | — | — | NOT_STARTED | — |
-| INT-12 | M | **서버 데이터 권한** — 사업부·창고·인사 권한을 모든 서버 조회·쓰기·내보내기에 적용 | — | — | — | — | — | — | NOT_STARTED | — |
+| INT-09 | M | **감사 기록** — actor·action·entity·before·after·시각·IP·요청ID, 민감정보 제거 | — | `src/server/api/routers/admin.ts (auditLog)` | `src/server/modules/audit/service.ts`<br>`src/server/core/redact.ts` | `AuditLog`<br>`SecurityEvent` | `tests/unit/redact.test.ts`<br>`tests/integration/transaction.test.ts`<br>`tests/integration/auth.test.ts` | 감사로그·보안이벤트에 비밀번호·주민번호·계좌 원문 없음 확인 | DONE | 업무 변경과 같은 트랜잭션 기록, 롤백 시 함께 사라짐 |
+| INT-10 | M | **아웃박스** — 외부 이메일·메신저 부작용은 트랜잭셔널 아웃박스 | — | `src/server/api/routers/admin.ts (outboxEvents, retryOutbox)` | `src/server/modules/outbox/service.ts`<br>`src/server/jobs/worker.ts`<br>`src/server/jobs/handlers/email.ts` | `OutboxEvent`<br>`NotificationDelivery` | `tests/integration/transaction.test.ts` | SMTP 미설정 시 로그만 남고 아웃박스가 비워지는지 확인 | DONE | ADR-0010/0012. FOR UPDATE SKIP LOCKED, 백오프 5회 후 FAILED + 관리자 알림 |
+| INT-11 | M | **유일성 제약** — 문서번호·원천문서 연결·외부 요청ID에 DB 유일성 제약 | — | — | `src/server/modules/numbering/service.ts`<br>`src/server/modules/outbox/service.ts` | `NumberingCounter(ruleId,periodKey)`<br>`OutboxEvent(topic,dedupKey)`<br>`IdempotencyRecord(scope,requestId)` | `tests/integration/transaction.test.ts` | 동시 채번 30건 중복·결번 없음 확인 | DONE | B-10 통과. 원천전표 연결 유일성 제약은 STEP 7~10에서 추가 |
+| INT-12 | M | **서버 데이터 권한** — 사업부·창고·인사 권한을 모든 서버 조회·쓰기·내보내기에 적용 | — | `src/server/api/trpc.ts (permissionProcedure)` | `src/server/modules/rbac/service.ts` | `UserDivisionScope`<br>`UserWarehouseScope` | `tests/integration/rbac.test.ts` | — | IN_PROGRESS | 범위 검사·필터 구현과 시험 완료. 각 업무 조회·내보내기 적용은 해당 모듈 단계 |
 
 ## NFR — 비기능
 
@@ -180,24 +180,24 @@
 | NFR-PERF-02 | M | **저장 성능** — 일반 전표 저장 1초 이내(외부 알림 제외) | — | — | — | — | — | — | NOT_STARTED | — |
 | NFR-PERF-03 | M | **보고서 성능** — 1년 보고서 집계 5초 이내 | — | — | — | — | — | — | NOT_STARTED | — |
 | NFR-PERF-04 | M | **동시 사용자** — 확정된 동시 사용자 수에서 오류율·응답시간 충족 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-SEC-01 | M | **RBAC·데이터 범위** — 조회·등록·수정·삭제·승인 권한과 부문·창고 범위를 서버에서 강제 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-SEC-02 | M | **인사 권한 분리** — 인사 권한 분리, 본인 외 조회는 인사담당·경영진 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-SEC-03 | M | **인증·세션** — HTTPS, 안전한 해시, Secure·HttpOnly·SameSite 쿠키, 세션 만료·회전·폐기 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-SEC-04 | M | **로그인 보호** — 실패 제한, 잠금·해제, 비밀번호 초기화, 보안이벤트 감사 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-SEC-05 | M | **웹 취약점 방어** — CSRF·XSS·SQLi·권한우회 방어, 의존성 취약점 점검 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-SEC-06 | M | **민감정보 암호화** — 키·데이터 분리 암호화, 화면·로그·내보내기 마스킹 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-SEC-07 | M | **첨부 보안** — 크기·형식·권한 검증, 안전한 파일명, 비공개 저장, 만료형 URL | — | — | — | — | — | — | NOT_STARTED | — |
+| NFR-SEC-01 | M | **RBAC·데이터 범위** — 조회·등록·수정·삭제·승인 권한과 부문·창고 범위를 서버에서 강제 | — | `src/server/api/trpc.ts`<br>`src/server/api/routers/admin.ts` | `src/server/modules/rbac/permissions.ts`<br>`src/server/modules/rbac/service.ts` | `Role`<br>`Permission`<br>`RolePermission`<br>`UserRole` | `tests/integration/rbac.test.ts` | 역할별 허용·차단 라우터 호출 확인 | DONE | 8개 역할 시드, 권한 문자열 module.action |
+| NFR-SEC-02 | M | **인사 권한 분리** — 인사 권한 분리, 본인 외 조회는 인사담당·경영진 | — | — | `src/server/modules/rbac/service.ts (assertHrScope)`<br>`src/server/modules/storage/attachment.ts` | — | `tests/integration/rbac.test.ts`<br>`tests/integration/storage.test.ts` | hr.self 사용자가 타인 인사서류 접근 시 403 확인 | DONE | hr.read 없으면 본인만. 첨부도 SELF_OWNED_TYPES로 동일 규칙 적용 |
+| NFR-SEC-03 | M | **인증·세션** — HTTPS, 안전한 해시, Secure·HttpOnly·SameSite 쿠키, 세션 만료·회전·폐기 | — | `src/app/api/auth/login/route.ts`<br>`src/app/api/auth/logout/route.ts` | `src/server/core/crypto.ts`<br>`src/server/modules/auth/service.ts` | `Session`<br>`User` | `tests/unit/crypto.test.ts`<br>`tests/integration/auth.test.ts`<br>`tests/e2e/auth.spec.ts` | 쿠키 HttpOnly·SameSite=Lax, document.cookie 미노출 E2E 확인 | DONE | scrypt, 세션 토큰 해시 저장, 절대 12h·유휴 2h, 로그인 시 회전 |
+| NFR-SEC-04 | M | **로그인 보호** — 실패 제한, 잠금·해제, 비밀번호 초기화, 보안이벤트 감사 | — | `src/server/api/routers/auth.ts (unlockUser, resetPassword)` | `src/server/modules/auth/service.ts` | `LoginAttempt`<br>`SecurityEvent`<br>`User.lockedUntil` | `tests/integration/auth.test.ts` | 5회 실패 잠금 → 관리자 해제 → 정상 로그인 확인 | DONE | B-14 통과 |
+| NFR-SEC-05 | M | **웹 취약점 방어** — CSRF·XSS·SQLi·권한우회 방어, 의존성 취약점 점검 | — | `src/app/api/auth/login/route.ts` | `src/server/api/trpc.ts (csrfGuard)`<br>`next.config.ts (보안 헤더)` | — | `tests/integration/rbac.test.ts` | — | IN_PROGRESS | Origin 기반 CSRF·보안헤더·Prisma 파라미터 바인딩 적용. 의존성 취약점 점검과 XSS 전수는 STEP 13 |
+| NFR-SEC-06 | M | **민감정보 암호화** — 키·데이터 분리 암호화, 화면·로그·내보내기 마스킹 | — | — | `src/server/core/crypto.ts (AES-256-GCM)`<br>`src/server/core/redact.ts` | `EmployeeSensitive`<br>`SensitiveAccessLog` | `tests/unit/crypto.test.ts`<br>`tests/unit/redact.test.ts` | — | IN_PROGRESS | 암호화·마스킹 기반 구현. 실제 인사 민감정보 적용은 STEP 4 |
+| NFR-SEC-07 | M | **첨부 보안** — 크기·형식·권한 검증, 안전한 파일명, 비공개 저장, 만료형 URL | — | `src/server/api/routers/attachment.ts`<br>`src/app/api/files/[key]/route.ts` | `src/server/modules/storage/service.ts`<br>`src/server/modules/storage/attachment.ts` | `Attachment` | `tests/integration/storage.test.ts` | 만료된 서명 URL 거부, 확장자·매직바이트 불일치 거부 확인 | DONE | 20MB 제한, MIME 허용목록+매직바이트, 비공개 저장, 5분 만료 URL |
 | NFR-SEC-08 | M | **개인정보 파기** — 보유기간 도래 시 승인된 파기·익명화와 결과 기록 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-OPS-01 | M | **환경 분리** — 개발·스테이징·운영 환경과 데이터·비밀값 분리 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-OPS-02 | M | **CI/CD** — 컨테이너 배포, 빌드·테스트·마이그레이션 포함 CI/CD | — | — | — | — | — | — | NOT_STARTED | — |
+| NFR-OPS-01 | M | **환경 분리** — 개발·스테이징·운영 환경과 데이터·비밀값 분리 | — | — | `src/server/env.ts`<br>`.env.example` | — | `tests/unit/crypto.test.ts` | 환경변수 누락 시 부팅 실패 확인 | DONE | APP_ENV로 development/test/staging/production 분리, zod 검증 |
+| NFR-OPS-02 | M | **CI/CD** — 컨테이너 배포, 빌드·테스트·마이그레이션 포함 CI/CD | — | — | — | — | `.github/workflows/ci.yml (verify, e2e job)` | CI에서 lint/typecheck/unit/integration/build/traceability 실행 | DONE | 웹·워커 동일 이미지, 배포 시 prisma migrate deploy |
 | NFR-OPS-03 | M | **백업** — 일 1회 자동 백업, 보존주기, 암호화, 실패알림 | — | — | — | — | — | — | NOT_STARTED | — |
 | NFR-OPS-04 | M | **복구** — 복구 절차 문서화, 스테이징 복구시험 1회, RPO·RTO 기록 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-OPS-05 | M | **모니터링** — 구조화 로그·오류 추적·상태점검·용량·실패작업 모니터링 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-OPS-06 | M | **API 문서** — 내부 API를 OpenAPI 또는 동등 수준으로 문서화 | — | — | — | — | — | — | NOT_STARTED | — |
+| NFR-OPS-05 | M | **모니터링** — 구조화 로그·오류 추적·상태점검·용량·실패작업 모니터링 | — | `src/server/api/routers/admin.ts (systemHealth, outboxEvents)` | `src/server/core/logger.ts`<br>`src/app/api/health/route.ts` | — | `tests/e2e/auth.spec.ts` | — | IN_PROGRESS | 구조화 로그·상태점검·아웃박스 모니터링 구현. 오류추적 연동과 용량 모니터링은 STEP 13 |
+| NFR-OPS-06 | M | **API 문서** — 내부 API를 OpenAPI 또는 동등 수준으로 문서화 | — | `src/server/api/root.ts` | — | — | — | — | IN_PROGRESS | tRPC 라우터 구조 확립. OpenAPI 수준 명세 생성기는 STEP 13 |
 | NFR-OPS-07 | M | **브라우저 지원** — 최신 Chrome·Edge·Safari 지원 매트릭스와 핵심 흐름 검증 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-UX-01 | M | **현지화** — 한국어 UI, KRW 천단위, Asia/Seoul | — | — | — | — | — | — | NOT_STARTED | — |
+| NFR-UX-01 | M | **현지화** — 한국어 UI, KRW 천단위, Asia/Seoul | `src/app/layout.tsx`<br>`src/app/login/page.tsx` | — | `src/lib/dates.ts`<br>`src/lib/money.ts` | — | `tests/unit/dates.test.ts`<br>`tests/unit/money.test.ts` | — | IN_PROGRESS | 한국어 UI, KRW 천단위, Asia/Seoul 유틸리티. 전 화면 적용은 STEP 3/11 |
 | NFR-UX-02 | M | **학습 용이성** — 용어·오류·빈 상태 설계로 신규 사용자 입력 가능 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-UX-03 | M | **접근성** — 키보드·포커스·레이블·색상 외 상태표시 | — | — | — | — | — | — | NOT_STARTED | — |
+| NFR-UX-03 | M | **접근성** — 키보드·포커스·레이블·색상 외 상태표시 | `src/app/globals.css`<br>`src/app/login/page.tsx` | — | — | — | `tests/e2e/auth.spec.ts` | — | IN_PROGRESS | 포커스 표시·레이블·키보드 조작 확인. 전수 점검은 STEP 11 |
 
 ## MIG — 데이터 이관
 
@@ -217,16 +217,19 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| DEC-01 | D | **재고 평가** — 월 총평균법, 당월 잠정평가, 월 마감 확정·차이조정 | — | — | — | — | — | — | NOT_STARTED | — |
-| DEC-02 | D | **금액·부가세** — KRW 정수, 라인별 공급가·부가세 10% 원단위 절사 후 합산 | — | — | — | — | — | — | NOT_STARTED | — |
-| DEC-03 | D | **전표별 결재 정책** — 전표 유형·금액 구간별 결재 필수/선택/면제 | — | — | — | — | — | — | NOT_STARTED | — |
-| DEC-04 | D | **회계기간·전표일** — 달력 월 기준 마감·해제·역분개 | — | — | — | — | — | — | NOT_STARTED | — |
-| DEC-05 | D | **연차·근태** — 입사일 기준, 취업규칙·법령 반영 정책 버전 | — | — | — | — | — | — | NOT_STARTED | — |
-| DEC-06 | D | **개인정보 보유·파기** — 정보 항목별 보유기간표 | — | — | — | — | — | — | NOT_STARTED | — |
-| DEC-07 | D | **배포·인증·파일 저장** — Railway, 자체 세션, 외부 객체 저장소 | — | — | — | — | — | — | NOT_STARTED | — |
-| DEC-08 | D | **이관 범위** — 현행 데이터 전건 분석 후 원천별 매핑·기준일 | — | — | — | — | — | — | NOT_STARTED | — |
-| DEC-09 | D | **알림 채널** — 앱 내 알림·이메일 필수, 메신저 종류 확정 | — | — | — | — | — | — | NOT_STARTED | — |
+| DEC-01 | D | **재고 평가** — 월 총평균법, 당월 잠정평가, 월 마감 확정·차이조정 | — | — | — | — | `docs/acceptance-scenarios.md B-11` | — | DONE | 기본안 임시승인, PolicyVersion inventory.valuation v1 시드 |
+| DEC-02 | D | **금액·부가세** — KRW 정수, 라인별 공급가·부가세 10% 원단위 절사 후 합산 | — | — | — | — | `tests/unit/money.test.ts` | — | DONE | 기본안 임시승인, PolicyVersion money v1 시드 |
+| DEC-03 | D | **전표별 결재 정책** — 전표 유형·금액 구간별 결재 필수/선택/면제 | — | — | — | — | `prisma/seed.ts approval.matrix` | — | DONE | 기본안 임시승인, 착수회의에서 금액 구간 확정 필요 |
+| DEC-04 | D | **회계기간·전표일** — 달력 월 기준 마감·해제·역분개 | — | — | — | — | `tests/unit/dates.test.ts` | — | DONE | 기본안 임시승인 |
+| DEC-05 | D | **연차·근태** — 입사일 기준, 취업규칙·법령 반영 정책 버전 | — | — | — | — | `prisma/seed.ts leave v1` | — | DONE | 기본안 임시승인, 노무 검토 후 v2 예정 |
+| DEC-06 | D | **개인정보 보유·파기** — 정보 항목별 보유기간표 | — | — | — | — | `prisma/seed.ts retention v1` | — | DONE | 기본안 임시승인 |
+| DEC-07 | D | **배포·인증·파일 저장** — Railway, 자체 세션, 외부 객체 저장소 | — | — | — | — | `tests/integration/auth.test.ts`<br>`tests/integration/storage.test.ts` | — | DONE | Railway + 자체 세션 + S3 호환 저장소 구현 완료 |
+| DEC-08 | D | **이관 범위** — 현행 데이터 전건 분석 후 원천별 매핑·기준일 | — | — | — | — | `docs/scope.md` | — | DONE | 기본안 임시승인, 원천 파일 수령 후 매핑 확정 |
+| DEC-09 | D | **알림 채널** — 앱 내 알림·이메일 필수, 메신저 종류 확정 | — | — | — | — | `tests/integration/transaction.test.ts` | — | DONE | 앱+이메일 구현, 메신저 NONE |
 
 ## CHANGE_REQUEST
 
-(없음)
+| ID | 발견 단계 | 내용 | 관련 ID | 상태 |
+|---|---|---|---|---|
+| CR-01 | STEP 2 | 샌드박스 환경에서 Prisma 네이티브 schema-engine 다운로드가 차단되어, 동일한 migrations 산출물을 생성하는 WASM 기반 마이그레이션 드라이버(tools/migrate.mjs)를 추가했다. 운영·CI에서는 표준 prisma migrate deploy를 사용한다. | NFR-OPS-02 | IMPLEMENTED_AS_TOOLING |
+| CR-02 | STEP 2 | RFP에 명시되지 않았으나 hr.self 권한자의 본인 첨부파일 접근 규칙이 필요해 SELF_OWNED_TYPES 규칙을 정의했다. NFR-SEC-02 해석 확인 필요. | NFR-SEC-02, UIX-07, HRM-13 | OPEN |

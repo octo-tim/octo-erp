@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  DATABASE_URL: postgresql://erp:erp@localhost:5432/octo_erp
+  DATABASE_URL_TEST: postgresql://erp:erp@localhost:5432/octo_erp_test
+  SESSION_SECRET: ci-secret-value-at-least-32-bytes-long!!
+  DATA_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+  APP_ORIGIN: http://localhost:3000
+  APP_ENV: test
+  STORAGE_DRIVER: local
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erp
+          POSTGRES_PASSWORD: erp
+          POSTGRES_DB: octo_erp
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Create test database
+        run: PGPASSWORD=erp psql -h localhost -U erp -d octo_erp -c 'CREATE DATABASE octo_erp_test'
+      - run: npm run db:deploy
+      - run: npm run db:seed
+      - run: npm run traceability:check
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run test:integration
+      - run: npm run build
+      - name: Dependency vulnerabilities
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: verify
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erp
+          POSTGRES_PASSWORD: erp
+          POSTGRES_DB: octo_erp
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run db:deploy && npm run db:seed
+      - run: npm run build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

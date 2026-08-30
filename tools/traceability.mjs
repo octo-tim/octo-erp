@@ -29,31 +29,56 @@ if (dup.length) errors.push(`duplicate ids: ${dup.join(', ')}`);
 const byPrefix = {};
 for (const id of ids) {
   const m = id.match(/^([A-Z]+(?:-[A-Z]+)?)-(\d+)$/);
-  if (!m) { errors.push(`bad id format: ${id}`); continue; }
+  if (!m) {
+    errors.push(`bad id format: ${id}`);
+    continue;
+  }
   (byPrefix[m[1]] ||= []).push(Number(m[2]));
 }
 for (const [p, nums] of Object.entries(byPrefix)) {
   nums.sort((a, b) => a - b);
-  for (let i = 0; i < nums.length; i++) if (nums[i] !== i + 1) { errors.push(`gap in ${p}: expected ${p}-${String(i + 1).padStart(2, '0')}`); break; }
+  for (let i = 0; i < nums.length; i++)
+    if (nums[i] !== i + 1) {
+      errors.push(`gap in ${p}: expected ${p}-${String(i + 1).padStart(2, '0')}`);
+      break;
+    }
 }
-for (const id of Object.keys(state)) if (!ids.includes(id)) errors.push(`state has unknown id: ${id}`);
-for (const [id, s] of Object.entries(state)) {
+const entries = Object.entries(state).filter(([id]) => !id.startsWith('__'));
+for (const [id] of entries) if (!ids.includes(id)) errors.push(`state has unknown id: ${id}`);
+for (const [id, s] of entries) {
   if (!req.statuses.includes(s.status)) errors.push(`${id}: unknown status ${s.status}`);
   if (s.status === 'DONE') {
-    if (!(s.services?.length || s.api?.length || s.screens?.length || s.docs?.length)) errors.push(`${id}: DONE without implementation evidence`);
+    if (!(s.services?.length || s.api?.length || s.screens?.length || s.docs?.length))
+      errors.push(`${id}: DONE without implementation evidence`);
     if (!s.tests?.length) errors.push(`${id}: DONE without automated test evidence`);
   }
   if (s.status === 'BLOCKED' && !s.blocked) errors.push(`${id}: BLOCKED without reason/owner/targetDate`);
 }
 
 if (checkOnly) {
-  if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
+  if (errors.length) {
+    console.error(errors.join('\n'));
+    process.exit(1);
+  }
   console.log('traceability ok');
   process.exit(0);
 }
 
 const modules = [...new Set(req.requirements.map((r) => r.module))];
-const moduleNames = { BAS: '기초정보', SLS: '매출·매입·발주', INV: '재고', ACC: '회계', APV: '전자결재', HRM: '인사', RPT: '보고서', UIX: '공통 UI', INT: '공통 데이터 정합성', NFR: '비기능', MIG: '데이터 이관', DEC: '착수 시 확정 정책' };
+const moduleNames = {
+  BAS: '기초정보',
+  SLS: '매출·매입·발주',
+  INV: '재고',
+  ACC: '회계',
+  APV: '전자결재',
+  HRM: '인사',
+  RPT: '보고서',
+  UIX: '공통 UI',
+  INT: '공통 데이터 정합성',
+  NFR: '비기능',
+  MIG: '데이터 이관',
+  DEC: '착수 시 확정 정책',
+};
 const j = (a) => (a && a.length ? a.map((x) => `\`${x}\``).join('<br>') : '—');
 
 let md = `# 요구사항 추적표 (Requirements Traceability Matrix)\n\n`;
@@ -68,7 +93,9 @@ for (const m of modules) {
   const list = req.requirements.filter((r) => r.module === m);
   const M = list.filter((r) => r.priority === 'M').length;
   const O = list.filter((r) => r.priority === 'O').length;
-  tot.M += M; tot.O += O; tot.total += list.length;
+  tot.M += M;
+  tot.O += O;
+  tot.total += list.length;
   md += `| ${m} ${moduleNames[m] ?? ''} | ${M} | ${O} | ${list.length} | ${cnt(list, 'DONE')} | ${cnt(list, 'IN_PROGRESS')} | ${cnt(list, 'NOT_VERIFIED')} | ${cnt(list, 'BLOCKED')} | ${cnt(list, 'NOT_STARTED')} | ${cnt(list, 'OPTION_NOT_APPROVED')} |\n`;
 }
 md += `| **합계** | **${tot.M}** | **${tot.O}** | **${tot.total}** | ${cnt(req.requirements, 'DONE')} | ${cnt(req.requirements, 'IN_PROGRESS')} | ${cnt(req.requirements, 'NOT_VERIFIED')} | ${cnt(req.requirements, 'BLOCKED')} | ${cnt(req.requirements, 'NOT_STARTED')} | ${cnt(req.requirements, 'OPTION_NOT_APPROVED')} |\n\n`;
@@ -80,7 +107,15 @@ for (const m of modules) {
   for (const r of req.requirements.filter((x) => x.module === m)) {
     const s = state[r.id] ?? {};
     const status = s.status ?? 'NOT_STARTED';
-    const note = [s.notes, s.blocked ? `BLOCKED: ${s.blocked.reason} / 영향: ${s.blocked.impact} / 책임: ${s.blocked.owner} / 목표: ${s.blocked.targetDate}` : null, s.manualOnly ? '⚠ 수동확인만' : null].filter(Boolean).join('<br>');
+    const note = [
+      s.notes,
+      s.blocked
+        ? `BLOCKED: ${s.blocked.reason} / 영향: ${s.blocked.impact} / 책임: ${s.blocked.owner} / 목표: ${s.blocked.targetDate}`
+        : null,
+      s.manualOnly ? '⚠ 수동확인만' : null,
+    ]
+      .filter(Boolean)
+      .join('<br>');
     md += `| ${r.id} | ${r.priority} | **${r.title}** — ${r.summary} | ${j(s.screens)} | ${j(s.api)} | ${j(s.services)} | ${j(s.tables)} | ${j(s.tests)} | ${s.manual ?? '—'} | ${status} | ${note || '—'} |\n`;
   }
   md += `\n`;
@@ -88,9 +123,17 @@ for (const m of modules) {
 
 const cr = state.__changeRequests ?? [];
 md += `## CHANGE_REQUEST\n\n`;
-md += cr.length ? `| ID | 발견 단계 | 내용 | 관련 ID | 상태 |\n|---|---|---|---|---|\n` + cr.map((c) => `| ${c.id} | ${c.step} | ${c.text} | ${c.related?.join(', ') ?? ''} | ${c.status} |\n`).join('') : `(없음)\n`;
+md += cr.length
+  ? `| ID | 발견 단계 | 내용 | 관련 ID | 상태 |\n|---|---|---|---|---|\n` +
+    cr
+      .map((c) => `| ${c.id} | ${c.step} | ${c.text} | ${c.related?.join(', ') ?? ''} | ${c.status} |\n`)
+      .join('')
+  : `(없음)\n`;
 
 if (errors.length) md += `\n## 검증 경고\n\n${errors.map((e) => `- ${e}`).join('\n')}\n`;
 fs.writeFileSync(outPath, md);
 console.log(`wrote ${path.relative(root, outPath)}; ${errors.length} warning(s)`);
-if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
+if (errors.length) {
+  console.error(errors.join('\n'));
+  process.exit(1);
+}

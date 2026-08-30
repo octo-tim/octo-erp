@@ -1,0 +1,12 @@
+node_modules
+.next
+coverage
+prisma/migrations
+docs/requirements-traceability.md
+package-lock.json
+playwright-report
+test-results
+storage
+docs/**/*.md
+*.md
+docs/requirements.json
