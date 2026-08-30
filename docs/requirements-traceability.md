@@ -2,7 +2,7 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T18:03:48.224Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T19:03:02.534Z
 
 ## 집계
 
@@ -10,17 +10,17 @@
 |---|---|---|---|---|---|---|---|---|---|
 | BAS 기초정보 | 8 | 1 | 9 | 8 | 0 | 0 | 0 | 0 | 1 |
 | SLS 매출·매입·발주 | 13 | 0 | 13 | 0 | 0 | 0 | 0 | 13 | 0 |
-| INV 재고 | 9 | 1 | 10 | 0 | 0 | 0 | 0 | 9 | 1 |
+| INV 재고 | 9 | 1 | 10 | 9 | 0 | 0 | 0 | 0 | 1 |
 | ACC 회계 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | APV 전자결재 | 15 | 1 | 16 | 15 | 0 | 0 | 0 | 0 | 1 |
 | HRM 인사 | 13 | 1 | 14 | 13 | 0 | 0 | 0 | 0 | 1 |
 | RPT 보고서 | 10 | 1 | 11 | 0 | 0 | 0 | 0 | 10 | 1 |
 | UIX 공통 UI | 8 | 1 | 9 | 7 | 1 | 0 | 0 | 0 | 1 |
-| INT 공통 데이터 정합성 | 12 | 0 | 12 | 8 | 1 | 0 | 0 | 3 | 0 |
+| INT 공통 데이터 정합성 | 12 | 0 | 12 | 11 | 1 | 0 | 0 | 0 | 0 |
 | NFR 비기능 | 22 | 0 | 22 | 8 | 6 | 0 | 0 | 8 | 0 |
 | MIG 데이터 이관 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | DEC 착수 시 확정 정책 | 0 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| **합계** | **128** | **6** | **143** | 68 | 8 | 0 | 0 | 61 | 6 |
+| **합계** | **128** | **6** | **143** | 80 | 8 | 0 | 0 | 49 | 6 |
 
 기능 요구사항(BAS·SLS·INV·ACC·APV·HRM·RPT·UIX): M 85개, O 6개 (RFP 5장 선언: 필수 85 / 선택 6).
 
@@ -60,16 +60,16 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| INV-01 | M | **입고** — 매입 연동 및 사유가 있는 수동 입고 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-02 | M | **출고** — 매출 연동 및 샘플·폐기 등 사유가 있는 수동 출고 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-03 | M | **창고 이동** — 출발·도착 창고, 요청·이동중·완료·취소 상태 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-04 | M | **현재고** — 확정 시 원장 반영, 취소 시 반대 원장, 원장 합계가 진실 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-05 | M | **수불부** — 기간별 기초·입고·출고·기말과 원천전표, 엑셀 출력 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-06 | M | **마이너스 재고** — 설정에 따라 경고 또는 확정 차단, 동시 출고에서도 보장 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-07 | M | **안전재고** — 앱·이메일·확정 메신저 채널 알림과 재시도 이력 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-08 | M | **재고 실사** — 실사·차이·승인·조정전표 생성 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-09 | M | **재고 평가** — DEC-01 월 총평균가 산출, 당월 잠정평가·마감확정·차이조정 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-10 | O | **로트·유통기한** — 로트번호·유통기한·선입선출 권고 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항 |
+| INV-01 | M | **입고** — 매입 연동 및 사유가 있는 수동 입고 | `src/app/(app)/inventory/stock-in/page.tsx`<br>`src/app/(app)/inventory/documents/[id]/page.tsx`<br>`src/components/inventory/stock-document-form.tsx` | `inventory.createDocument`<br>`inventory.confirmDocument`<br>`inventory.documents`<br>`inventory.document` | `src/server/modules/inventory/stock-document.ts (create, confirm, buildLedgerRows)`<br>`src/server/modules/inventory/ledger.ts` | `StockDocument`<br>`StockDocumentLine`<br>`InventoryLedger` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 수동 입고에 사유가 강제되는지, 확정 시점에만 원장이 생성되는지 확인 | DONE | — |
+| INV-02 | M | **출고** — 매출 연동 및 샘플·폐기 등 사유가 있는 수동 출고 | `src/app/(app)/inventory/stock-out/page.tsx`<br>`src/app/(app)/inventory/documents/[id]/page.tsx` | `inventory.createDocument`<br>`inventory.confirmDocument` | `src/server/modules/inventory/stock-document.ts (ISSUE 분기)`<br>`src/server/modules/inventory/valuation.ts (provisionalCosts)` | `StockDocument`<br>`StockDocumentLine`<br>`InventoryLedger` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 샘플·폐기 사유 선택이 필수인지, 출고 단가가 입력값이 아니라 월 총평균가로 산정되는지 확인 | DONE | — |
+| INV-03 | M | **창고 이동** — 출발·도착 창고, 요청·이동중·완료·취소 상태 | `src/app/(app)/inventory/moves/page.tsx`<br>`src/app/(app)/inventory/documents/[id]/page.tsx` | `inventory.shipTransfer`<br>`inventory.confirmDocument`<br>`inventory.cancelDocument` | `src/server/modules/inventory/stock-document.ts (ship, movementTransitions, TRANSFER 원장 2행)` | `StockDocument`<br>`InventoryLedger` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 요청 상태에서는 재고가 움직이지 않고, 도착 처리 시 양쪽 창고가 동시에 바뀌는지 확인 | DONE | — |
+| INV-04 | M | **현재고** — 확정 시 원장 반영, 취소 시 반대 원장, 원장 합계가 진실 | `src/app/(app)/inventory/status/page.tsx`<br>`src/app/(app)/inventory/valuation/page.tsx` | `inventory.onHand`<br>`inventory.reconcile`<br>`inventory.rebuildSnapshot` | `src/server/modules/inventory/ledger.ts (post, reverse, reconcile, rebuild)`<br>`src/server/modules/inventory/stock-report.ts (onHand)` | `InventoryLedger`<br>`StockSnapshot` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 캐시를 고의로 훼손한 뒤 대조에서 검출되고 재생성으로 복구되는지 확인 | DONE | — |
+| INV-05 | M | **수불부** — 기간별 기초·입고·출고·기말과 원천전표, 엑셀 출력 | `src/app/(app)/inventory/ledger/page.tsx` | `inventory.book`<br>`inventory.bookCsv` | `src/server/modules/inventory/stock-report.ts (book, bookToCsv)` | `InventoryLedger`<br>`StockDocument` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 기초·기말과 원천전표 링크, 엑셀 내려받기(UTF-8 BOM)를 확인 | DONE | — |
+| INV-06 | M | **마이너스 재고** — 설정에 따라 경고 또는 확정 차단, 동시 출고에서도 보장 | `src/app/(app)/inventory/documents/[id]/page.tsx` | `inventory.confirmDocument` | `src/server/modules/inventory/ledger.ts (lockAndRead, checkNegative, negativeStockMode)`<br>`src/server/modules/inventory/stock-document.ts (postWithChecks)` | `InventoryLedger`<br>`StockSnapshot`<br>`SystemSetting (inventory.allowNegative)`<br>`SecurityEvent` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 동시 출고 경쟁시험에서 한 건만 성공하는지, 경고 모드 전환 시 SecurityEvent가 남는지 확인 | DONE | — |
+| INV-07 | M | **안전재고** — 앱·이메일·확정 메신저 채널 알림과 재시도 이력 | `src/app/(app)/inventory/status/page.tsx`<br>`src/components/ui/notification-center.tsx` | `inventory.safetyStock`<br>`inventory.onHand (belowSafetyOnly)` | `src/server/modules/inventory/safety-stock.ts`<br>`src/server/modules/notification/service.ts`<br>`src/server/modules/outbox/service.ts` | `Item.safetyStock`<br>`Notification`<br>`NotificationDelivery`<br>`OutboxEvent` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 미달 발생 시 앱·이메일 알림이 하루 1건으로 묶이는지, 재시도 이력이 남는지 확인 | DONE | — |
+| INV-08 | M | **재고 실사** — 실사·차이·승인·조정전표 생성 | `src/app/(app)/inventory/counts/page.tsx`<br>`src/app/(app)/inventory/counts/[id]/page.tsx` | `inventory.createCount`<br>`inventory.startCount`<br>`inventory.recordCount`<br>`inventory.approveCount`<br>`inventory.cancelCount`<br>`inventory.counts`<br>`inventory.count` | `src/server/modules/inventory/stock-count.ts` | `StockCount`<br>`StockCountLine`<br>`StockDocument (ADJUST)` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 실사 시작 후 발생한 이동이 차이에 영향을 주지 않는지, 미입력 품목이 승인을 막는지 확인 | DONE | — |
+| INV-09 | M | **재고 평가** — DEC-01 월 총평균가 산출, 당월 잠정평가·마감확정·차이조정 | `src/app/(app)/inventory/valuation/page.tsx` | `inventory.periods`<br>`inventory.closePreview`<br>`inventory.closePeriod`<br>`inventory.reopenPeriod` | `src/server/modules/inventory/valuation.ts (averageOf, provisionalCost, preview, close, reopen)` | `InventoryValuationPeriod`<br>`InventoryPeriodCost`<br>`InventoryLedger (VALUATION_ADJUST)`<br>`PolicyVersion` | `tests/unit/inventory-valuation.test.ts`<br>`tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | ADR-0003 승인 예시(B-11)와 동일한 잠정 15,364 / 확정 16,029 / 조정 665 / 기말 20,971이 나오는지 확인 | DONE | — |
+| INV-10 | O | **로트·유통기한** — 로트번호·유통기한·선입선출 권고 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항. 로트·유통기한은 InventoryLedger에 lotNo/expiryDate 컬럼을 추가하는 확장 지점만 남겨둠 |
 
 ## ACC — 회계
 
@@ -162,11 +162,11 @@
 | INT-01 | M | **정밀 숫자** — 금액·수량에 부동소수점 미사용, DB 정밀 숫자와 문자열 API 계약 | — | `src/server/api/schemas/common.ts`<br>`src/server/api/transformer.ts` | `src/lib/money.ts` | `Decimal(18,0) 금액 / (18,3) 수량 / (18,4) 단가` | `tests/unit/money.test.ts` | eslint no-restricted-syntax 로 parseFloat 차단 확인 | DONE | ADR-0011. API는 정밀 문자열 직렬화(superjson 미사용) |
 | INT-02 | M | **전표 상태머신** — DRAFT·PENDING_APPROVAL·CONFIRMED·CANCELED 상태와 허용 전이 | — | — | `src/server/core/state-machine.ts`<br>`src/server/modules/approval/service.ts (TRANSITIONS)` | — | `tests/unit/state-machine.test.ts`<br>`tests/integration/approval.test.ts` | 결재문서 상태 전이표 준수 확인 | DONE | 업무전표 적용은 STEP 7~10 |
 | INT-03 | M | **확정 후 수정 금지** — 확정 전표는 취소와 재작성으로 정정 | — | — | `src/server/core/state-machine.ts (assertMutable)`<br>`src/server/modules/approval/service.ts (resubmit 차단)` | — | `tests/unit/state-machine.test.ts`<br>`tests/integration/approval.test.ts` | B-07 완료문서 수정 차단 확인 | DONE | — |
-| INT-04 | M | **원장이 진실** — 재고는 원장 합계, 회계는 분개 원장, 캐시는 재생성 가능 | — | — | — | — | — | — | NOT_STARTED | — |
+| INT-04 | M | **원장이 진실** — 재고는 원장 합계, 회계는 분개 원장, 캐시는 재생성 가능 | `src/app/(app)/inventory/status/page.tsx`<br>`src/app/(app)/inventory/valuation/page.tsx` | `inventory.onHand`<br>`inventory.reconcile`<br>`inventory.rebuildSnapshot` | `src/server/modules/inventory/ledger.ts (balances, reconcile, rebuild)`<br>`src/server/modules/inventory/stock-report.ts` | `InventoryLedger`<br>`StockSnapshot` | `tests/integration/inventory.test.ts` | 캐시를 훼손한 뒤 대조가 검출하고 재생성이 원장과 일치시키는지 확인 | DONE | 회계 분개 원장은 STEP 8에서 같은 방식으로 추가한다 |
 | INT-05 | M | **멱등성** — 승인·확정·취소·수금배분 재실행 시 중복 결과 없음 | — | — | `src/server/core/idempotency.ts` | `IdempotencyRecord(scope,requestId) UNIQUE` | `tests/integration/transaction.test.ts` | 동일 requestId 재호출·동시호출 시 부작용 1건 확인 | DONE | ADR-0012. B-03 통과 |
 | INT-06 | M | **단일 트랜잭션 확정** — 재고·채권채무·회계·감사기록이 하나의 DB 트랜잭션 공유 | — | — | `src/server/core/context.ts (withTransaction)`<br>`src/server/modules/approval/service.ts (approve)` | — | `tests/integration/transaction.test.ts`<br>`tests/integration/approval.test.ts` | B-08 장애주입 시 결재·원장·근태·알림 전체 롤백 확인 | DONE | 전표 확정 결합은 STEP 10에서 확장 |
-| INT-07 | M | **취소 원복** — 재고 반대원장·채권채무 원복·회계 역분개를 동일 트랜잭션, 원장행 미삭제 | — | — | — | — | — | — | NOT_STARTED | — |
-| INT-08 | M | **동시 출고 잠금** — 품목·창고별 일관된 잠금 순서로 마이너스 재고 방지 | — | — | — | — | — | — | NOT_STARTED | — |
+| INT-07 | M | **취소 원복** — 재고 반대원장·채권채무 원복·회계 역분개를 동일 트랜잭션, 원장행 미삭제 | `src/app/(app)/inventory/documents/[id]/page.tsx` | `inventory.cancelDocument` | `src/server/modules/inventory/ledger.ts (reverse, sourceVersion)`<br>`src/server/modules/inventory/stock-document.ts (cancel)` | `InventoryLedger`<br>`prisma/migrations/20260830181000_inventory_ledger_guard` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 취소 후 원래 행이 남아 있고 반대 행이 추가되는지, 원장 UPDATE가 트리거로 거부되는지 확인 | DONE | 채권채무 원복·회계 역분개는 STEP 8·9에서 같은 트랜잭션에 추가한다 |
+| INT-08 | M | **동시 출고 잠금** — 품목·창고별 일관된 잠금 순서로 마이너스 재고 방지 | — | `inventory.confirmDocument` | `src/server/modules/inventory/ledger.ts (lockAndRead - itemId·warehouseId 정렬 잠금)` | `StockSnapshot (FOR UPDATE 잠금 대상)`<br>`InventoryLedger` | `tests/integration/inventory.test.ts` | 동시 출고 반복 경쟁시험에서 재고가 음수로 내려가지 않는지 확인 | DONE | — |
 | INT-09 | M | **감사 기록** — actor·action·entity·before·after·시각·IP·요청ID, 민감정보 제거 | — | `src/server/api/routers/admin.ts (auditLog)` | `src/server/modules/audit/service.ts`<br>`src/server/core/redact.ts` | `AuditLog`<br>`SecurityEvent` | `tests/unit/redact.test.ts`<br>`tests/integration/transaction.test.ts`<br>`tests/integration/auth.test.ts` | 감사로그·보안이벤트에 비밀번호·주민번호·계좌 원문 없음 확인 | DONE | 업무 변경과 같은 트랜잭션 기록, 롤백 시 함께 사라짐 |
 | INT-10 | M | **아웃박스** — 외부 이메일·메신저 부작용은 트랜잭셔널 아웃박스 | — | `src/server/api/routers/admin.ts (outboxEvents, retryOutbox)` | `src/server/modules/outbox/service.ts`<br>`src/server/jobs/worker.ts`<br>`src/server/jobs/handlers/email.ts` | `OutboxEvent`<br>`NotificationDelivery` | `tests/integration/transaction.test.ts` | SMTP 미설정 시 로그만 남고 아웃박스가 비워지는지 확인 | DONE | ADR-0010/0012. FOR UPDATE SKIP LOCKED, 백오프 5회 후 FAILED + 관리자 알림 |
 | INT-11 | M | **유일성 제약** — 문서번호·원천문서 연결·외부 요청ID에 DB 유일성 제약 | — | — | `src/server/modules/numbering/service.ts`<br>`src/server/modules/outbox/service.ts` | `NumberingCounter(ruleId,periodKey)`<br>`OutboxEvent(topic,dedupKey)`<br>`IdempotencyRecord(scope,requestId)` | `tests/integration/transaction.test.ts` | 동시 채번 30건 중복·결번 없음 확인 | DONE | B-10 통과. 원천전표 연결 유일성 제약은 STEP 7~10에서 추가 |
@@ -219,7 +219,7 @@
 |---|---|---|---|---|---|---|---|---|---|---|
 | DEC-01 | D | **재고 평가** — 월 총평균법, 당월 잠정평가, 월 마감 확정·차이조정 | — | — | — | — | `docs/acceptance-scenarios.md B-11` | — | DONE | 기본안 임시승인, PolicyVersion inventory.valuation v1 시드 |
 | DEC-02 | D | **금액·부가세** — KRW 정수, 라인별 공급가·부가세 10% 원단위 절사 후 합산 | — | — | — | — | `tests/unit/money.test.ts` | — | DONE | 기본안 임시승인, PolicyVersion money v1 시드 |
-| DEC-03 | D | **전표별 결재 정책** — 전표 유형·금액 구간별 결재 필수/선택/면제 | — | — | — | — | `prisma/seed.ts approval.matrix` | — | DONE | 기본안 임시승인, 착수회의에서 금액 구간 확정 필요 |
+| DEC-03 | D | **전표별 결재 정책** — 전표 유형·금액 구간별 결재 필수/선택/면제 | `src/app/(app)/inventory/documents/[id]/page.tsx` | `inventory.confirmDocument` | `src/server/modules/approval/matrix.ts`<br>`src/server/modules/inventory/stock-document.ts (confirm 게이트)` | `PolicyVersion (approval.matrix)` | `tests/integration/inventory.test.ts` | STOCK_OUT 1,000,000원 이상 전표가 직접 확정되지 않고 결재를 요구하는지 확인 | DONE | — |
 | DEC-04 | D | **회계기간·전표일** — 달력 월 기준 마감·해제·역분개 | — | — | — | — | `tests/unit/dates.test.ts` | — | DONE | 기본안 임시승인 |
 | DEC-05 | D | **연차·근태** — 입사일 기준, 취업규칙·법령 반영 정책 버전 | — | — | — | — | `prisma/seed.ts leave v1` | — | DONE | 기본안 임시승인, 노무 검토 후 v2 예정 |
 | DEC-06 | D | **개인정보 보유·파기** — 정보 항목별 보유기간표 | — | — | — | — | `prisma/seed.ts retention v1` | — | DONE | 기본안 임시승인 |
@@ -237,3 +237,6 @@
 | CR-04 | STEP 5 | 금액 컬럼이 빈 값일 때 표시 포맷터가 예외를 던져 화면이 깨지는 결함을 발견해 수정했다(fmt.krw/qty가 공백을 허용). 선택 금액 항목이 있는 모든 화면에 영향. | UIX-03, INT-01 | FIXED |
 | CR-05 | STEP 5 | 필수 표시(*)가 라벨 텍스트에 포함되어 접근성 이름과 자동화 선택자를 오염시켰다. CSS ::after로 옮기고 컨트롤에 aria-required를 부여했다. | NFR-UX-03, UIX-05 | FIXED |
 | CR-06 | STEP 6 | 마스터 상세 화면에서 수정·사용중지 후 변경 이력 카드가 갱신되지 않아 방금 한 변경이 보이지 않는 결함을 E2E로 발견했다. 개별 쿼리 refetch 대신 master 라우터 전체를 무효화하도록 바꿔 이후 마스터 화면에서 같은 유형의 결함이 재발하지 않도록 했다. | BAS-08, UIX-03 | FIXED |
+| CR-07 | STEP 7 | 알림 dedupKey가 아웃박스(이메일)에만 적용되고 인앱 알림 행은 매번 생성되어, 같은 품목의 안전재고 미달 알림이 출고 건마다 쌓이는 결함을 발견했다. Notification에 dedupKey와 (userId, dedupKey) 유일 제약을 추가해 알림센터에도 동일 규칙을 적용했다. 재고뿐 아니라 모든 알림 유형에 해당된다. | INV-07, UIX-08, DEC-09 | FIXED |
+| CR-08 | STEP 7 | 입출고 화면에서 조회조건의 종료일과 등록 폼의 입고 창고가 같은 DOM id(sd-to)를 사용해, label이 엉뚱한 컨트롤을 가리키는 접근성 결함을 E2E로 발견했다. 조회조건 id를 분리하고, 같은 유형이 재발하지 않도록 주요 화면 전체를 훑는 중복 id·미연결 label 점검 시험(tests/e2e/dom-integrity.spec.ts)을 추가했다. | UIX-02, UIX-05, NFR-UX-03 | FIXED |
+| CR-09 | STEP 7 | 전표 라인 편집기의 자동완성 datalist가 선택 시 셀에 내부 id(cuid)를 넣어, 사용자가 알아볼 수 없는 값이 표시되는 문제를 발견했다. 표시 라벨을 option 값으로 바꾸고, 이름만 입력해도 유일하게 일치하면 품목을 인식하도록 했다. | UIX-04, INV-01, INV-02 | FIXED |

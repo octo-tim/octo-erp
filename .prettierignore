@@ -10,3 +10,4 @@ storage
 docs/**/*.md
 *.md
 docs/requirements.json
+docs/traceability-state.json

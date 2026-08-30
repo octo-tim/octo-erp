@@ -5,7 +5,8 @@ import { Card, EmptyState, Spinner } from './primitives';
 import { fmt } from '@/lib/format';
 
 /** BAS-08: who changed what and when, read straight from the audit log. */
-type EntityType = 'Item' | 'Partner' | 'Warehouse' | 'Division' | 'CommonCode';
+type EntityType =
+  'Item' | 'Partner' | 'Warehouse' | 'Division' | 'CommonCode' | 'StockDocument' | 'StockCount';
 
 const ACTION_LABEL: Record<string, string> = {
   'item.create': '등록',
@@ -21,6 +22,15 @@ const ACTION_LABEL: Record<string, string> = {
   'warehouse.update': '수정',
   'division.create': '등록',
   'division.update': '수정',
+  'stock.create': '등록',
+  'stock.update': '수정',
+  'stock.confirm': '확정',
+  'stock.cancel': '취소',
+  'stock.ship': '출발',
+  'stockCount.create': '등록',
+  'stockCount.start': '실사 시작',
+  'stockCount.approve': '승인',
+  'stockCount.cancel': '취소',
 };
 
 function diff(before: unknown, after: unknown): { field: string; from: string; to: string }[] {
@@ -45,6 +55,10 @@ const FIELD_LABEL: Record<string, string> = {
   creditLimit: '여신한도',
   isActive: '사용여부',
   type: '유형',
+  status: '상태',
+  movementState: '이동상태',
+  totalQuantity: '수량',
+  docDate: '일자',
 };
 
 export function ChangeHistory({ entityType, entityId }: { entityType: EntityType; entityId: string }) {

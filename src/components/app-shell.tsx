@@ -67,6 +67,7 @@ export const NAV: NavGroup[] = [
       { href: '/inventory/status', label: '재고현황', permission: 'inventory.read', mobile: true },
       { href: '/inventory/ledger', label: '수불부', permission: 'inventory.read' },
       { href: '/inventory/counts', label: '실사', permission: 'inventory.count' },
+      { href: '/inventory/valuation', label: '재고평가·마감', permission: 'inventory.valuation' },
     ],
   },
   {

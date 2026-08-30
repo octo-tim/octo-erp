@@ -47,6 +47,7 @@ model Division {
   updatedAt DateTime @updatedAt
 
   userScopes UserDivisionScope[]
+  stockDocuments StockDocument[]
 }
 
 model Employee {
@@ -271,10 +272,17 @@ model Notification {
   body       String?
   linkUrl    String?
   readAt     DateTime?
+  /**
+   * UIX-08: collapses repeats of the same alert for one user. Callers scope it by whatever
+   * makes a repeat uninteresting - INV-07 uses item + business date, so a day of issues on
+   * one item produces one row, not one per movement.
+   */
+  dedupKey   String?
   createdAt  DateTime  @default(now())
 
   deliveries NotificationDelivery[]
 
+  @@unique([userId, dedupKey])
   @@index([userId, readAt, createdAt])
 }
 
@@ -379,6 +387,11 @@ model Warehouse {
   updatedAt  DateTime @updatedAt
 
   userScopes UserWarehouseScope[]
+  stockFrom  StockDocument[] @relation("StockFrom")
+  stockTo    StockDocument[] @relation("StockTo")
+  ledger     InventoryLedger[]
+  snapshots  StockSnapshot[]
+  counts     StockCount[]
 }
 
 // ───────────────────────── HRM (STEP 4) ─────────────────────────
@@ -838,6 +851,12 @@ model Item {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  stockLines  StockDocumentLine[]
+  ledger      InventoryLedger[]
+  snapshots   StockSnapshot[]
+  countLines  StockCountLine[]
+  periodCosts InventoryPeriodCost[]
+
   @@index([name])
   @@index([categoryId])
   @@index([isActive])
@@ -866,6 +885,7 @@ model Partner {
 
   contacts     PartnerContact[]
   defaultForItems Item[] @relation("DefaultSupplier")
+  stockDocuments  StockDocument[]
 
   @@index([name])
   @@index([businessNo])
@@ -919,4 +939,214 @@ model ImportBatch {
   appliedAt     DateTime?
 
   @@index([targetType, createdAt])
+}
+
+// ───────────────────────── Inventory (INV) — STEP 7 ─────────────────────────
+
+/**
+ * INV-01/02/03: one document shape carries receipts, issues and transfers.
+ * A transfer is the only kind with both warehouses set, and the only kind that
+ * moves through the IN_TRANSIT state (INV-03).
+ */
+model StockDocument {
+  id            String   @id @default(cuid())
+  docNo         String   @unique
+  /** RECEIPT | ISSUE | TRANSFER | ADJUST */
+  docType       String
+  /** business date: the day the movement belongs to, which drives period close (DEC-04) */
+  docDate       DateTime @db.Date
+  /** DRAFT | PENDING_APPROVAL | CONFIRMED | CANCELED, plus IN_TRANSIT for transfers */
+  status        String   @default("DRAFT")
+  /** INV-03: REQUESTED | IN_TRANSIT | COMPLETED | CANCELED, null for non-transfers */
+  movementState String?
+  fromWarehouseId String?
+  fromWarehouse   Warehouse? @relation("StockFrom", fields: [fromWarehouseId], references: [id])
+  toWarehouseId   String?
+  toWarehouse     Warehouse? @relation("StockTo", fields: [toWarehouseId], references: [id])
+  partnerId     String?
+  partner       Partner? @relation(fields: [partnerId], references: [id])
+  /** INV-01/02: a manual receipt or issue must say why (common code STOCK_REASON_IN/OUT) */
+  reasonCode    String?
+  /** the sales/purchase document this movement was generated from, when not manual */
+  sourceType    String?
+  sourceId      String?
+  divisionId    String?
+  division      Division? @relation(fields: [divisionId], references: [id])
+  note          String?
+  totalQuantity Decimal  @default(0) @db.Decimal(18, 3)
+  totalAmount   Decimal  @default(0) @db.Decimal(18, 0)
+  version       Int      @default(1)
+  confirmedAt   DateTime?
+  confirmedById String?
+  canceledAt    DateTime?
+  canceledById  String?
+  cancelReason  String?
+  /** INV-08: the count this adjustment document was generated from */
+  stockCountId  String?  @unique
+  stockCount    StockCount? @relation(fields: [stockCountId], references: [id])
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lines StockDocumentLine[]
+
+  @@index([docType, status, docDate])
+  @@index([docDate])
+  @@index([sourceType, sourceId])
+}
+
+model StockDocumentLine {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    StockDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  lineNo      Int
+  itemId      String
+  item        Item     @relation(fields: [itemId], references: [id])
+  quantity    Decimal  @db.Decimal(18, 3)
+  /** receipts carry the acquisition cost; issues are valued by the DEC-01 policy at confirm time */
+  unitCost    Decimal? @db.Decimal(18, 4)
+  amount      Decimal  @default(0) @db.Decimal(18, 0)
+  note        String?
+
+  @@unique([documentId, lineNo])
+  @@index([itemId])
+}
+
+/**
+ * INV-04: the ledger is the single source of truth for stock on hand. Rows are
+ * append-only - a cancellation writes an opposite row rather than deleting.
+ * INT-04/INT-07.
+ */
+model InventoryLedger {
+  id            String   @id @default(cuid())
+  /** STOCK_DOCUMENT | SALES | PURCHASE | OPENING | VALUATION_ADJUST */
+  sourceType    String
+  sourceId      String
+  sourceLineId  String?
+  /** monotonically increasing per source, so a cancel row never collides with its original */
+  sourceVersion Int      @default(1)
+  itemId        String
+  item          Item     @relation(fields: [itemId], references: [id])
+  warehouseId   String
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
+  /** signed: positive is inbound, negative is outbound */
+  quantity      Decimal  @db.Decimal(18, 3)
+  unitCost      Decimal? @db.Decimal(18, 4)
+  amount        Decimal  @default(0) @db.Decimal(18, 0)
+  reason        String?
+  /** the business day this movement belongs to, used by every period query */
+  occurredAt    DateTime
+  /** INV-09: set when a month close has already valued this row */
+  valuationPeriod String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  /** INT-05: the same source line can never produce two ledger rows for one version */
+  @@unique([sourceType, sourceId, sourceLineId, sourceVersion])
+  @@index([itemId, warehouseId, occurredAt])
+  @@index([warehouseId, occurredAt])
+  @@index([occurredAt])
+  @@index([valuationPeriod])
+}
+
+/**
+ * INV-04: a read cache over the ledger. Never authoritative - `rebuild` recreates
+ * every row from InventoryLedger and `reconcile` reports drift.
+ */
+model StockSnapshot {
+  id           String   @id @default(cuid())
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id])
+  warehouseId  String
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  quantity     Decimal  @default(0) @db.Decimal(18, 3)
+  amount       Decimal  @default(0) @db.Decimal(18, 0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([itemId, warehouseId])
+  @@index([warehouseId])
+}
+
+/** INV-08: a physical count, its differences, and the adjustment it produces. */
+model StockCount {
+  id           String   @id @default(cuid())
+  countNo      String   @unique
+  warehouseId  String
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  countDate    DateTime @db.Date
+  /** DRAFT | COUNTING | PENDING_APPROVAL | APPROVED | CANCELED */
+  status       String   @default("DRAFT")
+  /** the ledger position frozen when counting started, so later movements do not distort the difference */
+  frozenAt     DateTime?
+  note         String?
+  version      Int      @default(1)
+  approvedAt   DateTime?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lines      StockCountLine[]
+  adjustment StockDocument?
+
+  @@index([warehouseId, countDate])
+}
+
+model StockCountLine {
+  id           String   @id @default(cuid())
+  countId      String
+  count        StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id])
+  /** what the ledger said when the count was frozen */
+  systemQty    Decimal  @db.Decimal(18, 3)
+  /** what was actually on the shelf; null until counted */
+  countedQty   Decimal? @db.Decimal(18, 3)
+  reason       String?
+
+  @@unique([countId, itemId])
+  @@index([itemId])
+}
+
+/** INV-09 / DEC-01: monthly total-average valuation, provisional until the month closes. */
+model InventoryValuationPeriod {
+  id           String   @id @default(cuid())
+  /** YYYY-MM */
+  period       String   @unique
+  /** OPEN | CLOSED */
+  status       String   @default("OPEN")
+  policyVersionId String?
+  closedAt     DateTime?
+  closedById   String?
+  reopenedAt   DateTime?
+  reopenReason String?
+  createdAt    DateTime @default(now())
+
+  costs InventoryPeriodCost[]
+}
+
+/** the confirmed month-end average per item, and the closing position it implies. */
+model InventoryPeriodCost {
+  id           String   @id @default(cuid())
+  periodId     String
+  period       InventoryValuationPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id])
+  openingQty   Decimal  @db.Decimal(18, 3)
+  openingAmount Decimal @db.Decimal(18, 0)
+  inQty        Decimal  @db.Decimal(18, 3)
+  inAmount     Decimal  @db.Decimal(18, 0)
+  outQty       Decimal  @db.Decimal(18, 3)
+  /** what the issues were provisionally valued at during the month */
+  provisionalOutAmount Decimal @db.Decimal(18, 0)
+  /** the confirmed month total average unit cost */
+  averageCost  Decimal  @db.Decimal(18, 4)
+  /** outQty x averageCost, truncated to KRW */
+  finalOutAmount Decimal @db.Decimal(18, 0)
+  /** finalOutAmount - provisionalOutAmount, posted as a VALUATION_ADJUST ledger row */
+  adjustment   Decimal  @db.Decimal(18, 0)
+  closingQty   Decimal  @db.Decimal(18, 3)
+  closingAmount Decimal @db.Decimal(18, 0)
+
+  @@unique([periodId, itemId])
+  @@index([itemId])
 }

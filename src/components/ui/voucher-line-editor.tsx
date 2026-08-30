@@ -215,12 +215,14 @@ export function VoucherLineEditor<L extends Record<string, string>>({
                               col.kind !== 'text' && 'tabular text-right',
                             )}
                           />
+                          {/* The label is the option's value: picking a suggestion must
+                              leave a readable name in the cell, never an internal id. The
+                              caller maps the chosen label back to its id on submit, so
+                              labels handed to `suggestions` have to be unique. */}
                           {col.suggestions ? (
                             <datalist id={listId}>
                               {col.suggestions.map((s) => (
-                                <option key={s.value} value={s.value}>
-                                  {s.label}
-                                </option>
+                                <option key={s.value} value={s.label} />
                               ))}
                             </datalist>
                           ) : null}

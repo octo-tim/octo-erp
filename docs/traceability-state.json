@@ -470,13 +470,23 @@
   },
   "DEC-03": {
     "status": "DONE",
-    "docs": [
-      "docs/adr/0005-approval-policy-matrix.md"
+    "services": [
+      "src/server/modules/approval/matrix.ts",
+      "src/server/modules/inventory/stock-document.ts (confirm 게이트)"
+    ],
+    "api": [
+      "inventory.confirmDocument"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/documents/[id]/page.tsx"
+    ],
+    "tables": [
+      "PolicyVersion (approval.matrix)"
     ],
     "tests": [
-      "prisma/seed.ts approval.matrix"
+      "tests/integration/inventory.test.ts"
     ],
-    "notes": "기본안 임시승인, 착수회의에서 금액 구간 확정 필요"
+    "manual": "STOCK_OUT 1,000,000원 이상 전표가 직접 확정되지 않고 결재를 요구하는지 확인"
   },
   "DEC-04": {
     "status": "DONE",
@@ -594,7 +604,7 @@
   },
   "INV-10": {
     "status": "OPTION_NOT_APPROVED",
-    "notes": "선택 요구사항"
+    "notes": "선택 요구사항. 로트·유통기한은 InventoryLedger에 lotNo/expiryDate 컬럼을 추가하는 확장 지점만 남겨둠"
   },
   "APV-16": {
     "status": "OPTION_NOT_APPROVED",
@@ -1222,6 +1232,39 @@
         "UIX-03"
       ],
       "status": "FIXED"
+    },
+    {
+      "id": "CR-07",
+      "step": "STEP 7",
+      "text": "알림 dedupKey가 아웃박스(이메일)에만 적용되고 인앱 알림 행은 매번 생성되어, 같은 품목의 안전재고 미달 알림이 출고 건마다 쌓이는 결함을 발견했다. Notification에 dedupKey와 (userId, dedupKey) 유일 제약을 추가해 알림센터에도 동일 규칙을 적용했다. 재고뿐 아니라 모든 알림 유형에 해당된다.",
+      "related": [
+        "INV-07",
+        "UIX-08",
+        "DEC-09"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-08",
+      "step": "STEP 7",
+      "text": "입출고 화면에서 조회조건의 종료일과 등록 폼의 입고 창고가 같은 DOM id(sd-to)를 사용해, label이 엉뚱한 컨트롤을 가리키는 접근성 결함을 E2E로 발견했다. 조회조건 id를 분리하고, 같은 유형이 재발하지 않도록 주요 화면 전체를 훑는 중복 id·미연결 label 점검 시험(tests/e2e/dom-integrity.spec.ts)을 추가했다.",
+      "related": [
+        "UIX-02",
+        "UIX-05",
+        "NFR-UX-03"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-09",
+      "step": "STEP 7",
+      "text": "전표 라인 편집기의 자동완성 datalist가 선택 시 셀에 내부 id(cuid)를 넣어, 사용자가 알아볼 수 없는 값이 표시되는 문제를 발견했다. 표시 라벨을 option 값으로 바꾸고, 이름만 입력해도 유일하게 일치하면 품목을 인식하도록 했다.",
+      "related": [
+        "UIX-04",
+        "INV-01",
+        "INV-02"
+      ],
+      "status": "FIXED"
     }
   ],
   "BAS-01": {
@@ -1414,5 +1457,301 @@
       "tests/e2e/master.spec.ts"
     ],
     "manual": "사용 이력이 있는 마스터는 삭제 버튼이 비활성화되고 사용중지만 가능한지 확인"
+  },
+  "INV-01": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/stock-document.ts (create, confirm, buildLedgerRows)",
+      "src/server/modules/inventory/ledger.ts"
+    ],
+    "api": [
+      "inventory.createDocument",
+      "inventory.confirmDocument",
+      "inventory.documents",
+      "inventory.document"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/stock-in/page.tsx",
+      "src/app/(app)/inventory/documents/[id]/page.tsx",
+      "src/components/inventory/stock-document-form.tsx"
+    ],
+    "tables": [
+      "StockDocument",
+      "StockDocumentLine",
+      "InventoryLedger"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "수동 입고에 사유가 강제되는지, 확정 시점에만 원장이 생성되는지 확인"
+  },
+  "INV-02": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/stock-document.ts (ISSUE 분기)",
+      "src/server/modules/inventory/valuation.ts (provisionalCosts)"
+    ],
+    "api": [
+      "inventory.createDocument",
+      "inventory.confirmDocument"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/stock-out/page.tsx",
+      "src/app/(app)/inventory/documents/[id]/page.tsx"
+    ],
+    "tables": [
+      "StockDocument",
+      "StockDocumentLine",
+      "InventoryLedger"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "샘플·폐기 사유 선택이 필수인지, 출고 단가가 입력값이 아니라 월 총평균가로 산정되는지 확인"
+  },
+  "INV-03": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/stock-document.ts (ship, movementTransitions, TRANSFER 원장 2행)"
+    ],
+    "api": [
+      "inventory.shipTransfer",
+      "inventory.confirmDocument",
+      "inventory.cancelDocument"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/moves/page.tsx",
+      "src/app/(app)/inventory/documents/[id]/page.tsx"
+    ],
+    "tables": [
+      "StockDocument",
+      "InventoryLedger"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "요청 상태에서는 재고가 움직이지 않고, 도착 처리 시 양쪽 창고가 동시에 바뀌는지 확인"
+  },
+  "INV-04": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/ledger.ts (post, reverse, reconcile, rebuild)",
+      "src/server/modules/inventory/stock-report.ts (onHand)"
+    ],
+    "api": [
+      "inventory.onHand",
+      "inventory.reconcile",
+      "inventory.rebuildSnapshot"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/status/page.tsx",
+      "src/app/(app)/inventory/valuation/page.tsx"
+    ],
+    "tables": [
+      "InventoryLedger",
+      "StockSnapshot"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "캐시를 고의로 훼손한 뒤 대조에서 검출되고 재생성으로 복구되는지 확인"
+  },
+  "INV-05": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/stock-report.ts (book, bookToCsv)"
+    ],
+    "api": [
+      "inventory.book",
+      "inventory.bookCsv"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/ledger/page.tsx"
+    ],
+    "tables": [
+      "InventoryLedger",
+      "StockDocument"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "기초·기말과 원천전표 링크, 엑셀 내려받기(UTF-8 BOM)를 확인"
+  },
+  "INV-06": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/ledger.ts (lockAndRead, checkNegative, negativeStockMode)",
+      "src/server/modules/inventory/stock-document.ts (postWithChecks)"
+    ],
+    "api": [
+      "inventory.confirmDocument"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/documents/[id]/page.tsx"
+    ],
+    "tables": [
+      "InventoryLedger",
+      "StockSnapshot",
+      "SystemSetting (inventory.allowNegative)",
+      "SecurityEvent"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "동시 출고 경쟁시험에서 한 건만 성공하는지, 경고 모드 전환 시 SecurityEvent가 남는지 확인"
+  },
+  "INV-07": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/safety-stock.ts",
+      "src/server/modules/notification/service.ts",
+      "src/server/modules/outbox/service.ts"
+    ],
+    "api": [
+      "inventory.safetyStock",
+      "inventory.onHand (belowSafetyOnly)"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/status/page.tsx",
+      "src/components/ui/notification-center.tsx"
+    ],
+    "tables": [
+      "Item.safetyStock",
+      "Notification",
+      "NotificationDelivery",
+      "OutboxEvent"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "미달 발생 시 앱·이메일 알림이 하루 1건으로 묶이는지, 재시도 이력이 남는지 확인"
+  },
+  "INV-08": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/stock-count.ts"
+    ],
+    "api": [
+      "inventory.createCount",
+      "inventory.startCount",
+      "inventory.recordCount",
+      "inventory.approveCount",
+      "inventory.cancelCount",
+      "inventory.counts",
+      "inventory.count"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/counts/page.tsx",
+      "src/app/(app)/inventory/counts/[id]/page.tsx"
+    ],
+    "tables": [
+      "StockCount",
+      "StockCountLine",
+      "StockDocument (ADJUST)"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "실사 시작 후 발생한 이동이 차이에 영향을 주지 않는지, 미입력 품목이 승인을 막는지 확인"
+  },
+  "INV-09": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/valuation.ts (averageOf, provisionalCost, preview, close, reopen)"
+    ],
+    "api": [
+      "inventory.periods",
+      "inventory.closePreview",
+      "inventory.closePeriod",
+      "inventory.reopenPeriod"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/valuation/page.tsx"
+    ],
+    "tables": [
+      "InventoryValuationPeriod",
+      "InventoryPeriodCost",
+      "InventoryLedger (VALUATION_ADJUST)",
+      "PolicyVersion"
+    ],
+    "tests": [
+      "tests/unit/inventory-valuation.test.ts",
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "ADR-0003 승인 예시(B-11)와 동일한 잠정 15,364 / 확정 16,029 / 조정 665 / 기말 20,971이 나오는지 확인"
+  },
+  "INT-04": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/ledger.ts (balances, reconcile, rebuild)",
+      "src/server/modules/inventory/stock-report.ts"
+    ],
+    "api": [
+      "inventory.onHand",
+      "inventory.reconcile",
+      "inventory.rebuildSnapshot"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/status/page.tsx",
+      "src/app/(app)/inventory/valuation/page.tsx"
+    ],
+    "tables": [
+      "InventoryLedger",
+      "StockSnapshot"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts"
+    ],
+    "manual": "캐시를 훼손한 뒤 대조가 검출하고 재생성이 원장과 일치시키는지 확인",
+    "notes": "회계 분개 원장은 STEP 8에서 같은 방식으로 추가한다"
+  },
+  "INT-07": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/ledger.ts (reverse, sourceVersion)",
+      "src/server/modules/inventory/stock-document.ts (cancel)"
+    ],
+    "api": [
+      "inventory.cancelDocument"
+    ],
+    "screens": [
+      "src/app/(app)/inventory/documents/[id]/page.tsx"
+    ],
+    "tables": [
+      "InventoryLedger",
+      "prisma/migrations/20260830181000_inventory_ledger_guard"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts",
+      "tests/e2e/inventory.spec.ts"
+    ],
+    "manual": "취소 후 원래 행이 남아 있고 반대 행이 추가되는지, 원장 UPDATE가 트리거로 거부되는지 확인",
+    "notes": "채권채무 원복·회계 역분개는 STEP 8·9에서 같은 트랜잭션에 추가한다"
+  },
+  "INT-08": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/inventory/ledger.ts (lockAndRead - itemId·warehouseId 정렬 잠금)"
+    ],
+    "api": [
+      "inventory.confirmDocument"
+    ],
+    "tables": [
+      "StockSnapshot (FOR UPDATE 잠금 대상)",
+      "InventoryLedger"
+    ],
+    "tests": [
+      "tests/integration/inventory.test.ts"
+    ],
+    "manual": "동시 출고 반복 경쟁시험에서 재고가 음수로 내려가지 않는지 확인"
   }
 }

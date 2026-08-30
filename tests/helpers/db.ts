@@ -31,7 +31,9 @@ export async function truncateBusinessData(): Promise<void> {
       "LoginAttempt", "Session",
       "LeaveUsage", "LeaveGrant", "LeaveRequest", "AttendanceCorrectionRequest", "Attendance",
       "EmployeeChangeRequest", "CertificateIssue", "EmployeeDocument", "Assignment",
-      "DepartmentHistory", "EmployeeSensitive"
+      "DepartmentHistory", "EmployeeSensitive",
+      "InventoryPeriodCost", "InventoryValuationPeriod", "StockCountLine", "StockCount",
+      "StockDocumentLine", "StockDocument", "InventoryLedger", "StockSnapshot"
     RESTART IDENTITY CASCADE`);
   // Employee cannot be truncated with CASCADE without wiping the seeded users that
   // reference it, so detach and delete instead.

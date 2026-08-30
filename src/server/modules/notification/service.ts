@@ -24,6 +24,15 @@ export async function notify(ctx: TransactionContext, input: NotifyInput): Promi
   });
 
   for (const user of users) {
+    // UIX-08: a dedupKey means "one row per user per key". Without this the in-app centre
+    // fills with identical alerts while only the email side is deduplicated.
+    if (input.dedupKey) {
+      const existing = await ctx.tx.notification.findUnique({
+        where: { userId_dedupKey: { userId: user.id, dedupKey: input.dedupKey } },
+      });
+      if (existing) continue;
+    }
+
     const notification = await ctx.tx.notification.create({
       data: {
         userId: user.id,
@@ -31,6 +40,7 @@ export async function notify(ctx: TransactionContext, input: NotifyInput): Promi
         title: input.title,
         body: input.body ?? null,
         linkUrl: input.linkUrl ?? null,
+        dedupKey: input.dedupKey ?? null,
       },
     });
 

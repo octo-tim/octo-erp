@@ -88,9 +88,12 @@ export const masterRouter = router({
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => item.detail(t, input.id))),
 
+  // an empty q returns the first `take` active items, which is what a picker needs on open
   searchItems: permissionProcedure('master.read')
-    .input(z.object({ q: z.string().min(1).max(50) }))
-    .query(({ ctx, input }) => readTx(ctx, (t) => item.search(t, input.q))),
+    .input(
+      z.object({ q: z.string().max(50).default(''), take: z.number().int().min(1).max(500).default(20) }),
+    )
+    .query(({ ctx, input }) => readTx(ctx, (t) => item.search(t, input.q, input.take))),
 
   createItem: permissionProcedure('master.write')
     .input(itemInput.extend({ requestId }))
@@ -412,7 +415,16 @@ export const masterRouter = router({
   changeHistory: permissionProcedure('master.read')
     .input(
       z.object({
-        entityType: z.enum(['Item', 'Partner', 'Warehouse', 'Division', 'CommonCode']),
+        // the change-history card is shared by master and document screens alike
+        entityType: z.enum([
+          'Item',
+          'Partner',
+          'Warehouse',
+          'Division',
+          'CommonCode',
+          'StockDocument',
+          'StockCount',
+        ]),
         entityId: cuid,
       }),
     )
