@@ -4,6 +4,7 @@ import { hashPassword } from '../src/server/core/crypto';
 import { moduleOf, PERMISSIONS, ROLE_PRESETS } from '../src/server/modules/rbac/permissions';
 import { DOC_TYPES } from '../src/server/modules/numbering/service';
 import { toDateOnly } from '../src/lib/dates';
+import { DEFAULT_FORMS } from '../src/server/modules/approval/form';
 
 const ADMIN_USERNAME = process.env['SEED_ADMIN_USERNAME'] ?? 'admin';
 const ADMIN_PASSWORD = process.env['SEED_ADMIN_PASSWORD'] ?? 'Admin!2345';
@@ -251,12 +252,93 @@ async function seedSystemSettings() {
   }
 }
 
+/** APV-02/03/05: default forms, a standard approval line and the amount-branching rules. */
+async function seedApproval() {
+  const effectiveFrom = toDateOnly('2020-01-01');
+
+  for (const [index, def] of DEFAULT_FORMS.entries()) {
+    const form = await prisma.approvalForm.upsert({
+      where: { code: def.code },
+      create: {
+        code: def.code,
+        name: def.name,
+        category: def.category,
+        targetType: def.targetType ?? null,
+        sortOrder: index,
+      },
+      update: {
+        name: def.name,
+        category: def.category,
+        targetType: def.targetType ?? null,
+        sortOrder: index,
+      },
+    });
+    const existing = await prisma.approvalFormVersion.findFirst({ where: { formId: form.id } });
+    if (!existing) {
+      await prisma.approvalFormVersion.create({
+        data: { formId: form.id, version: 1, fieldSchema: def.fields as never, effectiveFrom },
+      });
+    }
+  }
+
+  // Standard line: department head approves; over 3,000,000 KRW the CEO is added.
+  const standard = await prisma.approvalLineTemplate.upsert({
+    where: { code: 'STANDARD' },
+    create: { code: 'STANDARD', name: '기본 결재선 (부서장 → 대표)', editable: true },
+    update: { name: '기본 결재선 (부서장 → 대표)' },
+  });
+  const steps = [
+    {
+      stepNo: 1,
+      role: 'APPROVE',
+      resolveBy: 'DRAFTER_MANAGER',
+      canFinalize: true,
+      minAmount: null as string | null,
+    },
+    {
+      stepNo: 2,
+      role: 'APPROVE',
+      resolveBy: 'POSITION',
+      positionCode: 'CEO',
+      canFinalize: false,
+      minAmount: '3000000',
+    },
+  ];
+  for (const step of steps) {
+    await prisma.approvalLineTemplateStep.upsert({
+      where: { templateId_stepNo: { templateId: standard.id, stepNo: step.stepNo } },
+      create: {
+        templateId: standard.id,
+        stepNo: step.stepNo,
+        role: step.role,
+        resolveBy: step.resolveBy,
+        positionCode: 'positionCode' in step ? step.positionCode : null,
+        canFinalize: step.canFinalize,
+        minAmount: step.minAmount,
+      },
+      update: { canFinalize: step.canFinalize, minAmount: step.minAmount },
+    });
+  }
+
+  await prisma.approvalRule.upsert({
+    where: { code: 'DEFAULT' },
+    create: {
+      code: 'DEFAULT',
+      name: '기본 규칙 (모든 양식)',
+      lineTemplateId: standard.id,
+      priority: 0,
+    },
+    update: { lineTemplateId: standard.id },
+  });
+}
+
 async function main() {
   await seedPermissionsAndRoles();
   await seedOrganization();
   await seedNumberingRules();
   await seedPolicies();
   await seedSystemSettings();
+  await seedApproval();
   await seedAdminUser();
   console.log(`seed complete (admin user: ${ADMIN_USERNAME})`);
 }

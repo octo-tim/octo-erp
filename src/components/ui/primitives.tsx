@@ -1,5 +1,6 @@
 'use client';
 
+import { cloneElement, isValidElement } from 'react';
 import { cn } from '@/lib/cn';
 import { DOC_STATUS_LABEL, DOC_STATUS_TONE } from '@/lib/format';
 
@@ -70,15 +71,21 @@ export function Field({
 }) {
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      <label htmlFor={htmlFor} className="text-sm font-medium text-slate-700">
+      {/* The required marker is drawn by CSS (see globals.css), so the label's text is
+          exactly the field name — screen readers and tests both read "제목", not "제목*".
+          The control itself carries aria-required. */}
+      <label
+        htmlFor={htmlFor}
+        data-required={required ? 'true' : undefined}
+        className="text-sm font-medium text-slate-700"
+      >
         {label}
-        {required ? (
-          <span className="ml-0.5 text-red-600" aria-label="필수">
-            *
-          </span>
-        ) : null}
       </label>
-      {children}
+      {required && isValidElement(children)
+        ? cloneElement(children as React.ReactElement<{ 'aria-required'?: boolean }>, {
+            'aria-required': true,
+          })
+        : children}
       {error ? (
         <p className="text-xs text-red-600" role="alert">
           {error}

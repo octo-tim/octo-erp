@@ -2,9 +2,13 @@ import { formatKrw, formatQty, type Numeric } from './money';
 import { formatKst } from './dates';
 
 /** NFR-UX-01: shared display formatting for all screens and exports. */
+/** Blank inputs are common (optional money fields), so every formatter tolerates them. */
+const isBlank = (v: unknown): boolean =>
+  v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+
 export const fmt = {
-  krw: (v: Numeric | null | undefined): string => (v === null || v === undefined ? '' : formatKrw(v)),
-  qty: (v: Numeric | null | undefined): string => (v === null || v === undefined ? '' : formatQty(v)),
+  krw: (v: Numeric | null | undefined): string => (isBlank(v) ? '' : formatKrw(v as Numeric)),
+  qty: (v: Numeric | null | undefined): string => (isBlank(v) ? '' : formatQty(v as Numeric)),
   date: (v: Date | string | null | undefined): string => {
     if (!v) return '';
     return typeof v === 'string' ? v.slice(0, 10) : formatKst(v, false);

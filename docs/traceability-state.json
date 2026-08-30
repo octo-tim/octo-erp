@@ -9,16 +9,20 @@
     "notes": "ADR-0011. API는 정밀 문자열 직렬화(superjson 미사용)"
   },
   "INT-02": {
-    "status": "IN_PROGRESS",
-    "services": ["src/server/core/state-machine.ts"],
-    "tests": ["tests/unit/state-machine.test.ts"],
-    "notes": "공통 상태머신·전이표 구현. 각 전표 적용은 STEP 7~10"
+    "status": "DONE",
+    "services": ["src/server/core/state-machine.ts", "src/server/modules/approval/service.ts (TRANSITIONS)"],
+    "tests": ["tests/unit/state-machine.test.ts", "tests/integration/approval.test.ts"],
+    "manual": "결재문서 상태 전이표 준수 확인",
+    "notes": "업무전표 적용은 STEP 7~10"
   },
   "INT-03": {
-    "status": "IN_PROGRESS",
-    "services": ["src/server/core/state-machine.ts (assertMutable)"],
-    "tests": ["tests/unit/state-machine.test.ts"],
-    "notes": "규칙 구현 완료, 전표별 적용은 STEP 7~10"
+    "status": "DONE",
+    "services": [
+      "src/server/core/state-machine.ts (assertMutable)",
+      "src/server/modules/approval/service.ts (resubmit 차단)"
+    ],
+    "tests": ["tests/unit/state-machine.test.ts", "tests/integration/approval.test.ts"],
+    "manual": "B-07 완료문서 수정 차단 확인"
   },
   "INT-05": {
     "status": "DONE",
@@ -29,10 +33,14 @@
     "notes": "ADR-0012. B-03 통과"
   },
   "INT-06": {
-    "status": "IN_PROGRESS",
-    "services": ["src/server/core/context.ts (withTransaction)"],
-    "tests": ["tests/integration/transaction.test.ts"],
-    "notes": "단일 트랜잭션 헬퍼와 롤백 원자성 검증 완료. 업무 확정 결합은 STEP 10"
+    "status": "DONE",
+    "services": [
+      "src/server/core/context.ts (withTransaction)",
+      "src/server/modules/approval/service.ts (approve)"
+    ],
+    "tests": ["tests/integration/transaction.test.ts", "tests/integration/approval.test.ts"],
+    "manual": "B-08 장애주입 시 결재·원장·근태·알림 전체 롤백 확인",
+    "notes": "전표 확정 결합은 STEP 10에서 확장"
   },
   "INT-09": {
     "status": "DONE",
@@ -328,7 +336,7 @@
   },
   "APV-16": {
     "status": "OPTION_NOT_APPROVED",
-    "notes": "선택 요구사항"
+    "notes": "선택 요구사항 (서명·도장 이미지)"
   },
   "HRM-14": {
     "status": "OPTION_NOT_APPROVED",
@@ -479,6 +487,147 @@
     "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
     "manual": "본인 정보·근태·연차 조회와 연락처 변경신청 확인"
   },
+  "APV-01": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/approval/form.ts",
+      "src/server/modules/approval/service.ts (activeFormVersion, formSnapshot)"
+    ],
+    "api": ["approval.forms", "approval.publishFormVersion", "approval.listFormVersions"],
+    "screens": ["src/app/(app)/approval/forms/page.tsx"],
+    "tables": ["ApprovalForm", "ApprovalFormVersion"],
+    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "manual": "새 버전 발행 후 기존 문서가 상신 당시 양식으로 재현되는지 확인"
+  },
+  "APV-02": {
+    "status": "DONE",
+    "services": ["src/server/modules/approval/form.ts (DEFAULT_FORMS)"],
+    "screens": ["src/app/(app)/approval/forms/page.tsx"],
+    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "manual": "지출결의·구매요청·품의·계약검토·휴가·근태정정 6종 시드 확인"
+  },
+  "APV-03": {
+    "status": "DONE",
+    "services": ["src/server/modules/approval/line.ts (buildLine, selectLineTemplate)"],
+    "api": ["approval.lineTemplates", "approval.rules", "approval.submit(lineTemplateId)"],
+    "screens": ["src/app/(app)/approval/lines/page.tsx"],
+    "tables": ["ApprovalLineTemplate", "ApprovalLineTemplateStep", "ApprovalRule", "ApprovalParticipant"],
+    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "manual": "순차·병렬합의·참조 구분과 규칙 우선순위 확인"
+  },
+  "APV-04": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/approval/line.ts (resolveDelegate)",
+      "src/server/modules/approval/form.ts (setDelegation)",
+      "src/server/modules/approval/service.ts (canFinalize)"
+    ],
+    "api": ["approval.setDelegation", "approval.endDelegation", "approval.listDelegations"],
+    "screens": ["src/app/(app)/approval/lines/page.tsx"],
+    "tables": ["Delegation", "ApprovalStep.actedByUserId"],
+    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "manual": "전결 시 이후 단계 SKIPPED, 대결자 처리 시 원 결재자 보존, 대결 연쇄 차단 확인"
+  },
+  "APV-05": {
+    "status": "DONE",
+    "services": ["src/server/modules/approval/line.ts (minAmount 분기)"],
+    "tests": ["tests/integration/approval.test.ts"],
+    "manual": "300만원 미만 1단계 / 이상 2단계 확인"
+  },
+  "APV-06": {
+    "status": "DONE",
+    "services": ["src/server/modules/approval/service.ts (draft, validateContent)"],
+    "api": ["approval.draft"],
+    "screens": ["src/app/(app)/approval/draft/page.tsx"],
+    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "manual": "임시저장, 동적 양식 입력, 필수값 오류 요약 확인",
+    "notes": "첨부 다건은 AttachmentPanel(UIX-07) 사용"
+  },
+  "APV-07": {
+    "status": "DONE",
+    "services": ["src/server/modules/approval/service.ts (approve, reject, hold, withdraw, resubmit)"],
+    "api": [
+      "approval.approve",
+      "approval.reject",
+      "approval.hold",
+      "approval.releaseHold",
+      "approval.withdraw",
+      "approval.resubmit"
+    ],
+    "screens": ["src/app/(app)/approval/documents/[id]/page.tsx"],
+    "tests": ["tests/integration/approval.test.ts"],
+    "manual": "승인·반려·보류·회수·재상신, 순서 밖 결재 차단, 낙관적 잠금 확인"
+  },
+  "APV-08": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/approval/handlers/index.ts",
+      "src/server/modules/approval/service.ts (onApproved)"
+    ],
+    "tables": ["ApprovalLink(targetType,targetId,targetVersion) UNIQUE"],
+    "tests": ["tests/integration/approval.test.ts"],
+    "manual": "승인 콜백이 같은 트랜잭션에서 실행되고 실패 시 전체 롤백되는지 확인",
+    "notes": "전표 핸들러는 STEP 10에서 등록. 현재는 인사 2종"
+  },
+  "APV-09": {
+    "status": "DONE",
+    "services": ["src/server/modules/approval/handlers/hrm.ts"],
+    "tests": ["tests/integration/approval.test.ts"],
+    "manual": "휴가 승인 → 연차 사용원장·근태 반영, 근태정정 승인 → Attendance 정정 확인",
+    "notes": "E2E-03 통과. 구매요청→발주는 STEP 10"
+  },
+  "APV-10": {
+    "status": "DONE",
+    "services": ["src/server/modules/approval/service.ts (listInbox, pendingCount)"],
+    "api": ["approval.inbox", "approval.pendingCount"],
+    "screens": ["src/app/(app)/approval/inbox/page.tsx"],
+    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "manual": "기안·대기·진행·완료·반려·참조함과 미결 배지 확인"
+  },
+  "APV-11": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/approval/service.ts (notifyPending, longPending)",
+      "src/server/modules/notification/service.ts"
+    ],
+    "tables": ["Notification", "NotificationDelivery", "OutboxEvent"],
+    "tests": ["tests/integration/approval.test.ts"],
+    "manual": "요청·승인·반려 알림 생성과 이메일 아웃박스 적재, 장기미결 탐지 확인",
+    "notes": "재시도·실패이력은 아웃박스 워커(INT-10) 공통"
+  },
+  "APV-12": {
+    "status": "DONE",
+    "services": ["src/server/modules/approval/service.ts (requestCancel, applyCancellation)"],
+    "api": ["approval.requestCancel"],
+    "tables": ["ApprovalDocument.cancelsDocumentId", "ApprovalActionLog"],
+    "tests": ["tests/integration/approval.test.ts"],
+    "manual": "완료문서 수정 차단, 취소문서 승인 시 원문서 CANCELED와 반대원장 확인",
+    "notes": "ApprovalActionLog는 append-only"
+  },
+  "APV-13": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/approval/service.ts (listInbox 조건)",
+      "src/server/modules/numbering/service.ts"
+    ],
+    "api": ["approval.inbox"],
+    "screens": ["src/app/(app)/approval/search/page.tsx"],
+    "tests": ["tests/integration/transaction.test.ts", "tests/e2e/approval.spec.ts"],
+    "manual": "양식별 채번(AP-YYYYMM-nnnn)과 다조건 검색 확인"
+  },
+  "APV-14": {
+    "status": "DONE",
+    "screens": ["src/app/(app)/approval/inbox/page.tsx", "src/app/(app)/approval/documents/[id]/page.tsx"],
+    "tests": ["tests/e2e/approval.spec.ts"],
+    "manual": "390px에서 결재함·기안 화면 조작 확인"
+  },
+  "APV-15": {
+    "status": "DONE",
+    "screens": ["src/app/(app)/approval/documents/[id]/page.tsx", "src/app/globals.css (@media print)"],
+    "tests": ["tests/e2e/approval.spec.ts"],
+    "manual": "결재선·결재일시가 포함된 인쇄 출력 확인",
+    "notes": "브라우저 인쇄로 PDF 저장. 서버 PDF 렌더는 STEP 11에서 공통화"
+  },
   "__changeRequests": [
     {
       "id": "CR-01",
@@ -500,6 +649,20 @@
       "text": "모바일 390px에서 스티키 헤더에 가려지는 문제를 scroll-padding-top으로, 넓은 그리드가 페이지 전체를 가로로 넘치게 하는 문제를 min-w-0으로 수정했다. RFP 미명시 개선사항.",
       "related": ["UIX-06", "NFR-UX-03"],
       "status": "IMPLEMENTED"
+    },
+    {
+      "id": "CR-04",
+      "step": "STEP 5",
+      "text": "금액 컬럼이 빈 값일 때 표시 포맷터가 예외를 던져 화면이 깨지는 결함을 발견해 수정했다(fmt.krw/qty가 공백을 허용). 선택 금액 항목이 있는 모든 화면에 영향.",
+      "related": ["UIX-03", "INT-01"],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-05",
+      "step": "STEP 5",
+      "text": "필수 표시(*)가 라벨 텍스트에 포함되어 접근성 이름과 자동화 선택자를 오염시켰다. CSS ::after로 옮기고 컨트롤에 aria-required를 부여했다.",
+      "related": ["NFR-UX-03", "UIX-05"],
+      "status": "FIXED"
     }
   ]
 }

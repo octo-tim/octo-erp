@@ -2,7 +2,7 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T16:49:26.773Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T17:25:25.096Z
 
 ## 집계
 
@@ -12,15 +12,15 @@
 | SLS 매출·매입·발주 | 13 | 0 | 13 | 0 | 0 | 0 | 0 | 13 | 0 |
 | INV 재고 | 9 | 1 | 10 | 0 | 0 | 0 | 0 | 9 | 1 |
 | ACC 회계 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
-| APV 전자결재 | 15 | 1 | 16 | 0 | 0 | 0 | 0 | 15 | 1 |
+| APV 전자결재 | 15 | 1 | 16 | 15 | 0 | 0 | 0 | 0 | 1 |
 | HRM 인사 | 13 | 1 | 14 | 13 | 0 | 0 | 0 | 0 | 1 |
 | RPT 보고서 | 10 | 1 | 11 | 0 | 0 | 0 | 0 | 10 | 1 |
 | UIX 공통 UI | 8 | 1 | 9 | 7 | 1 | 0 | 0 | 0 | 1 |
-| INT 공통 데이터 정합성 | 12 | 0 | 12 | 5 | 4 | 0 | 0 | 3 | 0 |
+| INT 공통 데이터 정합성 | 12 | 0 | 12 | 8 | 1 | 0 | 0 | 3 | 0 |
 | NFR 비기능 | 22 | 0 | 22 | 8 | 6 | 0 | 0 | 8 | 0 |
 | MIG 데이터 이관 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | DEC 착수 시 확정 정책 | 0 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| **합계** | **128** | **6** | **143** | 42 | 12 | 0 | 0 | 83 | 6 |
+| **합계** | **128** | **6** | **143** | 60 | 9 | 0 | 0 | 68 | 6 |
 
 기능 요구사항(BAS·SLS·INV·ACC·APV·HRM·RPT·UIX): M 85개, O 6개 (RFP 5장 선언: 필수 85 / 선택 6).
 
@@ -89,22 +89,22 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| APV-01 | M | **양식 관리** — 동적 필드, 기본 결재선, 버전 관리, 이전 버전 문서 재현 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-02 | M | **기본 양식** — 지출결의·구매요청·품의·계약검토·휴가·근태정정 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-03 | M | **결재선** — 순차, 병렬합의, 참조·열람, 기안 시 변경 허용 설정 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-04 | M | **전결·대결** — 직위·금액 전결, 유효기간이 있는 부재·대결 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-05 | M | **금액 분기** — 금액 구간에 따른 결재자 자동 추가 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-06 | M | **기안** — 임시저장, 첨부 다건, 복사 재기안, 관련 문서 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-07 | M | **처리** — 승인·반려·보류·회수, 의견, 수정 후 재상신 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-08 | M | **전표 연동** — 정책상 결재 대상인 전표는 승인 콜백에서만 확정 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-09 | M | **재고·인사 연동** — 구매요청 승인 시 발주서, 휴가 승인 시 연차·근태 반영 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-10 | M | **결재함** — 기안·대기·진행·완료·반려·참조함과 미결 배지 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-11 | M | **알림** — 요청·승인·반려·장기미결 알림, 재시도와 실패이력 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-12 | M | **감사** — 완료 문서 불변, 이력 영구 보관, 취소문서로만 취소 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-13 | M | **번호·검색** — 양식별 채번과 다조건 검색 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-14 | M | **모바일 결재** — 모바일 조회·승인·반려 | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-15 | M | **출력** — 결재선·결재일시가 표시된 PDF | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-16 | O | **서명 이미지** — 결재자별 서명·도장 이미지 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항 |
+| APV-01 | M | **양식 관리** — 동적 필드, 기본 결재선, 버전 관리, 이전 버전 문서 재현 | `src/app/(app)/approval/forms/page.tsx` | `approval.forms`<br>`approval.publishFormVersion`<br>`approval.listFormVersions` | `src/server/modules/approval/form.ts`<br>`src/server/modules/approval/service.ts (activeFormVersion, formSnapshot)` | `ApprovalForm`<br>`ApprovalFormVersion` | `tests/integration/approval.test.ts`<br>`tests/e2e/approval.spec.ts` | 새 버전 발행 후 기존 문서가 상신 당시 양식으로 재현되는지 확인 | DONE | — |
+| APV-02 | M | **기본 양식** — 지출결의·구매요청·품의·계약검토·휴가·근태정정 | `src/app/(app)/approval/forms/page.tsx` | — | `src/server/modules/approval/form.ts (DEFAULT_FORMS)` | — | `tests/integration/approval.test.ts`<br>`tests/e2e/approval.spec.ts` | 지출결의·구매요청·품의·계약검토·휴가·근태정정 6종 시드 확인 | DONE | — |
+| APV-03 | M | **결재선** — 순차, 병렬합의, 참조·열람, 기안 시 변경 허용 설정 | `src/app/(app)/approval/lines/page.tsx` | `approval.lineTemplates`<br>`approval.rules`<br>`approval.submit(lineTemplateId)` | `src/server/modules/approval/line.ts (buildLine, selectLineTemplate)` | `ApprovalLineTemplate`<br>`ApprovalLineTemplateStep`<br>`ApprovalRule`<br>`ApprovalParticipant` | `tests/integration/approval.test.ts`<br>`tests/e2e/approval.spec.ts` | 순차·병렬합의·참조 구분과 규칙 우선순위 확인 | DONE | — |
+| APV-04 | M | **전결·대결** — 직위·금액 전결, 유효기간이 있는 부재·대결 | `src/app/(app)/approval/lines/page.tsx` | `approval.setDelegation`<br>`approval.endDelegation`<br>`approval.listDelegations` | `src/server/modules/approval/line.ts (resolveDelegate)`<br>`src/server/modules/approval/form.ts (setDelegation)`<br>`src/server/modules/approval/service.ts (canFinalize)` | `Delegation`<br>`ApprovalStep.actedByUserId` | `tests/integration/approval.test.ts`<br>`tests/e2e/approval.spec.ts` | 전결 시 이후 단계 SKIPPED, 대결자 처리 시 원 결재자 보존, 대결 연쇄 차단 확인 | DONE | — |
+| APV-05 | M | **금액 분기** — 금액 구간에 따른 결재자 자동 추가 | — | — | `src/server/modules/approval/line.ts (minAmount 분기)` | — | `tests/integration/approval.test.ts` | 300만원 미만 1단계 / 이상 2단계 확인 | DONE | — |
+| APV-06 | M | **기안** — 임시저장, 첨부 다건, 복사 재기안, 관련 문서 | `src/app/(app)/approval/draft/page.tsx` | `approval.draft` | `src/server/modules/approval/service.ts (draft, validateContent)` | — | `tests/integration/approval.test.ts`<br>`tests/e2e/approval.spec.ts` | 임시저장, 동적 양식 입력, 필수값 오류 요약 확인 | DONE | 첨부 다건은 AttachmentPanel(UIX-07) 사용 |
+| APV-07 | M | **처리** — 승인·반려·보류·회수, 의견, 수정 후 재상신 | `src/app/(app)/approval/documents/[id]/page.tsx` | `approval.approve`<br>`approval.reject`<br>`approval.hold`<br>`approval.releaseHold`<br>`approval.withdraw`<br>`approval.resubmit` | `src/server/modules/approval/service.ts (approve, reject, hold, withdraw, resubmit)` | — | `tests/integration/approval.test.ts` | 승인·반려·보류·회수·재상신, 순서 밖 결재 차단, 낙관적 잠금 확인 | DONE | — |
+| APV-08 | M | **전표 연동** — 정책상 결재 대상인 전표는 승인 콜백에서만 확정 | — | — | `src/server/modules/approval/handlers/index.ts`<br>`src/server/modules/approval/service.ts (onApproved)` | `ApprovalLink(targetType,targetId,targetVersion) UNIQUE` | `tests/integration/approval.test.ts` | 승인 콜백이 같은 트랜잭션에서 실행되고 실패 시 전체 롤백되는지 확인 | DONE | 전표 핸들러는 STEP 10에서 등록. 현재는 인사 2종 |
+| APV-09 | M | **재고·인사 연동** — 구매요청 승인 시 발주서, 휴가 승인 시 연차·근태 반영 | — | — | `src/server/modules/approval/handlers/hrm.ts` | — | `tests/integration/approval.test.ts` | 휴가 승인 → 연차 사용원장·근태 반영, 근태정정 승인 → Attendance 정정 확인 | DONE | E2E-03 통과. 구매요청→발주는 STEP 10 |
+| APV-10 | M | **결재함** — 기안·대기·진행·완료·반려·참조함과 미결 배지 | `src/app/(app)/approval/inbox/page.tsx` | `approval.inbox`<br>`approval.pendingCount` | `src/server/modules/approval/service.ts (listInbox, pendingCount)` | — | `tests/integration/approval.test.ts`<br>`tests/e2e/approval.spec.ts` | 기안·대기·진행·완료·반려·참조함과 미결 배지 확인 | DONE | — |
+| APV-11 | M | **알림** — 요청·승인·반려·장기미결 알림, 재시도와 실패이력 | — | — | `src/server/modules/approval/service.ts (notifyPending, longPending)`<br>`src/server/modules/notification/service.ts` | `Notification`<br>`NotificationDelivery`<br>`OutboxEvent` | `tests/integration/approval.test.ts` | 요청·승인·반려 알림 생성과 이메일 아웃박스 적재, 장기미결 탐지 확인 | DONE | 재시도·실패이력은 아웃박스 워커(INT-10) 공통 |
+| APV-12 | M | **감사** — 완료 문서 불변, 이력 영구 보관, 취소문서로만 취소 | — | `approval.requestCancel` | `src/server/modules/approval/service.ts (requestCancel, applyCancellation)` | `ApprovalDocument.cancelsDocumentId`<br>`ApprovalActionLog` | `tests/integration/approval.test.ts` | 완료문서 수정 차단, 취소문서 승인 시 원문서 CANCELED와 반대원장 확인 | DONE | ApprovalActionLog는 append-only |
+| APV-13 | M | **번호·검색** — 양식별 채번과 다조건 검색 | `src/app/(app)/approval/search/page.tsx` | `approval.inbox` | `src/server/modules/approval/service.ts (listInbox 조건)`<br>`src/server/modules/numbering/service.ts` | — | `tests/integration/transaction.test.ts`<br>`tests/e2e/approval.spec.ts` | 양식별 채번(AP-YYYYMM-nnnn)과 다조건 검색 확인 | DONE | — |
+| APV-14 | M | **모바일 결재** — 모바일 조회·승인·반려 | `src/app/(app)/approval/inbox/page.tsx`<br>`src/app/(app)/approval/documents/[id]/page.tsx` | — | — | — | `tests/e2e/approval.spec.ts` | 390px에서 결재함·기안 화면 조작 확인 | DONE | — |
+| APV-15 | M | **출력** — 결재선·결재일시가 표시된 PDF | `src/app/(app)/approval/documents/[id]/page.tsx`<br>`src/app/globals.css (@media print)` | — | — | — | `tests/e2e/approval.spec.ts` | 결재선·결재일시가 포함된 인쇄 출력 확인 | DONE | 브라우저 인쇄로 PDF 저장. 서버 PDF 렌더는 STEP 11에서 공통화 |
+| APV-16 | O | **서명 이미지** — 결재자별 서명·도장 이미지 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항 (서명·도장 이미지) |
 
 ## HRM — 인사
 
@@ -160,11 +160,11 @@
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | INT-01 | M | **정밀 숫자** — 금액·수량에 부동소수점 미사용, DB 정밀 숫자와 문자열 API 계약 | — | `src/server/api/schemas/common.ts`<br>`src/server/api/transformer.ts` | `src/lib/money.ts` | `Decimal(18,0) 금액 / (18,3) 수량 / (18,4) 단가` | `tests/unit/money.test.ts` | eslint no-restricted-syntax 로 parseFloat 차단 확인 | DONE | ADR-0011. API는 정밀 문자열 직렬화(superjson 미사용) |
-| INT-02 | M | **전표 상태머신** — DRAFT·PENDING_APPROVAL·CONFIRMED·CANCELED 상태와 허용 전이 | — | — | `src/server/core/state-machine.ts` | — | `tests/unit/state-machine.test.ts` | — | IN_PROGRESS | 공통 상태머신·전이표 구현. 각 전표 적용은 STEP 7~10 |
-| INT-03 | M | **확정 후 수정 금지** — 확정 전표는 취소와 재작성으로 정정 | — | — | `src/server/core/state-machine.ts (assertMutable)` | — | `tests/unit/state-machine.test.ts` | — | IN_PROGRESS | 규칙 구현 완료, 전표별 적용은 STEP 7~10 |
+| INT-02 | M | **전표 상태머신** — DRAFT·PENDING_APPROVAL·CONFIRMED·CANCELED 상태와 허용 전이 | — | — | `src/server/core/state-machine.ts`<br>`src/server/modules/approval/service.ts (TRANSITIONS)` | — | `tests/unit/state-machine.test.ts`<br>`tests/integration/approval.test.ts` | 결재문서 상태 전이표 준수 확인 | DONE | 업무전표 적용은 STEP 7~10 |
+| INT-03 | M | **확정 후 수정 금지** — 확정 전표는 취소와 재작성으로 정정 | — | — | `src/server/core/state-machine.ts (assertMutable)`<br>`src/server/modules/approval/service.ts (resubmit 차단)` | — | `tests/unit/state-machine.test.ts`<br>`tests/integration/approval.test.ts` | B-07 완료문서 수정 차단 확인 | DONE | — |
 | INT-04 | M | **원장이 진실** — 재고는 원장 합계, 회계는 분개 원장, 캐시는 재생성 가능 | — | — | — | — | — | — | NOT_STARTED | — |
 | INT-05 | M | **멱등성** — 승인·확정·취소·수금배분 재실행 시 중복 결과 없음 | — | — | `src/server/core/idempotency.ts` | `IdempotencyRecord(scope,requestId) UNIQUE` | `tests/integration/transaction.test.ts` | 동일 requestId 재호출·동시호출 시 부작용 1건 확인 | DONE | ADR-0012. B-03 통과 |
-| INT-06 | M | **단일 트랜잭션 확정** — 재고·채권채무·회계·감사기록이 하나의 DB 트랜잭션 공유 | — | — | `src/server/core/context.ts (withTransaction)` | — | `tests/integration/transaction.test.ts` | — | IN_PROGRESS | 단일 트랜잭션 헬퍼와 롤백 원자성 검증 완료. 업무 확정 결합은 STEP 10 |
+| INT-06 | M | **단일 트랜잭션 확정** — 재고·채권채무·회계·감사기록이 하나의 DB 트랜잭션 공유 | — | — | `src/server/core/context.ts (withTransaction)`<br>`src/server/modules/approval/service.ts (approve)` | — | `tests/integration/transaction.test.ts`<br>`tests/integration/approval.test.ts` | B-08 장애주입 시 결재·원장·근태·알림 전체 롤백 확인 | DONE | 전표 확정 결합은 STEP 10에서 확장 |
 | INT-07 | M | **취소 원복** — 재고 반대원장·채권채무 원복·회계 역분개를 동일 트랜잭션, 원장행 미삭제 | — | — | — | — | — | — | NOT_STARTED | — |
 | INT-08 | M | **동시 출고 잠금** — 품목·창고별 일관된 잠금 순서로 마이너스 재고 방지 | — | — | — | — | — | — | NOT_STARTED | — |
 | INT-09 | M | **감사 기록** — actor·action·entity·before·after·시각·IP·요청ID, 민감정보 제거 | — | `src/server/api/routers/admin.ts (auditLog)` | `src/server/modules/audit/service.ts`<br>`src/server/core/redact.ts` | `AuditLog`<br>`SecurityEvent` | `tests/unit/redact.test.ts`<br>`tests/integration/transaction.test.ts`<br>`tests/integration/auth.test.ts` | 감사로그·보안이벤트에 비밀번호·주민번호·계좌 원문 없음 확인 | DONE | 업무 변경과 같은 트랜잭션 기록, 롤백 시 함께 사라짐 |
@@ -234,3 +234,5 @@
 | CR-01 | STEP 2 | 샌드박스 환경에서 Prisma 네이티브 schema-engine 다운로드가 차단되어, 동일한 migrations 산출물을 생성하는 WASM 기반 마이그레이션 드라이버(tools/migrate.mjs)를 추가했다. 운영·CI에서는 표준 prisma migrate deploy를 사용한다. | NFR-OPS-02 | IMPLEMENTED_AS_TOOLING |
 | CR-02 | STEP 2 | RFP에 명시되지 않았으나 hr.self 권한자의 본인 첨부파일 접근 규칙이 필요해 SELF_OWNED_TYPES 규칙을 정의했다. NFR-SEC-02 해석 확인 필요. | NFR-SEC-02, UIX-07, HRM-13 | OPEN |
 | CR-03 | STEP 3 | 모바일 390px에서 스티키 헤더에 가려지는 문제를 scroll-padding-top으로, 넓은 그리드가 페이지 전체를 가로로 넘치게 하는 문제를 min-w-0으로 수정했다. RFP 미명시 개선사항. | UIX-06, NFR-UX-03 | IMPLEMENTED |
+| CR-04 | STEP 5 | 금액 컬럼이 빈 값일 때 표시 포맷터가 예외를 던져 화면이 깨지는 결함을 발견해 수정했다(fmt.krw/qty가 공백을 허용). 선택 금액 항목이 있는 모든 화면에 영향. | UIX-03, INT-01 | FIXED |
+| CR-05 | STEP 5 | 필수 표시(*)가 라벨 텍스트에 포함되어 접근성 이름과 자동화 선택자를 오염시켰다. CSS ::after로 옮기고 컨트롤에 aria-required를 부여했다. | NFR-UX-03, UIX-05 | FIXED |

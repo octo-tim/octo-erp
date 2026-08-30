@@ -51,6 +51,13 @@ body {
   outline-offset: 2px;
 }
 
+/* NFR-UX-03: required fields are marked visually without polluting the label text */
+label[data-required='true']::after {
+  content: '*';
+  margin-left: 0.125rem;
+  color: oklch(0.55 0.2 25);
+}
+
 /* tabular numbers for money columns */
 .tabular {
   font-variant-numeric: tabular-nums;

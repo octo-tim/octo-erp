@@ -597,3 +597,197 @@ model RetentionRun {
   result      Json?
   createdAt   DateTime @default(now())
 }
+
+// ───────────────────────── Approval (APV) — STEP 5 ─────────────────────────
+
+model ApprovalForm {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  category    String   @default("GENERAL") // GENERAL | EXPENSE | PURCHASE | CONTRACT | HR
+  targetType  String?  // links the form to a business object handler (APV-08/09)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  versions ApprovalFormVersion[]
+}
+
+model ApprovalFormVersion {
+  id            String   @id @default(cuid())
+  formId        String
+  form          ApprovalForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  version       Int
+  /** ApprovalFieldSchema[] — dynamic field definitions (APV-01) */
+  fieldSchema   Json
+  bodyTemplate  String?
+  defaultLineTemplateId String?
+  effectiveFrom DateTime @db.Date
+  isActive      Boolean  @default(true)
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  documents ApprovalDocument[]
+
+  @@unique([formId, version])
+}
+
+model ApprovalLineTemplate {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  /** allow the drafter to edit the generated line (APV-03) */
+  editable  Boolean  @default(true)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  steps ApprovalLineTemplateStep[]
+}
+
+model ApprovalLineTemplateStep {
+  id            String @id @default(cuid())
+  templateId    String
+  template      ApprovalLineTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  stepNo        Int
+  /** APPROVE | AGREE (병렬합의) | REFERENCE (참조·열람) */
+  role          String @default("APPROVE")
+  /** resolution strategy: USER | POSITION | DEPARTMENT_HEAD | DRAFTER_MANAGER */
+  resolveBy     String @default("USER")
+  userId        String?
+  positionCode  String?
+  departmentId  String?
+  /** APV-05: only added when the document amount is at or above this threshold */
+  minAmount     Decimal? @db.Decimal(18, 0)
+  /** APV-04: this step may finalise the document without later steps */
+  canFinalize   Boolean @default(false)
+
+  @@unique([templateId, stepNo])
+}
+
+model ApprovalRule {
+  id             String  @id @default(cuid())
+  code           String  @unique
+  name           String
+  formId         String?
+  /** all conditions must match for the rule to apply */
+  divisionId     String?
+  departmentId   String?
+  minAmount      Decimal? @db.Decimal(18, 0)
+  maxAmount      Decimal? @db.Decimal(18, 0)
+  lineTemplateId String
+  priority       Int     @default(0)
+  isActive       Boolean @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Delegation {
+  id            String   @id @default(cuid())
+  /** the absent approver */
+  fromUserId    String
+  /** the deputy who may act in their place (APV-04) */
+  toUserId      String
+  validFrom     DateTime @db.Date
+  validTo       DateTime @db.Date
+  reason        String?
+  isActive      Boolean  @default(true)
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  @@index([fromUserId, validFrom, validTo])
+}
+
+model ApprovalDocument {
+  id            String   @id @default(cuid())
+  docNo         String   @unique
+  formVersionId String
+  formVersion   ApprovalFormVersion @relation(fields: [formVersionId], references: [id])
+  /** APV-01: snapshot of the form schema and rendered body at submit time */
+  formSnapshot  Json
+  title         String
+  content       Json
+  drafterId     String
+  drafterEmployeeId String?
+  divisionId    String?
+  departmentId  String?
+  amount        Decimal? @db.Decimal(18, 0)
+  status        String   @default("DRAFT") // DRAFT | IN_PROGRESS | ON_HOLD | APPROVED | REJECTED | WITHDRAWN | CANCELED
+  currentStepNo Int      @default(0)
+  version       Int      @default(1)
+  submittedAt   DateTime?
+  completedAt   DateTime?
+  policyVersionId String?
+  /** the document this one cancels (APV-12) */
+  cancelsDocumentId String? @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  steps        ApprovalStep[]
+  participants ApprovalParticipant[]
+  actions      ApprovalActionLog[]
+  links        ApprovalLink[]
+
+  @@index([status, currentStepNo])
+  @@index([drafterId, createdAt])
+}
+
+model ApprovalStep {
+  id            String   @id @default(cuid())
+  documentId    String
+  document      ApprovalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  stepNo        Int
+  role          String   @default("APPROVE") // APPROVE | AGREE | REFERENCE
+  approverId    String
+  /** set when a deputy acted instead of the assigned approver (APV-04) */
+  actedByUserId String?
+  canFinalize   Boolean  @default(false)
+  status        String   @default("PENDING") // PENDING | APPROVED | REJECTED | ON_HOLD | SKIPPED
+  comment       String?
+  actedAt       DateTime?
+  createdAt     DateTime @default(now())
+
+  @@unique([documentId, stepNo])
+  @@index([approverId, status])
+}
+
+model ApprovalParticipant {
+  id         String @id @default(cuid())
+  documentId String
+  document   ApprovalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId     String
+  role       String @default("REFERENCE") // REFERENCE | VIEWER
+  readAt     DateTime?
+
+  @@unique([documentId, userId, role])
+}
+
+model ApprovalActionLog {
+  id         String   @id @default(cuid())
+  documentId String
+  document   ApprovalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  stepNo     Int?
+  actorId    String
+  actedByUserId String?
+  action     String   // SUBMIT | APPROVE | REJECT | HOLD | WITHDRAW | RESUBMIT | CANCEL | READ
+  comment    String?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@unique([documentId, stepNo, action, requestId])
+  @@index([documentId, createdAt])
+}
+
+model ApprovalLink {
+  id            String   @id @default(cuid())
+  documentId    String
+  document      ApprovalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  targetType    String
+  targetId      String
+  targetVersion Int
+  createdAt     DateTime @default(now())
+
+  @@unique([targetType, targetId, targetVersion])
+  @@index([documentId])
+}

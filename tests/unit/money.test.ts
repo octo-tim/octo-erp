@@ -65,3 +65,16 @@ describe('money (INT-01)', () => {
     expect(vat.toString()).toBe('1000');
   });
 });
+
+describe('display formatting tolerates blanks (UIX-03)', () => {
+  it('returns an empty string rather than throwing on null, undefined or ""', async () => {
+    const { fmt } = await import('@/lib/format');
+    expect(fmt.krw(null)).toBe('');
+    expect(fmt.krw(undefined)).toBe('');
+    expect(fmt.krw('')).toBe('');
+    expect(fmt.krw('   ')).toBe('');
+    expect(fmt.qty('')).toBe('');
+    expect(fmt.date('')).toBe('');
+    expect(fmt.krw('1234567')).toBe('1,234,567');
+  });
+});
