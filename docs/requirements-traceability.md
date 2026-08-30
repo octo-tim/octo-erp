@@ -2,25 +2,25 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T15:35:30.560Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T16:30:25.848Z
 
 ## 집계
 
 | 모듈 | M | O | 합계 | DONE | IN_PROGRESS | NOT_VERIFIED | BLOCKED | NOT_STARTED | OPTION_NOT_APPROVED |
 |---|---|---|---|---|---|---|---|---|---|
-| BAS 기초정보 | 8 | 1 | 9 | 0 | 1 | 0 | 0 | 8 | 0 |
+| BAS 기초정보 | 8 | 1 | 9 | 0 | 1 | 0 | 0 | 7 | 1 |
 | SLS 매출·매입·발주 | 13 | 0 | 13 | 0 | 0 | 0 | 0 | 13 | 0 |
-| INV 재고 | 9 | 1 | 10 | 0 | 0 | 0 | 0 | 10 | 0 |
+| INV 재고 | 9 | 1 | 10 | 0 | 0 | 0 | 0 | 9 | 1 |
 | ACC 회계 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
-| APV 전자결재 | 15 | 1 | 16 | 0 | 0 | 0 | 0 | 16 | 0 |
-| HRM 인사 | 13 | 1 | 14 | 0 | 0 | 0 | 0 | 14 | 0 |
-| RPT 보고서 | 10 | 1 | 11 | 0 | 0 | 0 | 0 | 11 | 0 |
-| UIX 공통 UI | 8 | 1 | 9 | 0 | 4 | 0 | 0 | 5 | 0 |
+| APV 전자결재 | 15 | 1 | 16 | 0 | 0 | 0 | 0 | 15 | 1 |
+| HRM 인사 | 13 | 1 | 14 | 0 | 0 | 0 | 0 | 13 | 1 |
+| RPT 보고서 | 10 | 1 | 11 | 0 | 0 | 0 | 0 | 10 | 1 |
+| UIX 공통 UI | 8 | 1 | 9 | 7 | 1 | 0 | 0 | 0 | 1 |
 | INT 공통 데이터 정합성 | 12 | 0 | 12 | 5 | 4 | 0 | 0 | 3 | 0 |
-| NFR 비기능 | 22 | 0 | 22 | 7 | 6 | 0 | 0 | 9 | 0 |
+| NFR 비기능 | 22 | 0 | 22 | 7 | 7 | 0 | 0 | 8 | 0 |
 | MIG 데이터 이관 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | DEC 착수 시 확정 정책 | 0 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| **합계** | **128** | **6** | **143** | 21 | 15 | 0 | 0 | 107 | 0 |
+| **합계** | **128** | **6** | **143** | 28 | 13 | 0 | 0 | 96 | 6 |
 
 기능 요구사항(BAS·SLS·INV·ACC·APV·HRM·RPT·UIX): M 85개, O 6개 (RFP 5장 선언: 필수 85 / 선택 6).
 
@@ -32,7 +32,7 @@
 | BAS-02 | M | **품목 부가정보** — 안전재고, 리드타임, 기본 매입처, 대표 이미지, 비고 | — | — | — | — | — | — | NOT_STARTED | — |
 | BAS-03 | M | **품목 대량 처리** — 양식 다운로드, 일괄 등록·수정, 행별 오류 표시, 정상 행만 선택 반영 | — | — | — | — | — | — | NOT_STARTED | — |
 | BAS-04 | M | **거래처 관리** — 사업자번호 검증, 대표자, 업태·종목, 주소, 담당자 다건, 거래유형, 결제조건, 여신한도 | — | — | — | — | — | — | NOT_STARTED | — |
-| BAS-05 | O | **거래처별 단가** — 거래처-품목 단가표와 전표 입력 시 자동 적용 | — | — | — | — | — | — | NOT_STARTED | — |
+| BAS-05 | O | **거래처별 단가** — 거래처-품목 단가표와 전표 입력 시 자동 적용 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항. PartnerItemPrice 확장 포인트만 예약 |
 | BAS-06 | M | **창고 관리** — 정상·불량·위탁 유형, 담당자, 사용여부 | — | — | — | — | — | — | NOT_STARTED | — |
 | BAS-07 | M | **공통코드** — 단위·품목분류·사업부·결제수단 등을 관리자가 유지 | — | — | — | — | — | — | NOT_STARTED | — |
 | BAS-08 | M | **변경 이력** — 변경자·시각·변경 전후 값 조회, 민감정보 원문은 감사로그 미저장 | — | `src/server/api/routers/admin.ts (auditLog)` | `src/server/modules/audit/service.ts` | — | `tests/integration/transaction.test.ts` | — | IN_PROGRESS | 변경 전후 이력 조회 기반 완료. 마스터 화면 연결은 STEP 6 |
@@ -69,7 +69,7 @@
 | INV-07 | M | **안전재고** — 앱·이메일·확정 메신저 채널 알림과 재시도 이력 | — | — | — | — | — | — | NOT_STARTED | — |
 | INV-08 | M | **재고 실사** — 실사·차이·승인·조정전표 생성 | — | — | — | — | — | — | NOT_STARTED | — |
 | INV-09 | M | **재고 평가** — DEC-01 월 총평균가 산출, 당월 잠정평가·마감확정·차이조정 | — | — | — | — | — | — | NOT_STARTED | — |
-| INV-10 | O | **로트·유통기한** — 로트번호·유통기한·선입선출 권고 | — | — | — | — | — | — | NOT_STARTED | — |
+| INV-10 | O | **로트·유통기한** — 로트번호·유통기한·선입선출 권고 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항 |
 
 ## ACC — 회계
 
@@ -104,7 +104,7 @@
 | APV-13 | M | **번호·검색** — 양식별 채번과 다조건 검색 | — | — | — | — | — | — | NOT_STARTED | — |
 | APV-14 | M | **모바일 결재** — 모바일 조회·승인·반려 | — | — | — | — | — | — | NOT_STARTED | — |
 | APV-15 | M | **출력** — 결재선·결재일시가 표시된 PDF | — | — | — | — | — | — | NOT_STARTED | — |
-| APV-16 | O | **서명 이미지** — 결재자별 서명·도장 이미지 | — | — | — | — | — | — | NOT_STARTED | — |
+| APV-16 | O | **서명 이미지** — 결재자별 서명·도장 이미지 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항 |
 
 ## HRM — 인사
 
@@ -123,7 +123,7 @@
 | HRM-11 | M | **계정연동** — 사원-계정 1:1, 조직변경 반영, 퇴사 즉시 비활성 | — | — | — | — | — | — | NOT_STARTED | — |
 | HRM-12 | M | **개인정보** — 민감정보 분리·암호화·마스킹·복호화 접근이력 | — | — | — | — | — | — | NOT_STARTED | — |
 | HRM-13 | M | **본인조회** — 본인 정보·근태·연차 조회와 변경신청 | — | — | — | — | — | — | NOT_STARTED | — |
-| HRM-14 | O | **급여대장** — 외부 결과 업로드와 개인별 명세서 배포, 계산 제외 | — | — | — | — | — | — | NOT_STARTED | — |
+| HRM-14 | O | **급여대장** — 외부 결과 업로드와 개인별 명세서 배포, 계산 제외 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항 |
 
 ## RPT — 보고서
 
@@ -139,21 +139,21 @@
 | RPT-08 | M | **드릴다운** — 집계에서 권한 범위 내 원천전표로 이동 | — | — | — | — | — | — | NOT_STARTED | — |
 | RPT-09 | M | **결재현황** — 처리건수·평균시간·장기미결 | — | — | — | — | — | — | NOT_STARTED | — |
 | RPT-10 | M | **근태·인원** — 근태·연장근로·연차사용률·인원증감 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-11 | O | **예약발송** — 주기·수신자별 이메일 자동발송 | — | — | — | — | — | — | NOT_STARTED | — |
+| RPT-11 | O | **예약발송** — 주기·수신자별 이메일 자동발송 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항 |
 
 ## UIX — 공통 UI
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| UIX-01 | M | **홈** — 위젯 배치·표시 저장과 주요 기능 진입 | — | `src/server/api/routers/preference.ts` | — | `UserPreference` | — | — | IN_PROGRESS | 사용자별 위젯·컬럼·조회조건 저장소 완료. 홈 화면은 STEP 3/11 |
-| UIX-02 | M | **표준 조회** — 조건·그리드 구조, 컬럼 표시·순서·너비 저장 | — | `src/server/api/routers/preference.ts` | — | — | — | — | IN_PROGRESS | 컬럼 표시·순서·너비 저장 API 완료. StandardListPage는 STEP 3 |
-| UIX-03 | M | **그리드** — 정렬·필터·페이징/가상스크롤·다중선택·합계·엑셀 | — | — | — | — | — | — | NOT_STARTED | — |
-| UIX-04 | M | **전표 입력** — 라인 추가·복사·삭제, Tab/Enter, 자동완성 | — | — | — | — | — | — | NOT_STARTED | — |
-| UIX-05 | M | **입력검증** — 오류 위치 표시, 저장 실패 시 입력값 보존 | — | — | — | — | — | — | NOT_STARTED | — |
-| UIX-06 | M | **반응형** — PC 우선, 태블릿·모바일 조회·대시보드·결재 | — | — | — | — | — | — | NOT_STARTED | — |
-| UIX-07 | M | **첨부파일** — 전표·거래처·결재·인사파일의 권한 기반 업로드·미리보기 | — | `src/server/api/routers/attachment.ts` | `src/server/modules/storage/attachment.ts` | — | `tests/integration/storage.test.ts` | — | IN_PROGRESS | 권한 기반 업로드·다운로드 서비스 완료. AttachmentPanel UI는 STEP 3 |
-| UIX-08 | M | **알림센터** — 재고·여신·결재·인사 알림 통합 | — | `src/server/api/routers/notification.ts` | `src/server/modules/notification/service.ts` | `Notification`<br>`NotificationDelivery` | `tests/integration/transaction.test.ts` | — | IN_PROGRESS | 알림 생성·읽음 처리 서비스 완료. NotificationCenter UI는 STEP 3 |
-| UIX-09 | O | **즐겨찾기** — 즐겨찾기와 최근메뉴 | — | — | — | — | — | — | NOT_STARTED | — |
+| UIX-01 | M | **홈** — 위젯 배치·표시 저장과 주요 기능 진입 | `src/app/(app)/home/page.tsx`<br>`src/components/ui/dashboard-grid.tsx` | `src/server/api/routers/preference.ts` | — | `UserPreference` | `tests/e2e/components.spec.ts` | 위젯 숨김·순서 변경 후 새로고침 유지 확인 | DONE | 레이아웃·저장 완료. 업무 위젯 데이터 연결은 STEP 11 |
+| UIX-02 | M | **표준 조회** — 조건·그리드 구조, 컬럼 표시·순서·너비 저장 | `src/components/ui/standard-list-page.tsx` | `src/server/api/routers/preference.ts` | — | — | `tests/e2e/components.spec.ts` | 조회조건·컬럼 표시 저장 후 새로고침 복원 확인 | DONE | 모든 목록 화면이 StandardListPage + useSavedFilters 사용 |
+| UIX-03 | M | **그리드** — 정렬·필터·페이징/가상스크롤·다중선택·합계·엑셀 | `src/components/ui/data-grid.tsx` | — | — | — | `tests/e2e/components.spec.ts` | 정렬·다중선택·합계·페이징·컬럼설정·엑셀 버튼 확인 | DONE | 서버 페이징 전제(페이지당 최대 200). 1만건 전체 전송 없음 |
+| UIX-04 | M | **전표 입력** — 라인 추가·복사·삭제, Tab/Enter, 자동완성 | `src/components/ui/voucher-line-editor.tsx` | — | — | — | `tests/e2e/components.spec.ts` | Tab/Enter 이동, Ctrl+D 복사, Ctrl+Delete 삭제, 자동완성 확인 | DONE | 표시용 재계산만 클라이언트에서 수행하고 서버가 최종 검증(DEC-02) |
+| UIX-05 | M | **입력검증** — 오류 위치 표시, 저장 실패 시 입력값 보존 | `src/components/ui/form-error-summary.tsx` | — | — | — | `tests/e2e/components.spec.ts` | 저장 실패 시 오류 요약·필드 포커스·입력값 보존 확인 | DONE | — |
+| UIX-06 | M | **반응형** — PC 우선, 태블릿·모바일 조회·대시보드·결재 | `src/components/app-shell.tsx`<br>`src/app/globals.css` | — | — | — | `tests/e2e/components.spec.ts`<br>`tests/e2e/auth.spec.ts` | 1440·1024·390px 확인, 모바일 메뉴 토글 | IN_PROGRESS | 앱 셸 반응형 완료. 업무 화면 전수 확인은 STEP 11 |
+| UIX-07 | M | **첨부파일** — 전표·거래처·결재·인사파일의 권한 기반 업로드·미리보기 | `src/components/ui/attachment-panel.tsx` | `src/server/api/routers/attachment.ts` | `src/server/modules/storage/attachment.ts` | `Attachment` | `tests/integration/storage.test.ts`<br>`tests/e2e/components.spec.ts` | 권한 없는 첨부 접근 차단, 만료 URL 거부 확인 | DONE | — |
+| UIX-08 | M | **알림센터** — 재고·여신·결재·인사 알림 통합 | `src/components/ui/notification-center.tsx` | `src/server/api/routers/notification.ts` | `src/server/modules/notification/service.ts` | `Notification`<br>`NotificationDelivery` | `tests/integration/transaction.test.ts`<br>`tests/e2e/components.spec.ts` | 알림 목록·읽음·모두 읽음 확인 | DONE | 재고·여신·결재·인사 알림이 같은 센터로 모임 |
+| UIX-09 | O | **즐겨찾기** — 즐겨찾기와 최근메뉴 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항. 승인 시 구현 |
 
 ## INT — 공통 데이터 정합성
 
@@ -195,9 +195,9 @@
 | NFR-OPS-05 | M | **모니터링** — 구조화 로그·오류 추적·상태점검·용량·실패작업 모니터링 | — | `src/server/api/routers/admin.ts (systemHealth, outboxEvents)` | `src/server/core/logger.ts`<br>`src/app/api/health/route.ts` | — | `tests/e2e/auth.spec.ts` | — | IN_PROGRESS | 구조화 로그·상태점검·아웃박스 모니터링 구현. 오류추적 연동과 용량 모니터링은 STEP 13 |
 | NFR-OPS-06 | M | **API 문서** — 내부 API를 OpenAPI 또는 동등 수준으로 문서화 | — | `src/server/api/root.ts` | — | — | — | — | IN_PROGRESS | tRPC 라우터 구조 확립. OpenAPI 수준 명세 생성기는 STEP 13 |
 | NFR-OPS-07 | M | **브라우저 지원** — 최신 Chrome·Edge·Safari 지원 매트릭스와 핵심 흐름 검증 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-UX-01 | M | **현지화** — 한국어 UI, KRW 천단위, Asia/Seoul | `src/app/layout.tsx`<br>`src/app/login/page.tsx` | — | `src/lib/dates.ts`<br>`src/lib/money.ts` | — | `tests/unit/dates.test.ts`<br>`tests/unit/money.test.ts` | — | IN_PROGRESS | 한국어 UI, KRW 천단위, Asia/Seoul 유틸리티. 전 화면 적용은 STEP 3/11 |
-| NFR-UX-02 | M | **학습 용이성** — 용어·오류·빈 상태 설계로 신규 사용자 입력 가능 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-UX-03 | M | **접근성** — 키보드·포커스·레이블·색상 외 상태표시 | `src/app/globals.css`<br>`src/app/login/page.tsx` | — | — | — | `tests/e2e/auth.spec.ts` | — | IN_PROGRESS | 포커스 표시·레이블·키보드 조작 확인. 전수 점검은 STEP 11 |
+| NFR-UX-01 | M | **현지화** — 한국어 UI, KRW 천단위, Asia/Seoul | `src/app/layout.tsx`<br>`src/components/app-shell.tsx` | — | `src/lib/dates.ts`<br>`src/lib/money.ts`<br>`src/lib/format.ts` | — | `tests/unit/dates.test.ts`<br>`tests/unit/money.test.ts` | — | IN_PROGRESS | 한국어 UI, KRW 천단위, Asia/Seoul 공통 포맷터. 전 화면 적용은 STEP 11 |
+| NFR-UX-02 | M | **학습 용이성** — 용어·오류·빈 상태 설계로 신규 사용자 입력 가능 | `src/components/ui/primitives.tsx (EmptyState, ErrorState, Field)` | — | — | — | `tests/e2e/components.spec.ts` | — | IN_PROGRESS | 빈 상태·오류에 다음 행동 안내. 업무 용어 전수 점검은 STEP 11 |
+| NFR-UX-03 | M | **접근성** — 키보드·포커스·레이블·색상 외 상태표시 | `src/app/globals.css`<br>`src/components/ui/primitives.tsx` | — | — | — | `tests/e2e/components.spec.ts`<br>`tests/e2e/auth.spec.ts` | 키보드 전용 조작, 포커스 표시, 상태 라벨 병기 확인 | IN_PROGRESS | StatusBadge는 색상 외 라벨 병기. 전수 점검은 STEP 11 |
 
 ## MIG — 데이터 이관
 
@@ -233,3 +233,4 @@
 |---|---|---|---|---|
 | CR-01 | STEP 2 | 샌드박스 환경에서 Prisma 네이티브 schema-engine 다운로드가 차단되어, 동일한 migrations 산출물을 생성하는 WASM 기반 마이그레이션 드라이버(tools/migrate.mjs)를 추가했다. 운영·CI에서는 표준 prisma migrate deploy를 사용한다. | NFR-OPS-02 | IMPLEMENTED_AS_TOOLING |
 | CR-02 | STEP 2 | RFP에 명시되지 않았으나 hr.self 권한자의 본인 첨부파일 접근 규칙이 필요해 SELF_OWNED_TYPES 규칙을 정의했다. NFR-SEC-02 해석 확인 필요. | NFR-SEC-02, UIX-07, HRM-13 | OPEN |
+| CR-03 | STEP 3 | 모바일 390px에서 스티키 헤더에 가려지는 문제를 scroll-padding-top으로, 넓은 그리드가 페이지 전체를 가로로 넘치게 하는 문제를 min-w-0으로 수정했다. RFP 미명시 개선사항. | UIX-06, NFR-UX-03 | IMPLEMENTED |

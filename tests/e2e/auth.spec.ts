@@ -27,7 +27,7 @@ test('올바른 자격증명으로 로그인하면 홈으로 이동한다', asyn
   await page.getByLabel('비밀번호').fill(PASSWORD);
   await page.getByRole('button', { name: '로그인' }).click();
   await expect(page).toHaveURL(/\/home$/);
-  await expect(page.getByRole('heading')).toContainText('안녕하세요');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('안녕하세요');
 });
 
 test('세션 쿠키는 HttpOnly이며 값이 노출되지 않는다', async ({ page, context }) => {

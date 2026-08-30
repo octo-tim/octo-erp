@@ -25,6 +25,17 @@ body {
   height: 100%;
 }
 
+/* UIX-06: the app header is sticky, so anything scrolled to must clear it.
+   Without this, controls land underneath the header on narrow viewports. */
+html {
+  scroll-padding-top: 4rem;
+}
+
+:where(input, select, textarea, button, a, [tabindex]) {
+  scroll-margin-top: 4rem;
+  scroll-margin-bottom: 1rem;
+}
+
 body {
   background: var(--surface-muted);
   color: var(--text);
