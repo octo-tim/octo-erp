@@ -197,9 +197,16 @@ export const masterRouter = router({
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => partner.detail(t, input.id))),
 
+  // an empty q returns the first `take` active partners, which is what a picker needs on open
   searchPartners: permissionProcedure('master.read')
-    .input(z.object({ q: z.string().min(1).max(50), partnerType: partnerType.optional() }))
-    .query(({ ctx, input }) => readTx(ctx, (t) => partner.search(t, input.q, input.partnerType))),
+    .input(
+      z.object({
+        q: z.string().max(50).default(''),
+        partnerType: partnerType.optional(),
+        take: z.number().int().min(1).max(500).default(20),
+      }),
+    )
+    .query(({ ctx, input }) => readTx(ctx, (t) => partner.search(t, input.q, input.partnerType, input.take))),
 
   createPartner: permissionProcedure('master.write')
     .input(partnerInput.extend({ requestId }))

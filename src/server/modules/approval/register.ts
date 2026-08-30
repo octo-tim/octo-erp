@@ -1,5 +1,6 @@
 import { registerHrmHandlers } from './handlers/hrm';
 import { registerInventoryHandlers } from './handlers/inventory';
+import { registerSalesHandlers } from './handlers/sales';
 
 /**
  * Single place where approval target handlers are wired. Imported by the tRPC root so
@@ -12,6 +13,7 @@ export function registerApprovalHandlers(): void {
   if (registered) return;
   registerHrmHandlers();
   registerInventoryHandlers();
+  registerSalesHandlers();
   registered = true;
 }
 

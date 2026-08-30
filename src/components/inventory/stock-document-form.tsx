@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { api, newRequestId } from '@/lib/trpc';
 import { Button, Card, Field, Input, Select } from '@/components/ui/primitives';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
@@ -8,6 +8,7 @@ import { VoucherLineEditor, type LineColumn } from '@/components/ui/voucher-line
 import { fmt } from '@/lib/format';
 import { add, D } from '@/lib/money';
 import { businessDate } from '@/lib/dates';
+import { itemLabel, matchErrorText, resolveItemLabels, searchTermOf } from '@/lib/item-match';
 
 /**
  * INV-01/02/03: receipts, issues and transfers differ only in which warehouse fields
@@ -35,23 +36,6 @@ const emptyLine = (): Line => ({
   note: '',
 });
 
-/**
- * Picking from the datalist leaves the full "이름 (코드)" label in the cell, but an
- * operator who types just the name and tabs away means the same item when only one
- * matches. Only an ambiguous or unknown entry is rejected.
- */
-function resolveItem(options: { value: string; label: string }[], typed: string): string {
-  const text = typed.trim();
-  if (!text) return '';
-
-  const exact = options.find((o) => o.label === text);
-  if (exact) return exact.value;
-
-  const lower = text.toLowerCase();
-  const partial = options.filter((o) => o.label.toLowerCase().includes(lower));
-  return partial.length === 1 ? partial[0]!.value : '';
-}
-
 const REASON_GROUP: Record<FormDocType, string> = {
   RECEIPT: 'STOCK_REASON_IN',
   ISSUE: 'STOCK_REASON_OUT',
@@ -69,8 +53,16 @@ export function StockDocumentForm({
 }) {
   const warehouses = api.master.warehouses.useQuery({ activeOnly: true });
   const reasons = api.master.codes.useQuery({ groupCode: REASON_GROUP[docType], activeOnly: true });
-  const items = api.master.searchItems.useQuery({ q: '', take: 200 });
   const create = api.inventory.createDocument.useMutation();
+  const utils = api.useUtils();
+
+  /**
+   * CR-14: the datalist is a hint, so it follows what is being typed instead of holding a
+   * fixed slice of the master. What the typed text actually means is decided on submit by
+   * `resolveItemLabels`, which asks the server and therefore sees every item.
+   */
+  const [itemQuery, setItemQuery] = useState('');
+  const items = api.master.searchItems.useQuery({ q: itemQuery, take: 20 });
 
   const [header, setHeader] = useState({
     docDate: businessDate(new Date()),
@@ -83,8 +75,18 @@ export function StockDocumentForm({
   const [errors, setErrors] = useState<FieldError[]>([]);
 
   const suggestions = useMemo(
-    () => (items.data ?? []).map((i) => ({ value: i.id, label: `${i.name} (${i.code})` })),
+    () => (items.data ?? []).map((i) => ({ value: i.id, label: itemLabel(i) })),
     [items.data],
+  );
+
+  /** Keeps the suggestion query on whichever item cell was last edited. */
+  const onLinesChange = useCallback(
+    (next: Line[]) => {
+      const changed = next.find((l, i) => l.itemLabel !== (lines[i]?.itemLabel ?? ''));
+      if (changed) setItemQuery(searchTermOf(changed.itemLabel));
+      setLines(next);
+    },
+    [lines],
   );
 
   const columns: LineColumn<Line>[] = [
@@ -104,30 +106,31 @@ export function StockDocumentForm({
 
   async function submit() {
     setErrors([]);
-    const prepared = lines
-      .filter((l) => l.itemLabel.trim() || l.quantity.trim())
-      .map((l, i) => ({
-        index: i,
-        itemId: resolveItem(suggestions, l.itemLabel),
-        quantity: l.quantity,
-        unitCost: l.unitCost,
-        note: l.note,
-      }));
-
-    const missing = prepared.filter((l) => !l.itemId);
-    if (prepared.length === 0 || missing.length > 0) {
-      setErrors([
-        {
-          field: 'sd-lines',
-          label: '품목',
-          message:
-            prepared.length === 0
-              ? '품목을 한 건 이상 입력하세요.'
-              : `${missing.map((m) => `${m.index + 1}행`).join(', ')}: 품목을 찾을 수 없거나 여러 건이 일치합니다. 목록에서 선택하세요.`,
-        },
-      ]);
+    const entered = lines.filter((l) => l.itemLabel.trim() || l.quantity.trim());
+    if (entered.length === 0) {
+      setErrors([{ field: 'sd-lines', label: '품목', message: '품목을 한 건 이상 입력하세요.' }]);
       return;
     }
+
+    // CR-14: the server decides what the typed text means, so an item outside the
+    // suggestion list is still found.
+    const matches = await resolveItemLabels(
+      entered.map((l) => l.itemLabel),
+      (term) => utils.master.searchItems.fetch({ q: term, take: 5 }),
+    );
+    const lineErrors = matches.map((m, i) => matchErrorText(i + 1, m)).filter((m): m is string => m !== null);
+    if (lineErrors.length > 0) {
+      setErrors(lineErrors.map((message) => ({ field: 'sd-lines', label: '품목', message })));
+      return;
+    }
+
+    const prepared = entered.map((l, i) => ({
+      index: i,
+      itemId: (matches[i] as { kind: 'OK'; id: string }).id,
+      quantity: l.quantity,
+      unitCost: l.unitCost,
+      note: l.note,
+    }));
 
     try {
       const doc = await create.mutateAsync({
@@ -237,7 +240,7 @@ export function StockDocumentForm({
         <VoucherLineEditor<Line>
           columns={columns}
           lines={lines}
-          onChange={setLines}
+          onChange={onLinesChange}
           newLine={emptyLine}
           recompute={(l) => ({
             ...l,

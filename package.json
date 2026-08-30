@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "serve": "node tools/serve.mjs",
     "worker": "tsx src/server/jobs/worker.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -49,6 +49,12 @@ model Division {
   userScopes UserDivisionScope[]
   stockDocuments StockDocument[]
   journalLines   JournalLine[]
+  quotations       Quotation[]
+  salesOrders      SalesOrder[]
+  salesDocuments   SalesDocument[]
+  purchaseRequests PurchaseRequest[]
+  purchaseOrders   PurchaseOrder[]
+  purchaseDocuments PurchaseDocument[]
 }
 
 model Employee {
@@ -390,6 +396,8 @@ model Warehouse {
   userScopes UserWarehouseScope[]
   stockFrom  StockDocument[] @relation("StockFrom")
   stockTo    StockDocument[] @relation("StockTo")
+  salesDocuments    SalesDocument[]
+  purchaseDocuments PurchaseDocument[]
   ledger     InventoryLedger[]
   snapshots  StockSnapshot[]
   counts     StockCount[]
@@ -853,6 +861,12 @@ model Item {
   updatedAt     DateTime @updatedAt
 
   stockLines  StockDocumentLine[]
+  quotationLines       QuotationLine[]
+  salesOrderLines      SalesOrderLine[]
+  salesDocumentLines   SalesDocumentLine[]
+  purchaseRequestLines PurchaseRequestLine[]
+  purchaseOrderLines   PurchaseOrderLine[]
+  purchaseDocumentLines PurchaseDocumentLine[]
   ledger      InventoryLedger[]
   snapshots   StockSnapshot[]
   countLines  StockCountLine[]
@@ -888,6 +902,14 @@ model Partner {
   defaultForItems Item[] @relation("DefaultSupplier")
   stockDocuments  StockDocument[]
   journalLines    JournalLine[]
+  quotations        Quotation[]
+  salesOrders       SalesOrder[]
+  salesDocuments    SalesDocument[]
+  purchaseOrders    PurchaseOrder[]
+  purchaseDocuments PurchaseDocument[]
+  receivables       Receivable[]
+  payables          Payable[]
+  settlements       Settlement[]
 
   @@index([name])
   @@index([businessNo])
@@ -1358,4 +1380,460 @@ model ClosingRun {
   runAt         DateTime @default(now())
 
   @@index([periodId, runAt])
+}
+
+// ───────────────────────── Sales / Purchase (SLS) — STEP 9 ─────────────────────────
+
+/**
+ * SLS-02/SLS-04/SLS-13: partial conversion between documents.
+ *
+ * Rather than each document type inventing its own "remaining quantity" field, every
+ * conversion is recorded here against the SOURCE LINE. Remaining = original - converted
+ * - canceled, derived from these rows, so two people converting the same quotation
+ * concurrently cannot both see the same remainder (the source line is locked first).
+ */
+model DocumentConversion {
+  id           String   @id @default(cuid())
+  /** QUOTATION | SALES_ORDER | PURCHASE_REQUEST | PURCHASE_ORDER */
+  sourceType   String
+  sourceId     String
+  sourceLineId String
+  /** SALES_ORDER | SALES | PURCHASE_ORDER | PURCHASE */
+  targetType   String
+  targetId     String
+  targetLineId String   @unique
+  quantity     Decimal  @db.Decimal(18, 3)
+  /** set when the target document is canceled, releasing the quantity back */
+  canceledAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([sourceType, sourceId])
+  @@index([sourceLineId, canceledAt])
+  @@index([targetType, targetId])
+}
+
+/** SLS-01: quotations. */
+model Quotation {
+  id           String   @id @default(cuid())
+  docNo        String   @unique
+  docDate      DateTime @db.Date
+  validUntil   DateTime? @db.Date
+  partnerId    String
+  partner      Partner  @relation(fields: [partnerId], references: [id])
+  divisionId   String?
+  division     Division? @relation(fields: [divisionId], references: [id])
+  /** DRAFT | CONFIRMED | CONVERTED | CANCELED | EXPIRED */
+  status       String   @default("DRAFT")
+  title        String?
+  note         String?
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+  totalAmount  Decimal  @default(0) @db.Decimal(18, 0)
+  policyVersionId String?
+  version      Int      @default(1)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lines QuotationLine[]
+
+  @@index([partnerId, docDate])
+  @@index([status, docDate])
+}
+
+model QuotationLine {
+  id           String   @id @default(cuid())
+  quotationId  String
+  quotation    Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  lineNo       Int
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id])
+  description  String?
+  quantity     Decimal  @db.Decimal(18, 3)
+  unitPrice    Decimal  @db.Decimal(18, 4)
+  taxType      String   @default("TAXABLE")
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+
+  @@unique([quotationId, lineNo])
+  @@index([itemId])
+}
+
+/** SLS-03: sales orders, with a delivery date and a lifecycle of their own. */
+model SalesOrder {
+  id           String   @id @default(cuid())
+  docNo        String   @unique
+  docDate      DateTime @db.Date
+  deliveryDate DateTime? @db.Date
+  partnerId    String
+  partner      Partner  @relation(fields: [partnerId], references: [id])
+  divisionId   String?
+  division     Division? @relation(fields: [divisionId], references: [id])
+  /** DRAFT | ACCEPTED | IN_PROGRESS | COMPLETED | CANCELED */
+  status       String   @default("DRAFT")
+  note         String?
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+  totalAmount  Decimal  @default(0) @db.Decimal(18, 0)
+  policyVersionId String?
+  version      Int      @default(1)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lines SalesOrderLine[]
+
+  @@index([partnerId, docDate])
+  @@index([status, deliveryDate])
+}
+
+model SalesOrderLine {
+  id           String   @id @default(cuid())
+  orderId      String
+  order        SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineNo       Int
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id])
+  description  String?
+  quantity     Decimal  @db.Decimal(18, 3)
+  unitPrice    Decimal  @db.Decimal(18, 4)
+  taxType      String   @default("TAXABLE")
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+
+  @@unique([orderId, lineNo])
+  @@index([itemId])
+}
+
+/**
+ * SLS-05/SLS-11: sales documents and sales returns. A return is a separate docType with
+ * positive quantities linked back to the original, never a negative-quantity sale.
+ */
+model SalesDocument {
+  id           String   @id @default(cuid())
+  docNo        String   @unique
+  /** SALES | RETURN_SALES */
+  docType      String   @default("SALES")
+  docDate      DateTime @db.Date
+  partnerId    String
+  partner      Partner  @relation(fields: [partnerId], references: [id])
+  warehouseId  String
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  divisionId   String?
+  division     Division? @relation(fields: [divisionId], references: [id])
+  /** DRAFT | PENDING_APPROVAL | CONFIRMED | CANCELED */
+  status       String   @default("DRAFT")
+  note         String?
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+  totalAmount  Decimal  @default(0) @db.Decimal(18, 0)
+  /** SLS-11: the document this one returns */
+  originalId   String?
+  original     SalesDocument? @relation("SalesReturn", fields: [originalId], references: [id])
+  returns      SalesDocument[] @relation("SalesReturn")
+  policyVersionId String?
+  version      Int      @default(1)
+  confirmedAt  DateTime?
+  confirmedById String?
+  canceledAt   DateTime?
+  cancelReason String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lines       SalesDocumentLine[]
+  receivables Receivable[]
+  taxDocuments TaxDocumentOutput[]
+
+  @@index([partnerId, docDate])
+  @@index([status, docDate])
+  @@index([docType, docDate])
+}
+
+model SalesDocumentLine {
+  id           String   @id @default(cuid())
+  documentId   String
+  document     SalesDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  lineNo       Int
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id])
+  description  String?
+  quantity     Decimal  @db.Decimal(18, 3)
+  unitPrice    Decimal  @db.Decimal(18, 4)
+  taxType      String   @default("TAXABLE")
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+  /** SLS-11: the original line this line returns */
+  originalLineId String?
+
+  @@unique([documentId, lineNo])
+  @@index([itemId])
+  @@index([originalLineId])
+}
+
+/** SLS-13: purchase requests, the document approval turns into a purchase order. */
+model PurchaseRequest {
+  id           String   @id @default(cuid())
+  docNo        String   @unique
+  docDate      DateTime @db.Date
+  requiredDate DateTime? @db.Date
+  divisionId   String?
+  division     Division? @relation(fields: [divisionId], references: [id])
+  /** DRAFT | PENDING_APPROVAL | APPROVED | REJECTED | ORDERED | CANCELED */
+  status       String   @default("DRAFT")
+  purpose      String?
+  note         String?
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+  totalAmount  Decimal  @default(0) @db.Decimal(18, 0)
+  version      Int      @default(1)
+  approvedAt   DateTime?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lines PurchaseRequestLine[]
+
+  @@index([status, docDate])
+}
+
+model PurchaseRequestLine {
+  id           String   @id @default(cuid())
+  requestId    String
+  request      PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  lineNo       Int
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id])
+  description  String?
+  quantity     Decimal  @db.Decimal(18, 3)
+  unitPrice    Decimal  @db.Decimal(18, 4)
+  taxType      String   @default("TAXABLE")
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+  suggestedSupplierId String?
+
+  @@unique([requestId, lineNo])
+  @@index([itemId])
+}
+
+/** SLS-13: purchase orders. */
+model PurchaseOrder {
+  id           String   @id @default(cuid())
+  docNo        String   @unique
+  docDate      DateTime @db.Date
+  dueDate      DateTime? @db.Date
+  partnerId    String
+  partner      Partner  @relation(fields: [partnerId], references: [id])
+  divisionId   String?
+  division     Division? @relation(fields: [divisionId], references: [id])
+  /** DRAFT | ORDERED | RECEIVING | COMPLETED | CANCELED */
+  status       String   @default("DRAFT")
+  note         String?
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+  totalAmount  Decimal  @default(0) @db.Decimal(18, 0)
+  policyVersionId String?
+  version      Int      @default(1)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lines PurchaseOrderLine[]
+
+  @@index([partnerId, docDate])
+  @@index([status, dueDate])
+}
+
+model PurchaseOrderLine {
+  id           String   @id @default(cuid())
+  orderId      String
+  order        PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineNo       Int
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id])
+  description  String?
+  quantity     Decimal  @db.Decimal(18, 3)
+  unitPrice    Decimal  @db.Decimal(18, 4)
+  taxType      String   @default("TAXABLE")
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+
+  @@unique([orderId, lineNo])
+  @@index([itemId])
+}
+
+/** SLS-06/SLS-11: purchase documents and purchase returns. */
+model PurchaseDocument {
+  id           String   @id @default(cuid())
+  docNo        String   @unique
+  /** PURCHASE | RETURN_PURCHASE */
+  docType      String   @default("PURCHASE")
+  docDate      DateTime @db.Date
+  partnerId    String
+  partner      Partner  @relation(fields: [partnerId], references: [id])
+  warehouseId  String
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  divisionId   String?
+  division     Division? @relation(fields: [divisionId], references: [id])
+  status       String   @default("DRAFT")
+  note         String?
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+  totalAmount  Decimal  @default(0) @db.Decimal(18, 0)
+  originalId   String?
+  original     PurchaseDocument? @relation("PurchaseReturn", fields: [originalId], references: [id])
+  returns      PurchaseDocument[] @relation("PurchaseReturn")
+  policyVersionId String?
+  version      Int      @default(1)
+  confirmedAt  DateTime?
+  confirmedById String?
+  canceledAt   DateTime?
+  cancelReason String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lines    PurchaseDocumentLine[]
+  payables Payable[]
+
+  @@index([partnerId, docDate])
+  @@index([status, docDate])
+  @@index([docType, docDate])
+}
+
+model PurchaseDocumentLine {
+  id           String   @id @default(cuid())
+  documentId   String
+  document     PurchaseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  lineNo       Int
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id])
+  description  String?
+  quantity     Decimal  @db.Decimal(18, 3)
+  unitPrice    Decimal  @db.Decimal(18, 4)
+  taxType      String   @default("TAXABLE")
+  supplyAmount Decimal  @default(0) @db.Decimal(18, 0)
+  vatAmount    Decimal  @default(0) @db.Decimal(18, 0)
+  originalLineId String?
+
+  @@unique([documentId, lineNo])
+  @@index([itemId])
+  @@index([originalLineId])
+}
+
+/**
+ * SLS-08: one receivable per confirmed sales document. `settledAmount` is a cache of the
+ * SettlementMatch rows; `balance` is derived, never stored, so the matches stay the truth.
+ */
+model Receivable {
+  id            String   @id @default(cuid())
+  documentId    String   @unique
+  document      SalesDocument @relation(fields: [documentId], references: [id])
+  partnerId     String
+  partner       Partner  @relation(fields: [partnerId], references: [id])
+  docDate       DateTime @db.Date
+  dueDate       DateTime? @db.Date
+  amount        Decimal  @db.Decimal(18, 0)
+  settledAmount Decimal  @default(0) @db.Decimal(18, 0)
+  /** OPEN | PARTIAL | SETTLED | CANCELED */
+  status        String   @default("OPEN")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  matches SettlementMatch[]
+
+  @@index([partnerId, status])
+  @@index([docDate])
+}
+
+model Payable {
+  id            String   @id @default(cuid())
+  documentId    String   @unique
+  document      PurchaseDocument @relation(fields: [documentId], references: [id])
+  partnerId     String
+  partner       Partner  @relation(fields: [partnerId], references: [id])
+  docDate       DateTime @db.Date
+  dueDate       DateTime? @db.Date
+  amount        Decimal  @db.Decimal(18, 0)
+  settledAmount Decimal  @default(0) @db.Decimal(18, 0)
+  status        String   @default("OPEN")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  matches SettlementMatch[]
+
+  @@index([partnerId, status])
+  @@index([docDate])
+}
+
+/** SLS-10: a receipt or payment, which is then allocated across open items. */
+model Settlement {
+  id            String   @id @default(cuid())
+  docNo         String   @unique
+  /** RECEIPT | PAYMENT */
+  docType       String
+  docDate       DateTime @db.Date
+  partnerId     String
+  partner       Partner  @relation(fields: [partnerId], references: [id])
+  method        String?
+  bankAccount   String?
+  amount        Decimal  @db.Decimal(18, 0)
+  /** how much of `amount` is allocated; the remainder is an unapplied balance */
+  allocatedAmount Decimal @default(0) @db.Decimal(18, 0)
+  status        String   @default("DRAFT")
+  note          String?
+  version       Int      @default(1)
+  confirmedAt   DateTime?
+  canceledAt    DateTime?
+  cancelReason  String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  matches SettlementMatch[]
+
+  @@index([partnerId, docDate])
+  @@index([status, docDate])
+}
+
+/**
+ * SLS-10: the allocation itself, append-only so a reallocation is visible as history
+ * rather than an overwrite. A reversal is a negative-amount row referencing the same pair.
+ */
+model SettlementMatch {
+  id            String   @id @default(cuid())
+  settlementId  String
+  settlement    Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  receivableId  String?
+  receivable    Receivable? @relation(fields: [receivableId], references: [id])
+  payableId     String?
+  payable       Payable? @relation(fields: [payableId], references: [id])
+  amount        Decimal  @db.Decimal(18, 0)
+  /** AUTO | MANUAL | REVERSAL */
+  origin        String   @default("AUTO")
+  note          String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  @@index([settlementId])
+  @@index([receivableId])
+  @@index([payableId])
+}
+
+/** SLS-07: the generated tax-invoice document and its email delivery. */
+model TaxDocumentOutput {
+  id           String   @id @default(cuid())
+  documentId   String
+  document     SalesDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  /** the rendered form, stored as an attachment */
+  attachmentId String?
+  /** GENERATED | SENT | FAILED */
+  status       String   @default("GENERATED")
+  recipientEmail String?
+  sentAt       DateTime?
+  failureReason String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  @@index([documentId, createdAt])
 }

@@ -5,6 +5,7 @@
 - 요구사항 원본: `docs/source/ERP_RFP_v0.3.md` / 구현 순서: `docs/source/ERP_prompt_pack_v1.0.md`
 - 추적표 갱신: `node tools/traceability.mjs` (CI는 `--check`)
 - 품질 게이트: `npm run check && npm run test:integration && npm run build`
+- 빌드 후 E2E 전에는 반드시 `npm run serve` (예전 서버가 살아 있으면 삭제된 청크를 계속 내려보내 화면이 통째로 깨진다)
 - 통합시험 DB: `DATABASE_URL_TEST` (실제 PostgreSQL, 모킹 금지)
 - 커밋 메시지: ASCII, 괄호 없음, `STEP n:` 접두사
 - 단계 완료 보고 형식: 대상 ID, 변경 파일, DB 변경, 시험 명령과 결과, 수동 확인, 잔여 위험

@@ -460,13 +460,19 @@
   },
   "DEC-02": {
     "status": "DONE",
+    "services": [
+      "src/server/modules/sales/pricing.ts (priceLine, priceLines, splitVatInclusive)"
+    ],
     "docs": [
       "docs/adr/0004-money-and-vat.md"
     ],
     "tests": [
-      "tests/unit/money.test.ts"
+      "tests/unit/sales-pricing.test.ts",
+      "docs/acceptance-scenarios.md B-12",
+      "tests/integration/sales.test.ts"
     ],
-    "notes": "기본안 임시승인, PolicyVersion money v1 시드"
+    "manual": "B-12 수치 재현 확인. 합계는 라인 합이며 합계의 10퍼센트가 아니다",
+    "notes": "기본안 임시승인. 라인별 내림 절사, 원 단위. PolicyVersion 없이 순수 함수로 고정되어 있으므로 재결정 시 시험이 먼저 깨진다"
   },
   "DEC-03": {
     "status": "DONE",
@@ -1301,6 +1307,53 @@
         "INT-07"
       ],
       "status": "FIXED"
+    },
+    {
+      "id": "CR-12",
+      "step": "STEP 9",
+      "text": "매출전표 등록 화면의 조회조건과 등록 폼이 적요와 매입처처럼 같은 라벨 문자열을 쓰고 있어 자동화 선택자가 두 컨트롤을 동시에 잡았다. DOM id는 서로 달라 접근성 결함은 아니었으나, 사람이 화면을 볼 때도 어느 영역의 입력인지 헷갈릴 소지가 있어 시험을 등록 카드 범위로 한정하고 조회조건 라벨을 구분했다.",
+      "related": [
+        "UIX-02",
+        "UIX-05"
+      ],
+      "status": "IMPLEMENTED"
+    },
+    {
+      "id": "CR-13",
+      "step": "STEP 9",
+      "text": "모바일 390px에서 매출전표 등록 흐름 E2E가 브라우저 가상 뷰포트 어긋남으로 불안정했다. UIX-06이 휴대폰 범위를 조회 대시보드 결재로 한정하고 있어 등록 흐름 시험은 데스크톱 전용으로 두고, 대신 휴대폰에서 실제로 쓰는 조회 화면 시험을 모바일 프로젝트에 추가해 커버리지가 비지 않도록 했다.",
+      "related": [
+        "UIX-06",
+        "NFR-UX-03"
+      ],
+      "status": "IMPLEMENTED"
+    },
+    {
+      "id": "CR-14",
+      "step": "STEP 9",
+      "text": "전표 라인의 품목 입력을 브라우저가 미리 받아둔 자동완성 목록 안에서만 해석하고 있었다. 그 목록은 상한이 있어(입출고 200건, 매출·매입 300건) 품목 마스터가 상한을 넘는 순간, 품목 화면에는 분명히 보이는 품목을 전표에 입력할 수 없고 '품목을 찾을 수 없거나 여러 건이 일치합니다'만 반복되는 상태가 된다. 실제로 활성 품목이 207건이 되자 입출고 전표 등록이 전부 막혔다. 해석을 서버 조회로 옮겨(src/lib/item-match.ts) 마스터 전체를 대상으로 판정하고, 자동완성 목록은 입력한 글자를 따라가는 힌트로 되돌렸다. 오류 문구도 '없음'과 '여러 건 일치'를 구분해 다음 행동을 안내한다.",
+      "related": [
+        "INV-01",
+        "INV-02",
+        "INV-03",
+        "SLS-01",
+        "SLS-05",
+        "SLS-06",
+        "SLS-13",
+        "UIX-04"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-15",
+      "step": "STEP 9",
+      "text": "매출·매입 전표 화면의 합계 표시가 금액을 자바스크립트 number로 더하고 있었다. 원 단위 정수라 당장 값이 틀리지는 않지만 INT-01이 금지한 방식이고 금액이 커지면 깨진다. decimal 덧셈으로 바꿨다.",
+      "related": [
+        "INT-01",
+        "SLS-05",
+        "SLS-06"
+      ],
+      "status": "FIXED"
     }
   ],
   "BAS-01": {
@@ -1518,7 +1571,8 @@
     ],
     "tests": [
       "tests/integration/inventory.test.ts",
-      "tests/e2e/inventory.spec.ts"
+      "tests/e2e/inventory.spec.ts",
+      "tests/unit/item-match.test.ts"
     ],
     "manual": "수동 입고에 사유가 강제되는지, 확정 시점에만 원장이 생성되는지 확인"
   },
@@ -1543,7 +1597,8 @@
     ],
     "tests": [
       "tests/integration/inventory.test.ts",
-      "tests/e2e/inventory.spec.ts"
+      "tests/e2e/inventory.spec.ts",
+      "tests/unit/item-match.test.ts"
     ],
     "manual": "샘플·폐기 사유 선택이 필수인지, 출고 단가가 입력값이 아니라 월 총평균가로 산정되는지 확인"
   },
@@ -1567,7 +1622,8 @@
     ],
     "tests": [
       "tests/integration/inventory.test.ts",
-      "tests/e2e/inventory.spec.ts"
+      "tests/e2e/inventory.spec.ts",
+      "tests/unit/item-match.test.ts"
     ],
     "manual": "요청 상태에서는 재고가 움직이지 않고, 도착 처리 시 양쪽 창고가 동시에 바뀌는지 확인"
   },
@@ -2018,5 +2074,352 @@
       "tests/e2e/accounting.spec.ts"
     ],
     "manual": "모든 회계 화면과 내보내기 파일에 내부관리용 표시가 나타나는지 확인"
+  },
+  "SLS-01": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/quotation.ts (create, update, copy, setStatus, list, detail)",
+      "src/server/modules/sales/pricing.ts (priceLines)",
+      "src/lib/item-match.ts (품목 입력 해석)"
+    ],
+    "api": [
+      "sales.quotations",
+      "sales.quotation",
+      "sales.createQuotation",
+      "sales.updateQuotation",
+      "sales.copyQuotation",
+      "sales.setQuotationStatus"
+    ],
+    "screens": [
+      "src/app/(app)/sales/quotations/page.tsx",
+      "src/app/(app)/sales/quotations/[id]/page.tsx"
+    ],
+    "tables": [
+      "Quotation",
+      "QuotationLine"
+    ],
+    "tests": [
+      "tests/unit/sales-pricing.test.ts",
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts",
+      "tests/unit/item-match.test.ts"
+    ],
+    "manual": "견적서 복사 후 유효기간과 단가가 그대로 넘어오는지, 만료된 견적이 주문으로 넘어가지 않는지 확인",
+    "notes": "유효기간 경과 견적은 EXPIRED로 표시되고 전환이 거부된다"
+  },
+  "SLS-02": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/quotation.ts (convertToOrder)",
+      "src/server/modules/sales/conversion.ts (reserve, release, remainingOf, progressOf)"
+    ],
+    "api": [
+      "sales.convertQuotationToOrder"
+    ],
+    "screens": [
+      "src/app/(app)/sales/quotations/[id]/page.tsx"
+    ],
+    "tables": [
+      "DocumentConversion(sourceType,sourceId,sourceLineId,targetType,targetId)"
+    ],
+    "tests": [
+      "tests/unit/sales-pricing.test.ts",
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts"
+    ],
+    "manual": "부분 전환 후 잔여수량이 줄고, 두 세션이 동시에 전환하면 한쪽만 성공하는지 확인",
+    "notes": "잔여수량은 라인에 저장하지 않고 DocumentConversion에서 도출한다. 원천 라인을 FOR UPDATE로 잠근 뒤 검증한다"
+  },
+  "SLS-03": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/sales-order.ts (create, cancel, list, detail)"
+    ],
+    "api": [
+      "sales.salesOrders",
+      "sales.salesOrder",
+      "sales.createSalesOrder",
+      "sales.cancelSalesOrder"
+    ],
+    "screens": [
+      "src/app/(app)/sales/orders/page.tsx",
+      "src/app/(app)/sales/orders/[id]/page.tsx"
+    ],
+    "tables": [
+      "SalesOrder",
+      "SalesOrderLine"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts"
+    ],
+    "manual": "이미 출고된 주문의 취소가 거부되고, 취소 시 견적 잔여수량이 되돌아오는지 확인"
+  },
+  "SLS-04": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/sales-document.ts (create, refreshOrderStatus)",
+      "src/server/modules/sales/conversion.ts (progressStatus)"
+    ],
+    "api": [
+      "sales.createSalesDocument",
+      "sales.salesOrder"
+    ],
+    "screens": [
+      "src/app/(app)/sales/orders/[id]/page.tsx",
+      "src/app/(app)/sales/sales-documents/page.tsx"
+    ],
+    "tables": [
+      "DocumentConversion"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts"
+    ],
+    "manual": "부분 출고 시 주문 상태가 PARTIAL, 전량 출고 시 COMPLETE로 바뀌는지 확인"
+  },
+  "SLS-05": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/sales-document.ts (create, update, confirm, cancel)",
+      "src/server/modules/sales/receivable.ts (raise, reverse)",
+      "src/server/modules/inventory/ledger.ts (post, reverse)",
+      "src/lib/item-match.ts (품목 입력 해석)"
+    ],
+    "api": [
+      "sales.salesDocuments",
+      "sales.salesDocument",
+      "sales.createSalesDocument",
+      "sales.updateSalesDocument",
+      "sales.confirmSalesDocument",
+      "sales.cancelSalesDocument"
+    ],
+    "screens": [
+      "src/app/(app)/sales/sales-documents/page.tsx",
+      "src/app/(app)/sales/sales-documents/[id]/page.tsx"
+    ],
+    "tables": [
+      "SalesDocument",
+      "SalesDocumentLine",
+      "OpenItem"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts",
+      "tests/unit/item-match.test.ts"
+    ],
+    "manual": "B-02 확정 한 번에 재고·채권·분개·감사로그가 함께 남고, 어느 하나가 실패하면 전부 남지 않는지 확인",
+    "notes": "E2E-01. 확정은 멱등키 뒤에서 한 트랜잭션으로 수행되며 여신한도와 DEC-03 결재 게이트를 통과해야 한다"
+  },
+  "SLS-06": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/purchase.ts (createDocument, confirmDocument, cancelDocument)",
+      "src/server/modules/sales/receivable.ts (raisePayable, reversePayable)",
+      "src/lib/item-match.ts (품목 입력 해석)"
+    ],
+    "api": [
+      "sales.purchaseDocuments",
+      "sales.purchaseDocument",
+      "sales.createPurchaseDocument",
+      "sales.confirmPurchaseDocument",
+      "sales.cancelPurchaseDocument"
+    ],
+    "screens": [
+      "src/app/(app)/sales/purchase-documents/page.tsx",
+      "src/app/(app)/sales/purchase-documents/[id]/page.tsx"
+    ],
+    "tables": [
+      "PurchaseDocument",
+      "PurchaseDocumentLine",
+      "OpenItem"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts",
+      "tests/unit/item-match.test.ts"
+    ],
+    "manual": "E2E-02 발주에서 입고까지 재고 수량과 이동평균 단가, 미지급금이 함께 반영되는지 확인"
+  },
+  "SLS-07": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/tax-invoice.ts (build, render, issue, history)"
+    ],
+    "api": [
+      "sales.taxInvoice",
+      "sales.issueTaxInvoice",
+      "sales.taxInvoiceHistory"
+    ],
+    "screens": [
+      "src/app/(app)/sales/sales-documents/[id]/page.tsx"
+    ],
+    "tables": [
+      "TaxDocumentOutput"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts"
+    ],
+    "manual": "발행 서식에 국세청 미전송 고지 문구가 항상 보이는지, 발행 이력이 남는지 확인",
+    "notes": "사내 관리용 서식이며 전자세금계산서 전송은 범위 밖이다. 이메일 발송은 아웃박스를 거쳐 중복 발송되지 않는다"
+  },
+  "SLS-08": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/receivable.ts (aging, openItems, outstandingOf)",
+      "src/server/modules/sales/pricing.ts (agingBucket)"
+    ],
+    "api": [
+      "sales.aging",
+      "sales.openItems"
+    ],
+    "screens": [
+      "src/app/(app)/settlement/receivables/page.tsx"
+    ],
+    "tables": [
+      "OpenItem"
+    ],
+    "tests": [
+      "tests/unit/sales-pricing.test.ts",
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts"
+    ],
+    "manual": "연령분석 구간 경계일이 아래 구간에 포함되는지, 거래처 합계가 미결제 잔액과 일치하는지 확인"
+  },
+  "SLS-09": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/receivable.ts (payableSummary, payableOutstandingOf, raisePayable)"
+    ],
+    "api": [
+      "sales.payableSummary",
+      "sales.openItems"
+    ],
+    "screens": [
+      "src/app/(app)/settlement/payables/page.tsx"
+    ],
+    "tables": [
+      "OpenItem"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts"
+    ],
+    "manual": "매입 확정 시 미지급금이 서고, 지급 시 정확히 상계되는지 확인"
+  },
+  "SLS-10": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/settlement.ts (create, autoAllocate, reallocate, confirm, cancel)"
+    ],
+    "api": [
+      "sales.settlements",
+      "sales.settlement",
+      "sales.createSettlement",
+      "sales.autoAllocate",
+      "sales.reallocate",
+      "sales.confirmSettlement",
+      "sales.cancelSettlement"
+    ],
+    "screens": [
+      "src/app/(app)/settlement/receipts/page.tsx",
+      "src/app/(app)/settlement/receipts/[id]/page.tsx",
+      "src/app/(app)/settlement/payments/page.tsx",
+      "src/components/sales/settlement-screen.tsx"
+    ],
+    "tables": [
+      "Settlement",
+      "SettlementAllocation"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts"
+    ],
+    "manual": "자동 소구가 오래된 건부터 채우는지, 재배분 후 이력이 AUTO REVERSAL MANUAL 순으로 남는지, 과소구가 양방향으로 거부되는지 확인",
+    "notes": "소구 이력은 추가전용이다. 재배분은 음수 REVERSAL 행을 쓴 뒤 새 MANUAL 행을 쓴다"
+  },
+  "SLS-11": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/sales-document.ts (validateReturn, RETURN_SALES 처리)",
+      "src/server/modules/sales/purchase.ts (RETURN_PURCHASE 처리)"
+    ],
+    "api": [
+      "sales.createSalesDocument",
+      "sales.createPurchaseDocument"
+    ],
+    "screens": [
+      "src/app/(app)/sales/returns/page.tsx"
+    ],
+    "tables": [
+      "SalesDocument.docType",
+      "SalesDocumentLine.originalLineId"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts"
+    ],
+    "manual": "반품 수량이 원전표 라인 수량을 넘지 못하는지, 반품이 재고와 채권을 반대로 되돌리는지 확인",
+    "notes": "반품은 음수 매출이 아니라 별도 문서유형이며 원전표 라인에 연결된다"
+  },
+  "SLS-12": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/sales-document.ts (create, confirm 기간검증)",
+      "src/server/modules/accounting/period.ts (assertOpen)"
+    ],
+    "api": [
+      "sales.createSalesDocument",
+      "sales.confirmSalesDocument",
+      "sales.createPurchaseDocument"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/periods/page.tsx"
+    ],
+    "tables": [
+      "AccountingPeriod"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "B-01 마감된 기간의 전표 등록과 확정이 모두 거부되는지 확인",
+    "notes": "DEC-04. 마감 검증은 확정뿐 아니라 등록 시점에도 수행한다"
+  },
+  "SLS-13": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/sales/purchase.ts (createRequest, markRequestApproved, convertRequestToOrder)",
+      "src/server/modules/approval/handlers/sales.ts",
+      "src/lib/item-match.ts (품목 입력 해석)"
+    ],
+    "api": [
+      "sales.purchaseRequests",
+      "sales.purchaseRequest",
+      "sales.createPurchaseRequest",
+      "sales.convertRequestToOrder",
+      "sales.purchaseOrders",
+      "sales.purchaseOrder"
+    ],
+    "screens": [
+      "src/app/(app)/sales/purchase-requests/page.tsx",
+      "src/app/(app)/sales/purchase-requests/[id]/page.tsx",
+      "src/app/(app)/sales/purchase-orders/page.tsx",
+      "src/app/(app)/sales/purchase-orders/[id]/page.tsx"
+    ],
+    "tables": [
+      "PurchaseRequest",
+      "PurchaseRequestLine",
+      "PurchaseOrder",
+      "PurchaseOrderLine"
+    ],
+    "tests": [
+      "tests/integration/sales.test.ts",
+      "tests/e2e/sales.spec.ts",
+      "tests/unit/item-match.test.ts"
+    ],
+    "manual": "결재 완료 전 구매요청이 발주로 전환되지 않는지, 공급처별로 발주가 나뉘는지 확인",
+    "notes": "결재 대상 핸들러로 등록되어 승인 시점에 요청 상태가 바뀐다"
   }
 }
