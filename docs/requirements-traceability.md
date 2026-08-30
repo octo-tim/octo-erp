@@ -2,13 +2,13 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T17:25:25.096Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T18:03:48.224Z
 
 ## 집계
 
 | 모듈 | M | O | 합계 | DONE | IN_PROGRESS | NOT_VERIFIED | BLOCKED | NOT_STARTED | OPTION_NOT_APPROVED |
 |---|---|---|---|---|---|---|---|---|---|
-| BAS 기초정보 | 8 | 1 | 9 | 0 | 1 | 0 | 0 | 7 | 1 |
+| BAS 기초정보 | 8 | 1 | 9 | 8 | 0 | 0 | 0 | 0 | 1 |
 | SLS 매출·매입·발주 | 13 | 0 | 13 | 0 | 0 | 0 | 0 | 13 | 0 |
 | INV 재고 | 9 | 1 | 10 | 0 | 0 | 0 | 0 | 9 | 1 |
 | ACC 회계 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
@@ -20,7 +20,7 @@
 | NFR 비기능 | 22 | 0 | 22 | 8 | 6 | 0 | 0 | 8 | 0 |
 | MIG 데이터 이관 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | DEC 착수 시 확정 정책 | 0 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| **합계** | **128** | **6** | **143** | 60 | 9 | 0 | 0 | 68 | 6 |
+| **합계** | **128** | **6** | **143** | 68 | 8 | 0 | 0 | 61 | 6 |
 
 기능 요구사항(BAS·SLS·INV·ACC·APV·HRM·RPT·UIX): M 85개, O 6개 (RFP 5장 선언: 필수 85 / 선택 6).
 
@@ -28,15 +28,15 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| BAS-01 | M | **품목 관리** — 코드 자동채번, 품목명, 규격, 단위, 3단 분류, 입·출고단가, 과세구분, 바코드, 사용여부 | — | — | — | — | — | — | NOT_STARTED | — |
-| BAS-02 | M | **품목 부가정보** — 안전재고, 리드타임, 기본 매입처, 대표 이미지, 비고 | — | — | — | — | — | — | NOT_STARTED | — |
-| BAS-03 | M | **품목 대량 처리** — 양식 다운로드, 일괄 등록·수정, 행별 오류 표시, 정상 행만 선택 반영 | — | — | — | — | — | — | NOT_STARTED | — |
-| BAS-04 | M | **거래처 관리** — 사업자번호 검증, 대표자, 업태·종목, 주소, 담당자 다건, 거래유형, 결제조건, 여신한도 | — | — | — | — | — | — | NOT_STARTED | — |
+| BAS-01 | M | **품목 관리** — 코드 자동채번, 품목명, 규격, 단위, 3단 분류, 입·출고단가, 과세구분, 바코드, 사용여부 | `src/app/(app)/master/items/page.tsx`<br>`src/app/(app)/master/items/[id]/page.tsx` | `master.items`<br>`master.item`<br>`master.searchItems`<br>`master.createItem`<br>`master.updateItem` | `src/server/modules/master/item.ts`<br>`src/server/modules/master/validation.ts (validateBarcode)` | `Item`<br>`ItemCategory`<br>`NumberingRule`<br>`NumberingCounter` | `tests/unit/master-validation.test.ts`<br>`tests/integration/master.test.ts`<br>`tests/e2e/master.spec.ts` | 품목 등록 시 IT-000000 형식으로 자동 채번되는지, 잘못된 바코드가 입력값을 유지한 채 거부되는지 확인 | DONE | — |
+| BAS-02 | M | **품목 부가정보** — 안전재고, 리드타임, 기본 매입처, 대표 이미지, 비고 | `src/app/(app)/master/items/page.tsx`<br>`src/app/(app)/master/items/[id]/page.tsx` | `master.itemCategories`<br>`master.createItemCategory` | `src/server/modules/master/item.ts (createCategory, assertCategoryIsLeaf)` | `ItemCategory`<br>`Item` | `tests/integration/master.test.ts` | 분류는 3단계까지만 생성되고 품목은 최하위 분류에만 연결되는지 확인 | DONE | — |
+| BAS-03 | M | **품목 대량 처리** — 양식 다운로드, 일괄 등록·수정, 행별 오류 표시, 정상 행만 선택 반영 | `src/app/(app)/master/items/bulk/page.tsx` | `master.importTemplate`<br>`master.validateImport`<br>`master.applyImport`<br>`master.importBatches` | `src/server/modules/master/import.ts` | `ImportBatch`<br>`Item`<br>`Partner` | `tests/integration/master.test.ts`<br>`tests/e2e/master.spec.ts` | 검증 단계는 저장하지 않고, 선택 행 반영 중 한 건이라도 실패하면 전체가 취소되는지 확인 | DONE | — |
+| BAS-04 | M | **거래처 관리** — 사업자번호 검증, 대표자, 업태·종목, 주소, 담당자 다건, 거래유형, 결제조건, 여신한도 | `src/app/(app)/master/partners/page.tsx`<br>`src/app/(app)/master/partners/[id]/page.tsx` | `master.partners`<br>`master.partner`<br>`master.searchPartners`<br>`master.createPartner`<br>`master.updatePartner` | `src/server/modules/master/partner.ts`<br>`src/server/modules/master/validation.ts (validateBusinessNo)` | `Partner`<br>`PartnerContact`<br>`SystemSetting (partner.requireBusinessNo)` | `tests/unit/master-validation.test.ts`<br>`tests/integration/master.test.ts`<br>`tests/e2e/master.spec.ts` | 국세청 체크섬 위반과 중복 사업자번호가 각각 다른 사유로 거부되는지, 사업자번호 없는 거래처가 허용되는지 확인 | DONE | — |
 | BAS-05 | O | **거래처별 단가** — 거래처-품목 단가표와 전표 입력 시 자동 적용 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항. PartnerItemPrice 확장 포인트만 예약 |
-| BAS-06 | M | **창고 관리** — 정상·불량·위탁 유형, 담당자, 사용여부 | — | — | — | — | — | — | NOT_STARTED | — |
-| BAS-07 | M | **공통코드** — 단위·품목분류·사업부·결제수단 등을 관리자가 유지 | — | — | — | — | — | — | NOT_STARTED | — |
-| BAS-08 | M | **변경 이력** — 변경자·시각·변경 전후 값 조회, 민감정보 원문은 감사로그 미저장 | — | `src/server/api/routers/admin.ts (auditLog)` | `src/server/modules/audit/service.ts` | — | `tests/integration/transaction.test.ts` | — | IN_PROGRESS | 변경 전후 이력 조회 기반 완료. 마스터 화면 연결은 STEP 6 |
-| BAS-09 | M | **삭제 정책** — 사용된 마스터 물리삭제 금지, 사용중지 처리 | — | — | — | — | — | — | NOT_STARTED | — |
+| BAS-06 | M | **창고 관리** — 정상·불량·위탁 유형, 담당자, 사용여부 | `src/app/(app)/master/warehouses/page.tsx` | `master.warehouses`<br>`master.createWarehouse`<br>`master.updateWarehouse` | `src/server/modules/master/reference.ts (listWarehouses, createWarehouse, updateWarehouse)` | `Warehouse` | `tests/integration/master.test.ts`<br>`tests/e2e/master.spec.ts` | INT-12에 따라 권한 범위 밖 창고가 목록에서 제외되는지 확인 | DONE | — |
+| BAS-07 | M | **공통코드** — 단위·품목분류·사업부·결제수단 등을 관리자가 유지 | `src/app/(app)/master/codes/page.tsx`<br>`src/app/(app)/master/divisions/page.tsx`<br>`src/app/(app)/master/numbering/page.tsx` | `master.codeGroups`<br>`master.codes`<br>`master.upsertCode`<br>`master.deactivateCode`<br>`master.divisions`<br>`master.createDivision`<br>`master.updateDivision`<br>`master.numberingRules`<br>`master.updateNumberingRule` | `src/server/modules/master/reference.ts (CODE_GROUPS, upsertCode, deactivateCode, 부문/채번규칙)` | `CommonCode`<br>`Division`<br>`NumberingRule`<br>`NumberingCounter` | `tests/integration/master.test.ts`<br>`tests/e2e/master.spec.ts` | 사용 중인 단위 코드는 사용중지 시 사용 건수를 근거로 거부되는지 확인 | DONE | — |
+| BAS-08 | M | **변경 이력** — 변경자·시각·변경 전후 값 조회, 민감정보 원문은 감사로그 미저장 | `src/components/ui/change-history.tsx`<br>`src/app/(app)/master/items/[id]/page.tsx`<br>`src/app/(app)/master/partners/[id]/page.tsx` | `master.changeHistory`<br>`admin.auditLog` | `src/server/modules/audit/service.ts`<br>`src/server/modules/master/reference.ts (changeHistory)` | `AuditLog` | `tests/integration/master.test.ts`<br>`tests/integration/transaction.test.ts`<br>`tests/e2e/master.spec.ts` | 품목 단가 수정 후 변경 이력에 '출고단가: 1000 → 1500'이 새로고침 없이 나타나는지 확인 | DONE | — |
+| BAS-09 | M | **삭제 정책** — 사용된 마스터 물리삭제 금지, 사용중지 처리 | `src/app/(app)/master/items/[id]/page.tsx`<br>`src/app/(app)/master/partners/[id]/page.tsx`<br>`src/app/(app)/master/codes/page.tsx` | `master.setItemActive`<br>`master.deleteItem`<br>`master.setPartnerActive`<br>`master.deletePartner`<br>`master.deactivateCode` | `src/server/modules/master/item.ts (usageCount, setActive, remove)`<br>`src/server/modules/master/partner.ts (usageCount, setActive, remove)`<br>`src/server/modules/master/reference.ts (deactivateCode)` | `Item`<br>`Partner`<br>`CommonCode` | `tests/integration/master.test.ts`<br>`tests/e2e/master.spec.ts` | 사용 이력이 있는 마스터는 삭제 버튼이 비활성화되고 사용중지만 가능한지 확인 | DONE | — |
 
 ## SLS — 매출·매입·발주
 
@@ -236,3 +236,4 @@
 | CR-03 | STEP 3 | 모바일 390px에서 스티키 헤더에 가려지는 문제를 scroll-padding-top으로, 넓은 그리드가 페이지 전체를 가로로 넘치게 하는 문제를 min-w-0으로 수정했다. RFP 미명시 개선사항. | UIX-06, NFR-UX-03 | IMPLEMENTED |
 | CR-04 | STEP 5 | 금액 컬럼이 빈 값일 때 표시 포맷터가 예외를 던져 화면이 깨지는 결함을 발견해 수정했다(fmt.krw/qty가 공백을 허용). 선택 금액 항목이 있는 모든 화면에 영향. | UIX-03, INT-01 | FIXED |
 | CR-05 | STEP 5 | 필수 표시(*)가 라벨 텍스트에 포함되어 접근성 이름과 자동화 선택자를 오염시켰다. CSS ::after로 옮기고 컨트롤에 aria-required를 부여했다. | NFR-UX-03, UIX-05 | FIXED |
+| CR-06 | STEP 6 | 마스터 상세 화면에서 수정·사용중지 후 변경 이력 카드가 갱신되지 않아 방금 한 변경이 보이지 않는 결함을 E2E로 발견했다. 개별 쿼리 refetch 대신 master 라우터 전체를 무효화하도록 바꿔 이후 마스터 화면에서 같은 유형의 결함이 재발하지 않도록 했다. | BAS-08, UIX-03 | FIXED |

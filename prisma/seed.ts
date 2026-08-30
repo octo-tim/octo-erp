@@ -245,6 +245,7 @@ async function seedSystemSettings() {
     ['company.name', { value: '(주)옥토웍스' }],
     ['company.timezone', { value: 'Asia/Seoul' }],
     ['inventory.allowNegative', { value: false }],
+    ['partner.requireBusinessNo', { value: false }],
     ['accounting.internalUseNotice', { value: '내부 관리용이며 세무신고·외부공시용 확정 재무제표가 아님' }],
   ];
   for (const [key, value] of settings) {
@@ -332,12 +333,133 @@ async function seedApproval() {
   });
 }
 
+/** BAS-07: common codes the business screens depend on from day one. */
+async function seedCommonCodes() {
+  const codes: [string, string, string, number][] = [
+    ['UNIT', 'EA', '개', 1],
+    ['UNIT', 'BOX', '박스', 2],
+    ['UNIT', 'SET', '세트', 3],
+    ['UNIT', 'M', 'm', 4],
+    ['UNIT', 'M2', '㎡', 5],
+    ['UNIT', 'KG', 'kg', 6],
+    ['UNIT', 'ROLL', '롤', 7],
+    ['PAYMENT_METHOD', 'TRANSFER', '계좌이체', 1],
+    ['PAYMENT_METHOD', 'CARD', '카드', 2],
+    ['PAYMENT_METHOD', 'CASH', '현금', 3],
+    ['PAYMENT_METHOD', 'NOTE', '어음', 4],
+    ['PAYMENT_TERMS', 'NET_30', '월말 30일', 1],
+    ['PAYMENT_TERMS', 'NET_60', '월말 60일', 2],
+    ['PAYMENT_TERMS', 'PREPAID', '선결제', 3],
+    ['PAYMENT_TERMS', 'COD', '인도결제', 4],
+    ['POSITION', 'CEO', '대표이사', 1],
+    ['POSITION', 'EVP', '전무이사', 2],
+    ['POSITION', 'DIRECTOR', '이사', 3],
+    ['POSITION', 'MANAGER', '팀장', 4],
+    ['POSITION', 'DEPUTY', '대리', 5],
+    ['POSITION', 'STAFF', '사원', 6],
+    ['STOCK_REASON_IN', 'PURCHASE', '매입입고', 1],
+    ['STOCK_REASON_IN', 'RETURN_IN', '반품입고', 2],
+    ['STOCK_REASON_IN', 'ADJUST_IN', '실사증가', 3],
+    ['STOCK_REASON_IN', 'ETC_IN', '기타입고', 9],
+    ['STOCK_REASON_OUT', 'SALES', '매출출고', 1],
+    ['STOCK_REASON_OUT', 'SAMPLE', '샘플출고', 2],
+    ['STOCK_REASON_OUT', 'DISPOSAL', '폐기', 3],
+    ['STOCK_REASON_OUT', 'ADJUST_OUT', '실사감소', 4],
+    ['STOCK_REASON_OUT', 'ETC_OUT', '기타출고', 9],
+    ['LEAVE_TYPE', 'ANNUAL', '연차', 1],
+    ['LEAVE_TYPE', 'SICK', '병가', 2],
+    ['LEAVE_TYPE', 'SPECIAL', '경조사', 3],
+  ];
+  for (const [groupCode, code, name, sortOrder] of codes) {
+    await prisma.commonCode.upsert({
+      where: { groupCode_code: { groupCode, code } },
+      create: { groupCode, code, name, sortOrder },
+      update: { name, sortOrder },
+    });
+  }
+}
+
+/** BAS-01: a starter three-level item classification matching the six business lines. */
+async function seedItemCategories() {
+  const tree: {
+    code: string;
+    name: string;
+    children: { code: string; name: string; children: { code: string; name: string }[] }[];
+  }[] = [
+    {
+      code: 'C10',
+      name: '건축자재',
+      children: [
+        {
+          code: 'C1010',
+          name: '환기·설비',
+          children: [
+            { code: 'C101010', name: '환기유닛' },
+            { code: 'C101020', name: '덕트·부속' },
+          ],
+        },
+        {
+          code: 'C1020',
+          name: '차양·창호',
+          children: [
+            { code: 'C102010', name: '전동차양' },
+            { code: 'C102020', name: '창호부속' },
+          ],
+        },
+      ],
+    },
+    {
+      code: 'C20',
+      name: '필름',
+      children: [
+        {
+          code: 'C2010',
+          name: '매트필름',
+          children: [
+            { code: 'C201010', name: '방염필름' },
+            { code: 'C201020', name: '일반필름' },
+          ],
+        },
+      ],
+    },
+    {
+      code: 'C30',
+      name: '자체브랜드',
+      children: [{ code: 'C3010', name: '화장품', children: [{ code: 'C301010', name: '스킨케어' }] }],
+    },
+  ];
+
+  for (const [i, level1] of tree.entries()) {
+    const l1 = await prisma.itemCategory.upsert({
+      where: { code: level1.code },
+      create: { code: level1.code, name: level1.name, level: 1, sortOrder: i },
+      update: { name: level1.name },
+    });
+    for (const [j, level2] of level1.children.entries()) {
+      const l2 = await prisma.itemCategory.upsert({
+        where: { code: level2.code },
+        create: { code: level2.code, name: level2.name, level: 2, parentId: l1.id, sortOrder: j },
+        update: { name: level2.name, parentId: l1.id },
+      });
+      for (const [k, level3] of level2.children.entries()) {
+        await prisma.itemCategory.upsert({
+          where: { code: level3.code },
+          create: { code: level3.code, name: level3.name, level: 3, parentId: l2.id, sortOrder: k },
+          update: { name: level3.name, parentId: l2.id },
+        });
+      }
+    }
+  }
+}
+
 async function main() {
   await seedPermissionsAndRoles();
   await seedOrganization();
   await seedNumberingRules();
   await seedPolicies();
   await seedSystemSettings();
+  await seedCommonCodes();
+  await seedItemCategories();
   await seedApproval();
   await seedAdminUser();
   console.log(`seed complete (admin user: ${ADMIN_USERNAME})`);

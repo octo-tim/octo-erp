@@ -791,3 +791,132 @@ model ApprovalLink {
   @@unique([targetType, targetId, targetVersion])
   @@index([documentId])
 }
+
+// ───────────────────────── Master data (BAS) — STEP 6 ─────────────────────────
+
+model ItemCategory {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  /** 1..3 — the RFP requires a three-level classification (BAS-01) */
+  level     Int
+  parentId  String?
+  parent    ItemCategory? @relation("CategoryTree", fields: [parentId], references: [id])
+  children  ItemCategory[] @relation("CategoryTree")
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items Item[]
+
+  @@index([parentId])
+  @@index([level])
+}
+
+model Item {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  spec          String?
+  unitCode      String   @default("EA")
+  categoryId    String?
+  category      ItemCategory? @relation(fields: [categoryId], references: [id])
+  purchasePrice Decimal? @db.Decimal(18, 4)
+  salesPrice    Decimal? @db.Decimal(18, 4)
+  taxType       String   @default("TAXABLE") // TAXABLE | ZERO | EXEMPT
+  barcode       String?
+  // BAS-02 supplementary
+  safetyStock   Decimal? @db.Decimal(18, 3)
+  leadTimeDays  Int?
+  defaultSupplierId String?
+  defaultSupplier   Partner? @relation("DefaultSupplier", fields: [defaultSupplierId], references: [id])
+  imageAttachmentId String?
+  note          String?
+  isActive      Boolean  @default(true)
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([name])
+  @@index([categoryId])
+  @@index([isActive])
+}
+
+model Partner {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  businessNo     String?
+  ceoName        String?
+  businessType   String?  // 업태
+  businessItem   String?  // 종목
+  address        String?
+  phone          String?
+  email          String?
+  /** CUSTOMER | SUPPLIER | BOTH */
+  partnerType    String   @default("BOTH")
+  paymentTerms   String?
+  creditLimit    Decimal? @db.Decimal(18, 0)
+  note           String?
+  isActive       Boolean  @default(true)
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  contacts     PartnerContact[]
+  defaultForItems Item[] @relation("DefaultSupplier")
+
+  @@index([name])
+  @@index([businessNo])
+  @@index([partnerType, isActive])
+}
+
+model PartnerContact {
+  id        String  @id @default(cuid())
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  name      String
+  position  String?
+  phone     String?
+  email     String?
+  isPrimary Boolean @default(false)
+  note      String?
+
+  @@index([partnerId])
+}
+
+model CommonCode {
+  id        String   @id @default(cuid())
+  groupCode String   // UNIT | ITEM_CATEGORY | PAYMENT_METHOD | POSITION | ...
+  code      String
+  name      String
+  value1    String?
+  value2    String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([groupCode, code])
+  @@index([groupCode, isActive])
+}
+
+/** BAS-03: every bulk upload is a batch, so errors and partial application are auditable. */
+model ImportBatch {
+  id            String   @id @default(cuid())
+  targetType    String   // ITEM | PARTNER | ...
+  templateVersion Int    @default(1)
+  fileName      String?
+  totalRows     Int      @default(0)
+  validRows     Int      @default(0)
+  errorRows     Int      @default(0)
+  appliedRows   Int      @default(0)
+  status        String   @default("VALIDATED") // VALIDATED | APPLIED | FAILED
+  errors        Json?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  appliedAt     DateTime?
+
+  @@index([targetType, createdAt])
+}

@@ -1,17 +1,32 @@
 {
   "INT-01": {
     "status": "DONE",
-    "services": ["src/lib/money.ts"],
-    "api": ["src/server/api/schemas/common.ts", "src/server/api/transformer.ts"],
-    "tables": ["Decimal(18,0) 금액 / (18,3) 수량 / (18,4) 단가"],
-    "tests": ["tests/unit/money.test.ts"],
+    "services": [
+      "src/lib/money.ts"
+    ],
+    "api": [
+      "src/server/api/schemas/common.ts",
+      "src/server/api/transformer.ts"
+    ],
+    "tables": [
+      "Decimal(18,0) 금액 / (18,3) 수량 / (18,4) 단가"
+    ],
+    "tests": [
+      "tests/unit/money.test.ts"
+    ],
     "manual": "eslint no-restricted-syntax 로 parseFloat 차단 확인",
     "notes": "ADR-0011. API는 정밀 문자열 직렬화(superjson 미사용)"
   },
   "INT-02": {
     "status": "DONE",
-    "services": ["src/server/core/state-machine.ts", "src/server/modules/approval/service.ts (TRANSITIONS)"],
-    "tests": ["tests/unit/state-machine.test.ts", "tests/integration/approval.test.ts"],
+    "services": [
+      "src/server/core/state-machine.ts",
+      "src/server/modules/approval/service.ts (TRANSITIONS)"
+    ],
+    "tests": [
+      "tests/unit/state-machine.test.ts",
+      "tests/integration/approval.test.ts"
+    ],
     "manual": "결재문서 상태 전이표 준수 확인",
     "notes": "업무전표 적용은 STEP 7~10"
   },
@@ -21,14 +36,23 @@
       "src/server/core/state-machine.ts (assertMutable)",
       "src/server/modules/approval/service.ts (resubmit 차단)"
     ],
-    "tests": ["tests/unit/state-machine.test.ts", "tests/integration/approval.test.ts"],
+    "tests": [
+      "tests/unit/state-machine.test.ts",
+      "tests/integration/approval.test.ts"
+    ],
     "manual": "B-07 완료문서 수정 차단 확인"
   },
   "INT-05": {
     "status": "DONE",
-    "services": ["src/server/core/idempotency.ts"],
-    "tables": ["IdempotencyRecord(scope,requestId) UNIQUE"],
-    "tests": ["tests/integration/transaction.test.ts"],
+    "services": [
+      "src/server/core/idempotency.ts"
+    ],
+    "tables": [
+      "IdempotencyRecord(scope,requestId) UNIQUE"
+    ],
+    "tests": [
+      "tests/integration/transaction.test.ts"
+    ],
     "manual": "동일 requestId 재호출·동시호출 시 부작용 1건 확인",
     "notes": "ADR-0012. B-03 통과"
   },
@@ -38,15 +62,26 @@
       "src/server/core/context.ts (withTransaction)",
       "src/server/modules/approval/service.ts (approve)"
     ],
-    "tests": ["tests/integration/transaction.test.ts", "tests/integration/approval.test.ts"],
+    "tests": [
+      "tests/integration/transaction.test.ts",
+      "tests/integration/approval.test.ts"
+    ],
     "manual": "B-08 장애주입 시 결재·원장·근태·알림 전체 롤백 확인",
     "notes": "전표 확정 결합은 STEP 10에서 확장"
   },
   "INT-09": {
     "status": "DONE",
-    "services": ["src/server/modules/audit/service.ts", "src/server/core/redact.ts"],
-    "api": ["src/server/api/routers/admin.ts (auditLog)"],
-    "tables": ["AuditLog", "SecurityEvent"],
+    "services": [
+      "src/server/modules/audit/service.ts",
+      "src/server/core/redact.ts"
+    ],
+    "api": [
+      "src/server/api/routers/admin.ts (auditLog)"
+    ],
+    "tables": [
+      "AuditLog",
+      "SecurityEvent"
+    ],
     "tests": [
       "tests/unit/redact.test.ts",
       "tests/integration/transaction.test.ts",
@@ -62,38 +97,72 @@
       "src/server/jobs/worker.ts",
       "src/server/jobs/handlers/email.ts"
     ],
-    "api": ["src/server/api/routers/admin.ts (outboxEvents, retryOutbox)"],
-    "tables": ["OutboxEvent", "NotificationDelivery"],
-    "tests": ["tests/integration/transaction.test.ts"],
+    "api": [
+      "src/server/api/routers/admin.ts (outboxEvents, retryOutbox)"
+    ],
+    "tables": [
+      "OutboxEvent",
+      "NotificationDelivery"
+    ],
+    "tests": [
+      "tests/integration/transaction.test.ts"
+    ],
     "manual": "SMTP 미설정 시 로그만 남고 아웃박스가 비워지는지 확인",
     "notes": "ADR-0010/0012. FOR UPDATE SKIP LOCKED, 백오프 5회 후 FAILED + 관리자 알림"
   },
   "INT-11": {
     "status": "DONE",
-    "services": ["src/server/modules/numbering/service.ts", "src/server/modules/outbox/service.ts"],
+    "services": [
+      "src/server/modules/numbering/service.ts",
+      "src/server/modules/outbox/service.ts"
+    ],
     "tables": [
       "NumberingCounter(ruleId,periodKey)",
       "OutboxEvent(topic,dedupKey)",
       "IdempotencyRecord(scope,requestId)"
     ],
-    "tests": ["tests/integration/transaction.test.ts"],
+    "tests": [
+      "tests/integration/transaction.test.ts"
+    ],
     "manual": "동시 채번 30건 중복·결번 없음 확인",
     "notes": "B-10 통과. 원천전표 연결 유일성 제약은 STEP 7~10에서 추가"
   },
   "INT-12": {
     "status": "IN_PROGRESS",
-    "services": ["src/server/modules/rbac/service.ts"],
-    "api": ["src/server/api/trpc.ts (permissionProcedure)"],
-    "tables": ["UserDivisionScope", "UserWarehouseScope"],
-    "tests": ["tests/integration/rbac.test.ts"],
+    "services": [
+      "src/server/modules/rbac/service.ts"
+    ],
+    "api": [
+      "src/server/api/trpc.ts (permissionProcedure)"
+    ],
+    "tables": [
+      "UserDivisionScope",
+      "UserWarehouseScope"
+    ],
+    "tests": [
+      "tests/integration/rbac.test.ts"
+    ],
     "notes": "범위 검사·필터 구현과 시험 완료. 각 업무 조회·내보내기 적용은 해당 모듈 단계"
   },
   "NFR-SEC-01": {
     "status": "DONE",
-    "services": ["src/server/modules/rbac/permissions.ts", "src/server/modules/rbac/service.ts"],
-    "api": ["src/server/api/trpc.ts", "src/server/api/routers/admin.ts"],
-    "tables": ["Role", "Permission", "RolePermission", "UserRole"],
-    "tests": ["tests/integration/rbac.test.ts"],
+    "services": [
+      "src/server/modules/rbac/permissions.ts",
+      "src/server/modules/rbac/service.ts"
+    ],
+    "api": [
+      "src/server/api/trpc.ts",
+      "src/server/api/routers/admin.ts"
+    ],
+    "tables": [
+      "Role",
+      "Permission",
+      "RolePermission",
+      "UserRole"
+    ],
+    "tests": [
+      "tests/integration/rbac.test.ts"
+    ],
     "manual": "역할별 허용·차단 라우터 호출 확인",
     "notes": "8개 역할 시드, 권한 문자열 module.action"
   },
@@ -103,33 +172,66 @@
       "src/server/modules/rbac/service.ts (assertHrScope)",
       "src/server/modules/storage/attachment.ts"
     ],
-    "tests": ["tests/integration/rbac.test.ts", "tests/integration/storage.test.ts"],
+    "tests": [
+      "tests/integration/rbac.test.ts",
+      "tests/integration/storage.test.ts"
+    ],
     "manual": "hr.self 사용자가 타인 인사서류 접근 시 403 확인",
     "notes": "hr.read 없으면 본인만. 첨부도 SELF_OWNED_TYPES로 동일 규칙 적용"
   },
   "NFR-SEC-03": {
     "status": "DONE",
-    "services": ["src/server/core/crypto.ts", "src/server/modules/auth/service.ts"],
-    "api": ["src/app/api/auth/login/route.ts", "src/app/api/auth/logout/route.ts"],
-    "tables": ["Session", "User"],
-    "tests": ["tests/unit/crypto.test.ts", "tests/integration/auth.test.ts", "tests/e2e/auth.spec.ts"],
+    "services": [
+      "src/server/core/crypto.ts",
+      "src/server/modules/auth/service.ts"
+    ],
+    "api": [
+      "src/app/api/auth/login/route.ts",
+      "src/app/api/auth/logout/route.ts"
+    ],
+    "tables": [
+      "Session",
+      "User"
+    ],
+    "tests": [
+      "tests/unit/crypto.test.ts",
+      "tests/integration/auth.test.ts",
+      "tests/e2e/auth.spec.ts"
+    ],
     "manual": "쿠키 HttpOnly·SameSite=Lax, document.cookie 미노출 E2E 확인",
     "notes": "scrypt, 세션 토큰 해시 저장, 절대 12h·유휴 2h, 로그인 시 회전"
   },
   "NFR-SEC-04": {
     "status": "DONE",
-    "services": ["src/server/modules/auth/service.ts"],
-    "api": ["src/server/api/routers/auth.ts (unlockUser, resetPassword)"],
-    "tables": ["LoginAttempt", "SecurityEvent", "User.lockedUntil"],
-    "tests": ["tests/integration/auth.test.ts"],
+    "services": [
+      "src/server/modules/auth/service.ts"
+    ],
+    "api": [
+      "src/server/api/routers/auth.ts (unlockUser, resetPassword)"
+    ],
+    "tables": [
+      "LoginAttempt",
+      "SecurityEvent",
+      "User.lockedUntil"
+    ],
+    "tests": [
+      "tests/integration/auth.test.ts"
+    ],
     "manual": "5회 실패 잠금 → 관리자 해제 → 정상 로그인 확인",
     "notes": "B-14 통과"
   },
   "NFR-SEC-05": {
     "status": "IN_PROGRESS",
-    "services": ["src/server/api/trpc.ts (csrfGuard)", "next.config.ts (보안 헤더)"],
-    "api": ["src/app/api/auth/login/route.ts"],
-    "tests": ["tests/integration/rbac.test.ts"],
+    "services": [
+      "src/server/api/trpc.ts (csrfGuard)",
+      "next.config.ts (보안 헤더)"
+    ],
+    "api": [
+      "src/app/api/auth/login/route.ts"
+    ],
+    "tests": [
+      "tests/integration/rbac.test.ts"
+    ],
     "notes": "Origin 기반 CSRF·보안헤더·Prisma 파라미터 바인딩 적용. 의존성 취약점 점검과 XSS 전수는 STEP 13"
   },
   "NFR-SEC-06": {
@@ -139,7 +241,10 @@
       "src/server/core/redact.ts",
       "src/server/modules/hrm/employee.ts"
     ],
-    "tables": ["EmployeeSensitive", "SensitiveAccessLog"],
+    "tables": [
+      "EmployeeSensitive",
+      "SensitiveAccessLog"
+    ],
     "tests": [
       "tests/unit/crypto.test.ts",
       "tests/unit/redact.test.ts",
@@ -151,174 +256,331 @@
   },
   "NFR-SEC-07": {
     "status": "DONE",
-    "services": ["src/server/modules/storage/service.ts", "src/server/modules/storage/attachment.ts"],
-    "api": ["src/server/api/routers/attachment.ts", "src/app/api/files/[key]/route.ts"],
-    "tables": ["Attachment"],
-    "tests": ["tests/integration/storage.test.ts"],
+    "services": [
+      "src/server/modules/storage/service.ts",
+      "src/server/modules/storage/attachment.ts"
+    ],
+    "api": [
+      "src/server/api/routers/attachment.ts",
+      "src/app/api/files/[key]/route.ts"
+    ],
+    "tables": [
+      "Attachment"
+    ],
+    "tests": [
+      "tests/integration/storage.test.ts"
+    ],
     "manual": "만료된 서명 URL 거부, 확장자·매직바이트 불일치 거부 확인",
     "notes": "20MB 제한, MIME 허용목록+매직바이트, 비공개 저장, 5분 만료 URL"
   },
   "NFR-OPS-01": {
     "status": "DONE",
-    "services": ["src/server/env.ts", ".env.example"],
-    "tests": ["tests/unit/crypto.test.ts"],
+    "services": [
+      "src/server/env.ts",
+      ".env.example"
+    ],
+    "tests": [
+      "tests/unit/crypto.test.ts"
+    ],
     "manual": "환경변수 누락 시 부팅 실패 확인",
     "notes": "APP_ENV로 development/test/staging/production 분리, zod 검증"
   },
   "NFR-OPS-02": {
     "status": "DONE",
-    "docs": ["Dockerfile", "railway.json", ".github/workflows/ci.yml"],
-    "tests": [".github/workflows/ci.yml (verify, e2e job)"],
+    "docs": [
+      "Dockerfile",
+      "railway.json",
+      ".github/workflows/ci.yml"
+    ],
+    "tests": [
+      ".github/workflows/ci.yml (verify, e2e job)"
+    ],
     "manual": "CI에서 lint/typecheck/unit/integration/build/traceability 실행",
     "notes": "웹·워커 동일 이미지, 배포 시 prisma migrate deploy"
   },
   "NFR-OPS-05": {
     "status": "IN_PROGRESS",
-    "services": ["src/server/core/logger.ts", "src/app/api/health/route.ts"],
-    "api": ["src/server/api/routers/admin.ts (systemHealth, outboxEvents)"],
-    "tests": ["tests/e2e/auth.spec.ts"],
+    "services": [
+      "src/server/core/logger.ts",
+      "src/app/api/health/route.ts"
+    ],
+    "api": [
+      "src/server/api/routers/admin.ts (systemHealth, outboxEvents)"
+    ],
+    "tests": [
+      "tests/e2e/auth.spec.ts"
+    ],
     "notes": "구조화 로그·상태점검·아웃박스 모니터링 구현. 오류추적 연동과 용량 모니터링은 STEP 13"
   },
   "NFR-OPS-06": {
     "status": "IN_PROGRESS",
-    "api": ["src/server/api/root.ts"],
+    "api": [
+      "src/server/api/root.ts"
+    ],
     "notes": "tRPC 라우터 구조 확립. OpenAPI 수준 명세 생성기는 STEP 13"
   },
   "NFR-UX-01": {
     "status": "IN_PROGRESS",
-    "services": ["src/lib/dates.ts", "src/lib/money.ts", "src/lib/format.ts"],
-    "screens": ["src/app/layout.tsx", "src/components/app-shell.tsx"],
-    "tests": ["tests/unit/dates.test.ts", "tests/unit/money.test.ts"],
+    "services": [
+      "src/lib/dates.ts",
+      "src/lib/money.ts",
+      "src/lib/format.ts"
+    ],
+    "screens": [
+      "src/app/layout.tsx",
+      "src/components/app-shell.tsx"
+    ],
+    "tests": [
+      "tests/unit/dates.test.ts",
+      "tests/unit/money.test.ts"
+    ],
     "notes": "한국어 UI, KRW 천단위, Asia/Seoul 공통 포맷터. 전 화면 적용은 STEP 11"
   },
   "NFR-UX-03": {
     "status": "IN_PROGRESS",
-    "screens": ["src/app/globals.css", "src/components/ui/primitives.tsx"],
-    "tests": ["tests/e2e/components.spec.ts", "tests/e2e/auth.spec.ts"],
+    "screens": [
+      "src/app/globals.css",
+      "src/components/ui/primitives.tsx"
+    ],
+    "tests": [
+      "tests/e2e/components.spec.ts",
+      "tests/e2e/auth.spec.ts"
+    ],
     "manual": "키보드 전용 조작, 포커스 표시, 상태 라벨 병기 확인",
     "notes": "StatusBadge는 색상 외 라벨 병기. 전수 점검은 STEP 11"
   },
   "UIX-07": {
     "status": "DONE",
-    "services": ["src/server/modules/storage/attachment.ts"],
-    "screens": ["src/components/ui/attachment-panel.tsx"],
-    "api": ["src/server/api/routers/attachment.ts"],
-    "tables": ["Attachment"],
-    "tests": ["tests/integration/storage.test.ts", "tests/e2e/components.spec.ts"],
+    "services": [
+      "src/server/modules/storage/attachment.ts"
+    ],
+    "screens": [
+      "src/components/ui/attachment-panel.tsx"
+    ],
+    "api": [
+      "src/server/api/routers/attachment.ts"
+    ],
+    "tables": [
+      "Attachment"
+    ],
+    "tests": [
+      "tests/integration/storage.test.ts",
+      "tests/e2e/components.spec.ts"
+    ],
     "manual": "권한 없는 첨부 접근 차단, 만료 URL 거부 확인"
   },
   "UIX-08": {
     "status": "DONE",
-    "services": ["src/server/modules/notification/service.ts"],
-    "screens": ["src/components/ui/notification-center.tsx"],
-    "api": ["src/server/api/routers/notification.ts"],
-    "tables": ["Notification", "NotificationDelivery"],
-    "tests": ["tests/integration/transaction.test.ts", "tests/e2e/components.spec.ts"],
+    "services": [
+      "src/server/modules/notification/service.ts"
+    ],
+    "screens": [
+      "src/components/ui/notification-center.tsx"
+    ],
+    "api": [
+      "src/server/api/routers/notification.ts"
+    ],
+    "tables": [
+      "Notification",
+      "NotificationDelivery"
+    ],
+    "tests": [
+      "tests/integration/transaction.test.ts",
+      "tests/e2e/components.spec.ts"
+    ],
     "manual": "알림 목록·읽음·모두 읽음 확인",
     "notes": "재고·여신·결재·인사 알림이 같은 센터로 모임"
   },
   "UIX-01": {
     "status": "DONE",
-    "screens": ["src/app/(app)/home/page.tsx", "src/components/ui/dashboard-grid.tsx"],
-    "api": ["src/server/api/routers/preference.ts"],
-    "tables": ["UserPreference"],
-    "tests": ["tests/e2e/components.spec.ts"],
+    "screens": [
+      "src/app/(app)/home/page.tsx",
+      "src/components/ui/dashboard-grid.tsx"
+    ],
+    "api": [
+      "src/server/api/routers/preference.ts"
+    ],
+    "tables": [
+      "UserPreference"
+    ],
+    "tests": [
+      "tests/e2e/components.spec.ts"
+    ],
     "manual": "위젯 숨김·순서 변경 후 새로고침 유지 확인",
     "notes": "레이아웃·저장 완료. 업무 위젯 데이터 연결은 STEP 11"
   },
   "UIX-02": {
     "status": "DONE",
-    "screens": ["src/components/ui/standard-list-page.tsx"],
-    "api": ["src/server/api/routers/preference.ts"],
-    "tests": ["tests/e2e/components.spec.ts"],
+    "screens": [
+      "src/components/ui/standard-list-page.tsx"
+    ],
+    "api": [
+      "src/server/api/routers/preference.ts"
+    ],
+    "tests": [
+      "tests/e2e/components.spec.ts"
+    ],
     "manual": "조회조건·컬럼 표시 저장 후 새로고침 복원 확인",
     "notes": "모든 목록 화면이 StandardListPage + useSavedFilters 사용"
   },
   "BAS-08": {
-    "status": "IN_PROGRESS",
-    "services": ["src/server/modules/audit/service.ts"],
-    "api": ["src/server/api/routers/admin.ts (auditLog)"],
-    "tests": ["tests/integration/transaction.test.ts"],
-    "notes": "변경 전후 이력 조회 기반 완료. 마스터 화면 연결은 STEP 6"
+    "status": "DONE",
+    "services": [
+      "src/server/modules/audit/service.ts",
+      "src/server/modules/master/reference.ts (changeHistory)"
+    ],
+    "api": [
+      "master.changeHistory",
+      "admin.auditLog"
+    ],
+    "screens": [
+      "src/components/ui/change-history.tsx",
+      "src/app/(app)/master/items/[id]/page.tsx",
+      "src/app/(app)/master/partners/[id]/page.tsx"
+    ],
+    "tables": [
+      "AuditLog"
+    ],
+    "tests": [
+      "tests/integration/master.test.ts",
+      "tests/integration/transaction.test.ts",
+      "tests/e2e/master.spec.ts"
+    ],
+    "manual": "품목 단가 수정 후 변경 이력에 '출고단가: 1000 → 1500'이 새로고침 없이 나타나는지 확인"
   },
   "DEC-01": {
     "status": "DONE",
-    "docs": ["docs/adr/0003-inventory-valuation-monthly-average.md"],
-    "tests": ["docs/acceptance-scenarios.md B-11"],
+    "docs": [
+      "docs/adr/0003-inventory-valuation-monthly-average.md"
+    ],
+    "tests": [
+      "docs/acceptance-scenarios.md B-11"
+    ],
     "notes": "기본안 임시승인, PolicyVersion inventory.valuation v1 시드"
   },
   "DEC-02": {
     "status": "DONE",
-    "docs": ["docs/adr/0004-money-and-vat.md"],
-    "tests": ["tests/unit/money.test.ts"],
+    "docs": [
+      "docs/adr/0004-money-and-vat.md"
+    ],
+    "tests": [
+      "tests/unit/money.test.ts"
+    ],
     "notes": "기본안 임시승인, PolicyVersion money v1 시드"
   },
   "DEC-03": {
     "status": "DONE",
-    "docs": ["docs/adr/0005-approval-policy-matrix.md"],
-    "tests": ["prisma/seed.ts approval.matrix"],
+    "docs": [
+      "docs/adr/0005-approval-policy-matrix.md"
+    ],
+    "tests": [
+      "prisma/seed.ts approval.matrix"
+    ],
     "notes": "기본안 임시승인, 착수회의에서 금액 구간 확정 필요"
   },
   "DEC-04": {
     "status": "DONE",
-    "docs": ["docs/adr/0006-accounting-period.md"],
-    "tests": ["tests/unit/dates.test.ts"],
+    "docs": [
+      "docs/adr/0006-accounting-period.md"
+    ],
+    "tests": [
+      "tests/unit/dates.test.ts"
+    ],
     "notes": "기본안 임시승인"
   },
   "DEC-05": {
     "status": "DONE",
-    "docs": ["docs/adr/0007-leave-policy.md"],
-    "tests": ["prisma/seed.ts leave v1"],
+    "docs": [
+      "docs/adr/0007-leave-policy.md"
+    ],
+    "tests": [
+      "prisma/seed.ts leave v1"
+    ],
     "notes": "기본안 임시승인, 노무 검토 후 v2 예정"
   },
   "DEC-06": {
     "status": "DONE",
-    "docs": ["docs/adr/0008-personal-data-retention.md"],
-    "tests": ["prisma/seed.ts retention v1"],
+    "docs": [
+      "docs/adr/0008-personal-data-retention.md"
+    ],
+    "tests": [
+      "prisma/seed.ts retention v1"
+    ],
     "notes": "기본안 임시승인"
   },
   "DEC-07": {
     "status": "DONE",
-    "docs": ["docs/adr/0002-deployment-auth-storage.md"],
-    "tests": ["tests/integration/auth.test.ts", "tests/integration/storage.test.ts"],
+    "docs": [
+      "docs/adr/0002-deployment-auth-storage.md"
+    ],
+    "tests": [
+      "tests/integration/auth.test.ts",
+      "tests/integration/storage.test.ts"
+    ],
     "notes": "Railway + 자체 세션 + S3 호환 저장소 구현 완료"
   },
   "DEC-08": {
     "status": "DONE",
-    "docs": ["docs/adr/0009-migration-scope.md"],
-    "tests": ["docs/scope.md"],
+    "docs": [
+      "docs/adr/0009-migration-scope.md"
+    ],
+    "tests": [
+      "docs/scope.md"
+    ],
     "notes": "기본안 임시승인, 원천 파일 수령 후 매핑 확정"
   },
   "DEC-09": {
     "status": "DONE",
-    "docs": ["docs/adr/0010-notification-channels.md"],
-    "tests": ["tests/integration/transaction.test.ts"],
+    "docs": [
+      "docs/adr/0010-notification-channels.md"
+    ],
+    "tests": [
+      "tests/integration/transaction.test.ts"
+    ],
     "notes": "앱+이메일 구현, 메신저 NONE"
   },
   "UIX-03": {
     "status": "DONE",
-    "screens": ["src/components/ui/data-grid.tsx"],
-    "tests": ["tests/e2e/components.spec.ts"],
+    "screens": [
+      "src/components/ui/data-grid.tsx"
+    ],
+    "tests": [
+      "tests/e2e/components.spec.ts"
+    ],
     "manual": "정렬·다중선택·합계·페이징·컬럼설정·엑셀 버튼 확인",
     "notes": "서버 페이징 전제(페이지당 최대 200). 1만건 전체 전송 없음"
   },
   "UIX-04": {
     "status": "DONE",
-    "screens": ["src/components/ui/voucher-line-editor.tsx"],
-    "tests": ["tests/e2e/components.spec.ts"],
+    "screens": [
+      "src/components/ui/voucher-line-editor.tsx"
+    ],
+    "tests": [
+      "tests/e2e/components.spec.ts"
+    ],
     "manual": "Tab/Enter 이동, Ctrl+D 복사, Ctrl+Delete 삭제, 자동완성 확인",
     "notes": "표시용 재계산만 클라이언트에서 수행하고 서버가 최종 검증(DEC-02)"
   },
   "UIX-05": {
     "status": "DONE",
-    "screens": ["src/components/ui/form-error-summary.tsx"],
-    "tests": ["tests/e2e/components.spec.ts"],
+    "screens": [
+      "src/components/ui/form-error-summary.tsx"
+    ],
+    "tests": [
+      "tests/e2e/components.spec.ts"
+    ],
     "manual": "저장 실패 시 오류 요약·필드 포커스·입력값 보존 확인"
   },
   "UIX-06": {
     "status": "IN_PROGRESS",
-    "screens": ["src/components/app-shell.tsx", "src/app/globals.css"],
-    "tests": ["tests/e2e/components.spec.ts", "tests/e2e/auth.spec.ts"],
+    "screens": [
+      "src/components/app-shell.tsx",
+      "src/app/globals.css"
+    ],
+    "tests": [
+      "tests/e2e/components.spec.ts",
+      "tests/e2e/auth.spec.ts"
+    ],
     "manual": "1440·1024·390px 확인, 모바일 메뉴 토글",
     "notes": "앱 셸 반응형 완료. 업무 화면 전수 확인은 STEP 11"
   },
@@ -348,40 +610,88 @@
   },
   "NFR-UX-02": {
     "status": "IN_PROGRESS",
-    "screens": ["src/components/ui/primitives.tsx (EmptyState, ErrorState, Field)"],
-    "tests": ["tests/e2e/components.spec.ts"],
+    "screens": [
+      "src/components/ui/primitives.tsx (EmptyState, ErrorState, Field)"
+    ],
+    "tests": [
+      "tests/e2e/components.spec.ts"
+    ],
     "notes": "빈 상태·오류에 다음 행동 안내. 업무 용어 전수 점검은 STEP 11"
   },
   "HRM-01": {
     "status": "DONE",
-    "services": ["src/server/modules/hrm/employee.ts"],
-    "api": ["hrm.list", "hrm.detail", "hrm.create", "hrm.update"],
-    "screens": ["src/app/(app)/hr/employees/page.tsx", "src/app/(app)/hr/employees/[id]/page.tsx"],
-    "tables": ["Employee"],
-    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "services": [
+      "src/server/modules/hrm/employee.ts"
+    ],
+    "api": [
+      "hrm.list",
+      "hrm.detail",
+      "hrm.create",
+      "hrm.update"
+    ],
+    "screens": [
+      "src/app/(app)/hr/employees/page.tsx",
+      "src/app/(app)/hr/employees/[id]/page.tsx"
+    ],
+    "tables": [
+      "Employee"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts",
+      "tests/e2e/hrm.spec.ts"
+    ],
     "manual": "사원 등록·수정·자동채번·낙관적 잠금 확인"
   },
   "HRM-02": {
     "status": "DONE",
-    "services": ["src/server/modules/hrm/organization.ts"],
-    "api": ["hrm.orgChart", "hrm.createDepartment", "hrm.reorganize", "hrm.departmentHistory"],
-    "screens": ["src/app/(app)/hr/org/page.tsx"],
-    "tables": ["Department", "DepartmentHistory"],
-    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "services": [
+      "src/server/modules/hrm/organization.ts"
+    ],
+    "api": [
+      "hrm.orgChart",
+      "hrm.createDepartment",
+      "hrm.reorganize",
+      "hrm.departmentHistory"
+    ],
+    "screens": [
+      "src/app/(app)/hr/org/page.tsx"
+    ],
+    "tables": [
+      "Department",
+      "DepartmentHistory"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts",
+      "tests/e2e/hrm.spec.ts"
+    ],
     "manual": "기준일 변경 시 개편 전후 조직도 재현 확인 (B-15)"
   },
   "HRM-03": {
     "status": "DONE",
-    "services": ["src/server/modules/hrm/organization.ts (assign, positionAt)"],
-    "api": ["hrm.assign", "hrm.assignmentHistory", "hrm.positionAt"],
-    "screens": ["src/app/(app)/hr/employees/[id]/page.tsx"],
-    "tables": ["Assignment"],
-    "tests": ["tests/integration/hrm.test.ts"],
+    "services": [
+      "src/server/modules/hrm/organization.ts (assign, positionAt)"
+    ],
+    "api": [
+      "hrm.assign",
+      "hrm.assignmentHistory",
+      "hrm.positionAt"
+    ],
+    "screens": [
+      "src/app/(app)/hr/employees/[id]/page.tsx"
+    ],
+    "tables": [
+      "Assignment"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts"
+    ],
     "manual": "발령 시 이전 발령 종료·현재값 동기화 확인"
   },
   "HRM-04": {
     "status": "DONE",
-    "services": ["src/server/modules/hrm/attendance.ts"],
+    "services": [
+      "src/server/modules/hrm/attendance.ts"
+    ],
     "api": [
       "hrm.checkIn",
       "hrm.checkOut",
@@ -389,29 +699,69 @@
       "hrm.requestCorrection",
       "hrm.listCorrections"
     ],
-    "screens": ["src/app/(app)/hr/attendance/page.tsx", "src/app/(app)/hr/me/page.tsx"],
-    "tables": ["Attendance", "AttendanceCorrectionRequest"],
-    "tests": ["tests/integration/hrm.test.ts"],
+    "screens": [
+      "src/app/(app)/hr/attendance/page.tsx",
+      "src/app/(app)/hr/me/page.tsx"
+    ],
+    "tables": [
+      "Attendance",
+      "AttendanceCorrectionRequest"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts"
+    ],
     "manual": "체크인·아웃, 엑셀 업로드 행별 오류, 정정신청 확인",
     "notes": "정정 승인 콜백 연결은 STEP 5"
   },
   "HRM-05": {
     "status": "DONE",
-    "services": ["src/server/modules/hrm/leave-policy.ts", "src/server/modules/hrm/leave.ts"],
-    "api": ["hrm.grantAnnual", "hrm.grantManual", "hrm.leaveBalance", "hrm.expireGrants"],
-    "screens": ["src/app/(app)/hr/leave/page.tsx"],
-    "tables": ["LeaveGrant", "LeaveUsage", "PolicyVersion(leave)"],
-    "tests": ["tests/unit/leave-policy.test.ts", "tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "services": [
+      "src/server/modules/hrm/leave-policy.ts",
+      "src/server/modules/hrm/leave.ts"
+    ],
+    "api": [
+      "hrm.grantAnnual",
+      "hrm.grantManual",
+      "hrm.leaveBalance",
+      "hrm.expireGrants"
+    ],
+    "screens": [
+      "src/app/(app)/hr/leave/page.tsx"
+    ],
+    "tables": [
+      "LeaveGrant",
+      "LeaveUsage",
+      "PolicyVersion(leave)"
+    ],
+    "tests": [
+      "tests/unit/leave-policy.test.ts",
+      "tests/integration/hrm.test.ts",
+      "tests/e2e/hrm.spec.ts"
+    ],
     "manual": "ADR-0007 승인 계산 예시 전건, 소멸 처리 확인",
     "notes": "DEC-05 정책 버전 기반. 상수 하드코딩 없음"
   },
   "HRM-06": {
     "status": "DONE",
-    "services": ["src/server/modules/hrm/leave.ts (requestLeave, applyApprovedLeave, cancelApprovedLeave)"],
-    "api": ["hrm.requestLeave", "hrm.listLeaveRequests", "hrm.cancelLeave"],
-    "screens": ["src/app/(app)/hr/leave/page.tsx"],
-    "tables": ["LeaveRequest", "LeaveUsage", "Attendance"],
-    "tests": ["tests/integration/hrm.test.ts"],
+    "services": [
+      "src/server/modules/hrm/leave.ts (requestLeave, applyApprovedLeave, cancelApprovedLeave)"
+    ],
+    "api": [
+      "hrm.requestLeave",
+      "hrm.listLeaveRequests",
+      "hrm.cancelLeave"
+    ],
+    "screens": [
+      "src/app/(app)/hr/leave/page.tsx"
+    ],
+    "tables": [
+      "LeaveRequest",
+      "LeaveUsage",
+      "Attendance"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts"
+    ],
     "manual": "승인 시 사용원장·근태 반영, 취소 시 반대행 확인",
     "notes": "결재 연동은 STEP 5에서 콜백으로 연결(E2E-03)"
   },
@@ -421,9 +771,16 @@
       "src/server/modules/hrm/leave-policy.ts (classifyWork, overtimeWarning)",
       "src/server/modules/hrm/attendance.ts (monthly)"
     ],
-    "api": ["hrm.attendanceMonthly"],
-    "screens": ["src/app/(app)/hr/attendance/page.tsx"],
-    "tests": ["tests/unit/leave-policy.test.ts", "tests/integration/hrm.test.ts"],
+    "api": [
+      "hrm.attendanceMonthly"
+    ],
+    "screens": [
+      "src/app/(app)/hr/attendance/page.tsx"
+    ],
+    "tests": [
+      "tests/unit/leave-policy.test.ts",
+      "tests/integration/hrm.test.ts"
+    ],
     "manual": "연장·야간·휴일 구분과 한도 경고 확인"
   },
   "HRM-08": {
@@ -432,27 +789,55 @@
       "src/server/modules/hrm/employee.ts (scheduleContractExpiryNotice)",
       "src/server/modules/storage/attachment.ts"
     ],
-    "api": ["attachment.*"],
-    "screens": ["src/app/(app)/hr/employees/[id]/page.tsx"],
-    "tables": ["EmployeeDocument", "Attachment", "OutboxEvent"],
-    "tests": ["tests/integration/storage.test.ts", "tests/integration/hrm.test.ts"],
+    "api": [
+      "attachment.*"
+    ],
+    "screens": [
+      "src/app/(app)/hr/employees/[id]/page.tsx"
+    ],
+    "tables": [
+      "EmployeeDocument",
+      "Attachment",
+      "OutboxEvent"
+    ],
+    "tests": [
+      "tests/integration/storage.test.ts",
+      "tests/integration/hrm.test.ts"
+    ],
     "manual": "인사서류 권한 접근통제, 계약만료 아웃박스 생성 확인"
   },
   "HRM-09": {
     "status": "DONE",
-    "services": ["src/server/modules/hrm/employee.ts (issueCertificate)"],
-    "api": ["hrm.issueCertificate"],
-    "tables": ["CertificateIssue"],
-    "tests": ["tests/integration/hrm.test.ts"],
+    "services": [
+      "src/server/modules/hrm/employee.ts (issueCertificate)"
+    ],
+    "api": [
+      "hrm.issueCertificate"
+    ],
+    "tables": [
+      "CertificateIssue"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts"
+    ],
     "manual": "발급이력 기록과 민감정보 미포함 확인",
     "notes": "PDF 렌더는 STEP 11 출력 공통화에서 연결"
   },
   "HRM-10": {
     "status": "DONE",
-    "services": ["src/server/modules/hrm/employee.ts (overview)"],
-    "api": ["hrm.overview"],
-    "screens": ["src/app/(app)/hr/overview/page.tsx"],
-    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "services": [
+      "src/server/modules/hrm/employee.ts (overview)"
+    ],
+    "api": [
+      "hrm.overview"
+    ],
+    "screens": [
+      "src/app/(app)/hr/overview/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts",
+      "tests/e2e/hrm.spec.ts"
+    ],
     "manual": "부서·고용형태·근속 분포와 입퇴사 집계 확인"
   },
   "HRM-11": {
@@ -461,9 +846,17 @@
       "src/server/modules/hrm/employee.ts (resign)",
       "src/server/modules/auth/service.ts (deactivateUserForEmployee)"
     ],
-    "api": ["hrm.resign"],
-    "tables": ["Employee", "User", "Session"],
-    "tests": ["tests/integration/hrm.test.ts"],
+    "api": [
+      "hrm.resign"
+    ],
+    "tables": [
+      "Employee",
+      "User",
+      "Session"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts"
+    ],
     "manual": "퇴사 시 계정 비활성·세션 폐기 원자성, 롤백 시 둘 다 원복 확인"
   },
   "HRM-12": {
@@ -472,19 +865,44 @@
       "src/server/modules/hrm/employee.ts (setSensitive, revealSensitive)",
       "src/server/core/crypto.ts"
     ],
-    "api": ["hrm.setSensitive", "hrm.revealSensitive", "hrm.sensitiveAccessLog"],
-    "screens": ["src/app/(app)/hr/employees/[id]/page.tsx"],
-    "tables": ["EmployeeSensitive", "SensitiveAccessLog"],
-    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "api": [
+      "hrm.setSensitive",
+      "hrm.revealSensitive",
+      "hrm.sensitiveAccessLog"
+    ],
+    "screens": [
+      "src/app/(app)/hr/employees/[id]/page.tsx"
+    ],
+    "tables": [
+      "EmployeeSensitive",
+      "SensitiveAccessLog"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts",
+      "tests/e2e/hrm.spec.ts"
+    ],
     "manual": "마스킹 기본, 사유 필수, 접근이력 기록, 감사로그 원문 없음 확인"
   },
   "HRM-13": {
     "status": "DONE",
-    "services": ["src/server/modules/hrm/employee.ts (me, requestChange, reviewChange)"],
-    "api": ["hrm.me", "hrm.requestChange", "hrm.reviewChange"],
-    "screens": ["src/app/(app)/hr/me/page.tsx"],
-    "tables": ["EmployeeChangeRequest"],
-    "tests": ["tests/integration/hrm.test.ts", "tests/e2e/hrm.spec.ts"],
+    "services": [
+      "src/server/modules/hrm/employee.ts (me, requestChange, reviewChange)"
+    ],
+    "api": [
+      "hrm.me",
+      "hrm.requestChange",
+      "hrm.reviewChange"
+    ],
+    "screens": [
+      "src/app/(app)/hr/me/page.tsx"
+    ],
+    "tables": [
+      "EmployeeChangeRequest"
+    ],
+    "tests": [
+      "tests/integration/hrm.test.ts",
+      "tests/e2e/hrm.spec.ts"
+    ],
     "manual": "본인 정보·근태·연차 조회와 연락처 변경신청 확인"
   },
   "APV-01": {
@@ -493,26 +911,61 @@
       "src/server/modules/approval/form.ts",
       "src/server/modules/approval/service.ts (activeFormVersion, formSnapshot)"
     ],
-    "api": ["approval.forms", "approval.publishFormVersion", "approval.listFormVersions"],
-    "screens": ["src/app/(app)/approval/forms/page.tsx"],
-    "tables": ["ApprovalForm", "ApprovalFormVersion"],
-    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "api": [
+      "approval.forms",
+      "approval.publishFormVersion",
+      "approval.listFormVersions"
+    ],
+    "screens": [
+      "src/app/(app)/approval/forms/page.tsx"
+    ],
+    "tables": [
+      "ApprovalForm",
+      "ApprovalFormVersion"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts",
+      "tests/e2e/approval.spec.ts"
+    ],
     "manual": "새 버전 발행 후 기존 문서가 상신 당시 양식으로 재현되는지 확인"
   },
   "APV-02": {
     "status": "DONE",
-    "services": ["src/server/modules/approval/form.ts (DEFAULT_FORMS)"],
-    "screens": ["src/app/(app)/approval/forms/page.tsx"],
-    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "services": [
+      "src/server/modules/approval/form.ts (DEFAULT_FORMS)"
+    ],
+    "screens": [
+      "src/app/(app)/approval/forms/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts",
+      "tests/e2e/approval.spec.ts"
+    ],
     "manual": "지출결의·구매요청·품의·계약검토·휴가·근태정정 6종 시드 확인"
   },
   "APV-03": {
     "status": "DONE",
-    "services": ["src/server/modules/approval/line.ts (buildLine, selectLineTemplate)"],
-    "api": ["approval.lineTemplates", "approval.rules", "approval.submit(lineTemplateId)"],
-    "screens": ["src/app/(app)/approval/lines/page.tsx"],
-    "tables": ["ApprovalLineTemplate", "ApprovalLineTemplateStep", "ApprovalRule", "ApprovalParticipant"],
-    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "services": [
+      "src/server/modules/approval/line.ts (buildLine, selectLineTemplate)"
+    ],
+    "api": [
+      "approval.lineTemplates",
+      "approval.rules",
+      "approval.submit(lineTemplateId)"
+    ],
+    "screens": [
+      "src/app/(app)/approval/lines/page.tsx"
+    ],
+    "tables": [
+      "ApprovalLineTemplate",
+      "ApprovalLineTemplateStep",
+      "ApprovalRule",
+      "ApprovalParticipant"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts",
+      "tests/e2e/approval.spec.ts"
+    ],
     "manual": "순차·병렬합의·참조 구분과 규칙 우선순위 확인"
   },
   "APV-04": {
@@ -522,30 +975,57 @@
       "src/server/modules/approval/form.ts (setDelegation)",
       "src/server/modules/approval/service.ts (canFinalize)"
     ],
-    "api": ["approval.setDelegation", "approval.endDelegation", "approval.listDelegations"],
-    "screens": ["src/app/(app)/approval/lines/page.tsx"],
-    "tables": ["Delegation", "ApprovalStep.actedByUserId"],
-    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "api": [
+      "approval.setDelegation",
+      "approval.endDelegation",
+      "approval.listDelegations"
+    ],
+    "screens": [
+      "src/app/(app)/approval/lines/page.tsx"
+    ],
+    "tables": [
+      "Delegation",
+      "ApprovalStep.actedByUserId"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts",
+      "tests/e2e/approval.spec.ts"
+    ],
     "manual": "전결 시 이후 단계 SKIPPED, 대결자 처리 시 원 결재자 보존, 대결 연쇄 차단 확인"
   },
   "APV-05": {
     "status": "DONE",
-    "services": ["src/server/modules/approval/line.ts (minAmount 분기)"],
-    "tests": ["tests/integration/approval.test.ts"],
+    "services": [
+      "src/server/modules/approval/line.ts (minAmount 분기)"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts"
+    ],
     "manual": "300만원 미만 1단계 / 이상 2단계 확인"
   },
   "APV-06": {
     "status": "DONE",
-    "services": ["src/server/modules/approval/service.ts (draft, validateContent)"],
-    "api": ["approval.draft"],
-    "screens": ["src/app/(app)/approval/draft/page.tsx"],
-    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "services": [
+      "src/server/modules/approval/service.ts (draft, validateContent)"
+    ],
+    "api": [
+      "approval.draft"
+    ],
+    "screens": [
+      "src/app/(app)/approval/draft/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts",
+      "tests/e2e/approval.spec.ts"
+    ],
     "manual": "임시저장, 동적 양식 입력, 필수값 오류 요약 확인",
     "notes": "첨부 다건은 AttachmentPanel(UIX-07) 사용"
   },
   "APV-07": {
     "status": "DONE",
-    "services": ["src/server/modules/approval/service.ts (approve, reject, hold, withdraw, resubmit)"],
+    "services": [
+      "src/server/modules/approval/service.ts (approve, reject, hold, withdraw, resubmit)"
+    ],
     "api": [
       "approval.approve",
       "approval.reject",
@@ -554,8 +1034,12 @@
       "approval.withdraw",
       "approval.resubmit"
     ],
-    "screens": ["src/app/(app)/approval/documents/[id]/page.tsx"],
-    "tests": ["tests/integration/approval.test.ts"],
+    "screens": [
+      "src/app/(app)/approval/documents/[id]/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts"
+    ],
     "manual": "승인·반려·보류·회수·재상신, 순서 밖 결재 차단, 낙관적 잠금 확인"
   },
   "APV-08": {
@@ -564,24 +1048,42 @@
       "src/server/modules/approval/handlers/index.ts",
       "src/server/modules/approval/service.ts (onApproved)"
     ],
-    "tables": ["ApprovalLink(targetType,targetId,targetVersion) UNIQUE"],
-    "tests": ["tests/integration/approval.test.ts"],
+    "tables": [
+      "ApprovalLink(targetType,targetId,targetVersion) UNIQUE"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts"
+    ],
     "manual": "승인 콜백이 같은 트랜잭션에서 실행되고 실패 시 전체 롤백되는지 확인",
     "notes": "전표 핸들러는 STEP 10에서 등록. 현재는 인사 2종"
   },
   "APV-09": {
     "status": "DONE",
-    "services": ["src/server/modules/approval/handlers/hrm.ts"],
-    "tests": ["tests/integration/approval.test.ts"],
+    "services": [
+      "src/server/modules/approval/handlers/hrm.ts"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts"
+    ],
     "manual": "휴가 승인 → 연차 사용원장·근태 반영, 근태정정 승인 → Attendance 정정 확인",
     "notes": "E2E-03 통과. 구매요청→발주는 STEP 10"
   },
   "APV-10": {
     "status": "DONE",
-    "services": ["src/server/modules/approval/service.ts (listInbox, pendingCount)"],
-    "api": ["approval.inbox", "approval.pendingCount"],
-    "screens": ["src/app/(app)/approval/inbox/page.tsx"],
-    "tests": ["tests/integration/approval.test.ts", "tests/e2e/approval.spec.ts"],
+    "services": [
+      "src/server/modules/approval/service.ts (listInbox, pendingCount)"
+    ],
+    "api": [
+      "approval.inbox",
+      "approval.pendingCount"
+    ],
+    "screens": [
+      "src/app/(app)/approval/inbox/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts",
+      "tests/e2e/approval.spec.ts"
+    ],
     "manual": "기안·대기·진행·완료·반려·참조함과 미결 배지 확인"
   },
   "APV-11": {
@@ -590,17 +1092,32 @@
       "src/server/modules/approval/service.ts (notifyPending, longPending)",
       "src/server/modules/notification/service.ts"
     ],
-    "tables": ["Notification", "NotificationDelivery", "OutboxEvent"],
-    "tests": ["tests/integration/approval.test.ts"],
+    "tables": [
+      "Notification",
+      "NotificationDelivery",
+      "OutboxEvent"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts"
+    ],
     "manual": "요청·승인·반려 알림 생성과 이메일 아웃박스 적재, 장기미결 탐지 확인",
     "notes": "재시도·실패이력은 아웃박스 워커(INT-10) 공통"
   },
   "APV-12": {
     "status": "DONE",
-    "services": ["src/server/modules/approval/service.ts (requestCancel, applyCancellation)"],
-    "api": ["approval.requestCancel"],
-    "tables": ["ApprovalDocument.cancelsDocumentId", "ApprovalActionLog"],
-    "tests": ["tests/integration/approval.test.ts"],
+    "services": [
+      "src/server/modules/approval/service.ts (requestCancel, applyCancellation)"
+    ],
+    "api": [
+      "approval.requestCancel"
+    ],
+    "tables": [
+      "ApprovalDocument.cancelsDocumentId",
+      "ApprovalActionLog"
+    ],
+    "tests": [
+      "tests/integration/approval.test.ts"
+    ],
     "manual": "완료문서 수정 차단, 취소문서 승인 시 원문서 CANCELED와 반대원장 확인",
     "notes": "ApprovalActionLog는 append-only"
   },
@@ -610,21 +1127,38 @@
       "src/server/modules/approval/service.ts (listInbox 조건)",
       "src/server/modules/numbering/service.ts"
     ],
-    "api": ["approval.inbox"],
-    "screens": ["src/app/(app)/approval/search/page.tsx"],
-    "tests": ["tests/integration/transaction.test.ts", "tests/e2e/approval.spec.ts"],
+    "api": [
+      "approval.inbox"
+    ],
+    "screens": [
+      "src/app/(app)/approval/search/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/transaction.test.ts",
+      "tests/e2e/approval.spec.ts"
+    ],
     "manual": "양식별 채번(AP-YYYYMM-nnnn)과 다조건 검색 확인"
   },
   "APV-14": {
     "status": "DONE",
-    "screens": ["src/app/(app)/approval/inbox/page.tsx", "src/app/(app)/approval/documents/[id]/page.tsx"],
-    "tests": ["tests/e2e/approval.spec.ts"],
+    "screens": [
+      "src/app/(app)/approval/inbox/page.tsx",
+      "src/app/(app)/approval/documents/[id]/page.tsx"
+    ],
+    "tests": [
+      "tests/e2e/approval.spec.ts"
+    ],
     "manual": "390px에서 결재함·기안 화면 조작 확인"
   },
   "APV-15": {
     "status": "DONE",
-    "screens": ["src/app/(app)/approval/documents/[id]/page.tsx", "src/app/globals.css (@media print)"],
-    "tests": ["tests/e2e/approval.spec.ts"],
+    "screens": [
+      "src/app/(app)/approval/documents/[id]/page.tsx",
+      "src/app/globals.css (@media print)"
+    ],
+    "tests": [
+      "tests/e2e/approval.spec.ts"
+    ],
     "manual": "결재선·결재일시가 포함된 인쇄 출력 확인",
     "notes": "브라우저 인쇄로 PDF 저장. 서버 PDF 렌더는 STEP 11에서 공통화"
   },
@@ -633,36 +1167,252 @@
       "id": "CR-01",
       "step": "STEP 2",
       "text": "샌드박스 환경에서 Prisma 네이티브 schema-engine 다운로드가 차단되어, 동일한 migrations 산출물을 생성하는 WASM 기반 마이그레이션 드라이버(tools/migrate.mjs)를 추가했다. 운영·CI에서는 표준 prisma migrate deploy를 사용한다.",
-      "related": ["NFR-OPS-02"],
+      "related": [
+        "NFR-OPS-02"
+      ],
       "status": "IMPLEMENTED_AS_TOOLING"
     },
     {
       "id": "CR-02",
       "step": "STEP 2",
       "text": "RFP에 명시되지 않았으나 hr.self 권한자의 본인 첨부파일 접근 규칙이 필요해 SELF_OWNED_TYPES 규칙을 정의했다. NFR-SEC-02 해석 확인 필요.",
-      "related": ["NFR-SEC-02", "UIX-07", "HRM-13"],
+      "related": [
+        "NFR-SEC-02",
+        "UIX-07",
+        "HRM-13"
+      ],
       "status": "OPEN"
     },
     {
       "id": "CR-03",
       "step": "STEP 3",
       "text": "모바일 390px에서 스티키 헤더에 가려지는 문제를 scroll-padding-top으로, 넓은 그리드가 페이지 전체를 가로로 넘치게 하는 문제를 min-w-0으로 수정했다. RFP 미명시 개선사항.",
-      "related": ["UIX-06", "NFR-UX-03"],
+      "related": [
+        "UIX-06",
+        "NFR-UX-03"
+      ],
       "status": "IMPLEMENTED"
     },
     {
       "id": "CR-04",
       "step": "STEP 5",
       "text": "금액 컬럼이 빈 값일 때 표시 포맷터가 예외를 던져 화면이 깨지는 결함을 발견해 수정했다(fmt.krw/qty가 공백을 허용). 선택 금액 항목이 있는 모든 화면에 영향.",
-      "related": ["UIX-03", "INT-01"],
+      "related": [
+        "UIX-03",
+        "INT-01"
+      ],
       "status": "FIXED"
     },
     {
       "id": "CR-05",
       "step": "STEP 5",
       "text": "필수 표시(*)가 라벨 텍스트에 포함되어 접근성 이름과 자동화 선택자를 오염시켰다. CSS ::after로 옮기고 컨트롤에 aria-required를 부여했다.",
-      "related": ["NFR-UX-03", "UIX-05"],
+      "related": [
+        "NFR-UX-03",
+        "UIX-05"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-06",
+      "step": "STEP 6",
+      "text": "마스터 상세 화면에서 수정·사용중지 후 변경 이력 카드가 갱신되지 않아 방금 한 변경이 보이지 않는 결함을 E2E로 발견했다. 개별 쿼리 refetch 대신 master 라우터 전체를 무효화하도록 바꿔 이후 마스터 화면에서 같은 유형의 결함이 재발하지 않도록 했다.",
+      "related": [
+        "BAS-08",
+        "UIX-03"
+      ],
       "status": "FIXED"
     }
-  ]
+  ],
+  "BAS-01": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/master/item.ts",
+      "src/server/modules/master/validation.ts (validateBarcode)"
+    ],
+    "api": [
+      "master.items",
+      "master.item",
+      "master.searchItems",
+      "master.createItem",
+      "master.updateItem"
+    ],
+    "screens": [
+      "src/app/(app)/master/items/page.tsx",
+      "src/app/(app)/master/items/[id]/page.tsx"
+    ],
+    "tables": [
+      "Item",
+      "ItemCategory",
+      "NumberingRule",
+      "NumberingCounter"
+    ],
+    "tests": [
+      "tests/unit/master-validation.test.ts",
+      "tests/integration/master.test.ts",
+      "tests/e2e/master.spec.ts"
+    ],
+    "manual": "품목 등록 시 IT-000000 형식으로 자동 채번되는지, 잘못된 바코드가 입력값을 유지한 채 거부되는지 확인"
+  },
+  "BAS-02": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/master/item.ts (createCategory, assertCategoryIsLeaf)"
+    ],
+    "api": [
+      "master.itemCategories",
+      "master.createItemCategory"
+    ],
+    "screens": [
+      "src/app/(app)/master/items/page.tsx",
+      "src/app/(app)/master/items/[id]/page.tsx"
+    ],
+    "tables": [
+      "ItemCategory",
+      "Item"
+    ],
+    "tests": [
+      "tests/integration/master.test.ts"
+    ],
+    "manual": "분류는 3단계까지만 생성되고 품목은 최하위 분류에만 연결되는지 확인"
+  },
+  "BAS-03": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/master/import.ts"
+    ],
+    "api": [
+      "master.importTemplate",
+      "master.validateImport",
+      "master.applyImport",
+      "master.importBatches"
+    ],
+    "screens": [
+      "src/app/(app)/master/items/bulk/page.tsx"
+    ],
+    "tables": [
+      "ImportBatch",
+      "Item",
+      "Partner"
+    ],
+    "tests": [
+      "tests/integration/master.test.ts",
+      "tests/e2e/master.spec.ts"
+    ],
+    "manual": "검증 단계는 저장하지 않고, 선택 행 반영 중 한 건이라도 실패하면 전체가 취소되는지 확인"
+  },
+  "BAS-04": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/master/partner.ts",
+      "src/server/modules/master/validation.ts (validateBusinessNo)"
+    ],
+    "api": [
+      "master.partners",
+      "master.partner",
+      "master.searchPartners",
+      "master.createPartner",
+      "master.updatePartner"
+    ],
+    "screens": [
+      "src/app/(app)/master/partners/page.tsx",
+      "src/app/(app)/master/partners/[id]/page.tsx"
+    ],
+    "tables": [
+      "Partner",
+      "PartnerContact",
+      "SystemSetting (partner.requireBusinessNo)"
+    ],
+    "tests": [
+      "tests/unit/master-validation.test.ts",
+      "tests/integration/master.test.ts",
+      "tests/e2e/master.spec.ts"
+    ],
+    "manual": "국세청 체크섬 위반과 중복 사업자번호가 각각 다른 사유로 거부되는지, 사업자번호 없는 거래처가 허용되는지 확인"
+  },
+  "BAS-06": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/master/reference.ts (listWarehouses, createWarehouse, updateWarehouse)"
+    ],
+    "api": [
+      "master.warehouses",
+      "master.createWarehouse",
+      "master.updateWarehouse"
+    ],
+    "screens": [
+      "src/app/(app)/master/warehouses/page.tsx"
+    ],
+    "tables": [
+      "Warehouse"
+    ],
+    "tests": [
+      "tests/integration/master.test.ts",
+      "tests/e2e/master.spec.ts"
+    ],
+    "manual": "INT-12에 따라 권한 범위 밖 창고가 목록에서 제외되는지 확인"
+  },
+  "BAS-07": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/master/reference.ts (CODE_GROUPS, upsertCode, deactivateCode, 부문/채번규칙)"
+    ],
+    "api": [
+      "master.codeGroups",
+      "master.codes",
+      "master.upsertCode",
+      "master.deactivateCode",
+      "master.divisions",
+      "master.createDivision",
+      "master.updateDivision",
+      "master.numberingRules",
+      "master.updateNumberingRule"
+    ],
+    "screens": [
+      "src/app/(app)/master/codes/page.tsx",
+      "src/app/(app)/master/divisions/page.tsx",
+      "src/app/(app)/master/numbering/page.tsx"
+    ],
+    "tables": [
+      "CommonCode",
+      "Division",
+      "NumberingRule",
+      "NumberingCounter"
+    ],
+    "tests": [
+      "tests/integration/master.test.ts",
+      "tests/e2e/master.spec.ts"
+    ],
+    "manual": "사용 중인 단위 코드는 사용중지 시 사용 건수를 근거로 거부되는지 확인"
+  },
+  "BAS-09": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/master/item.ts (usageCount, setActive, remove)",
+      "src/server/modules/master/partner.ts (usageCount, setActive, remove)",
+      "src/server/modules/master/reference.ts (deactivateCode)"
+    ],
+    "api": [
+      "master.setItemActive",
+      "master.deleteItem",
+      "master.setPartnerActive",
+      "master.deletePartner",
+      "master.deactivateCode"
+    ],
+    "screens": [
+      "src/app/(app)/master/items/[id]/page.tsx",
+      "src/app/(app)/master/partners/[id]/page.tsx",
+      "src/app/(app)/master/codes/page.tsx"
+    ],
+    "tables": [
+      "Item",
+      "Partner",
+      "CommonCode"
+    ],
+    "tests": [
+      "tests/integration/master.test.ts",
+      "tests/e2e/master.spec.ts"
+    ],
+    "manual": "사용 이력이 있는 마스터는 삭제 버튼이 비활성화되고 사용중지만 가능한지 확인"
+  }
 }
