@@ -48,6 +48,7 @@ model Division {
 
   userScopes UserDivisionScope[]
   stockDocuments StockDocument[]
+  journalLines   JournalLine[]
 }
 
 model Employee {
@@ -886,6 +887,7 @@ model Partner {
   contacts     PartnerContact[]
   defaultForItems Item[] @relation("DefaultSupplier")
   stockDocuments  StockDocument[]
+  journalLines    JournalLine[]
 
   @@index([name])
   @@index([businessNo])
@@ -1149,4 +1151,211 @@ model InventoryPeriodCost {
 
   @@unique([periodId, itemId])
   @@index([itemId])
+}
+
+// ───────────────────────── Accounting (ACC) — STEP 8 ─────────────────────────
+
+/** ACC-01: the chart of accounts, hierarchical, extendable by the user. */
+model Account {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  /** ASSET | LIABILITY | EQUITY | REVENUE | EXPENSE */
+  accountType String
+  /** DEBIT | CREDIT - which side increases this account */
+  normalSide  String
+  parentId    String?
+  parent      Account? @relation("AccountTree", fields: [parentId], references: [id])
+  children    Account[] @relation("AccountTree")
+  level       Int      @default(1)
+  /** only a leaf account may be posted to, the same rule the item categories use */
+  isPostable  Boolean  @default(true)
+  /** a standard account cannot be renamed away or deleted; the user may only deactivate it */
+  isStandard  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  note        String?
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines       JournalLine[]
+  openings    OpeningBalance[]
+  mappingsFor AccountMapping[]
+
+  @@index([accountType, code])
+  @@index([parentId])
+  @@index([isActive])
+}
+
+/**
+ * ACC-03: a named slot the posting rules resolve through ("매출", "외상매출금"), so a
+ * rule refers to a role rather than hard-coding an account code.
+ */
+model AccountMapping {
+  id        String   @id @default(cuid())
+  /** SALES | ACCOUNTS_RECEIVABLE | VAT_PAYABLE | INVENTORY | COGS | ... */
+  slot      String   @unique
+  label     String
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+  updatedAt DateTime @updatedAt
+}
+
+/** DEC-04 / ACC-08: calendar-month accounting periods. */
+model AccountingPeriod {
+  id           String   @id @default(cuid())
+  /** YYYY-MM */
+  periodKey    String   @unique
+  /** OPEN | CLOSED */
+  status       String   @default("OPEN")
+  closedAt     DateTime?
+  closedById   String?
+  reopenedAt   DateTime?
+  reopenedById String?
+  reopenReason String?
+  createdAt    DateTime @default(now())
+
+  entries JournalEntry[]
+  runs    ClosingRun[]
+}
+
+/** ACC-02: a balanced journal entry. Lines are append-only once the entry is confirmed. */
+model JournalEntry {
+  id           String   @id @default(cuid())
+  entryNo      String   @unique
+  /** TRANSFER | RECEIPT | PAYMENT - 대체 / 입금 / 출금 */
+  entryType    String   @default("TRANSFER")
+  entryDate    DateTime @db.Date
+  periodId     String
+  period       AccountingPeriod @relation(fields: [periodId], references: [id])
+  /** DRAFT | PENDING_APPROVAL | CONFIRMED | CANCELED */
+  status       String   @default("DRAFT")
+  description  String?
+  /** the business document this entry was posted from, when it was not entered by hand */
+  sourceType   String?
+  sourceId     String?
+  sourceVersion Int     @default(1)
+  /** ACC-03: which rule version produced it, so a later rule change cannot rewrite history */
+  postingRuleVersionId String?
+  postingRuleVersion   PostingRuleVersion? @relation(fields: [postingRuleVersionId], references: [id])
+  /** ACC-08 / INT-07: the entry this one reverses */
+  reversalOfId String?  @unique
+  reversalOf   JournalEntry? @relation("Reversal", fields: [reversalOfId], references: [id])
+  reversedBy   JournalEntry? @relation("Reversal")
+  totalDebit   Decimal  @default(0) @db.Decimal(18, 0)
+  totalCredit  Decimal  @default(0) @db.Decimal(18, 0)
+  /** true for the year-end 손익 close entry, which is excluded from the income statement */
+  isClosingEntry Boolean @default(false)
+  version      Int      @default(1)
+  confirmedAt  DateTime?
+  confirmedById String?
+  canceledAt   DateTime?
+  cancelReason String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lines JournalLine[]
+
+  /** INT-05: one source document version produces at most one entry */
+  @@unique([sourceType, sourceId, sourceVersion])
+  @@index([entryDate, status])
+  @@index([periodId, status])
+  @@index([sourceType, sourceId])
+}
+
+/**
+ * ACC-02 / ACC-07: one side of one account. Exactly one of debit/credit is positive;
+ * the divisionId on the LINE is what makes per-division P&L possible.
+ */
+model JournalLine {
+  id          String   @id @default(cuid())
+  entryId     String
+  entry       JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  lineNo      Int
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+  debit       Decimal  @default(0) @db.Decimal(18, 0)
+  credit      Decimal  @default(0) @db.Decimal(18, 0)
+  description String?
+  divisionId  String?
+  division    Division? @relation(fields: [divisionId], references: [id])
+  partnerId   String?
+  partner     Partner? @relation(fields: [partnerId], references: [id])
+
+  @@unique([entryId, lineNo])
+  @@index([accountId])
+  @@index([divisionId])
+  @@index([partnerId])
+}
+
+/** ACC-03: a named automatic-posting rule, versioned so past entries never move. */
+model PostingRule {
+  id        String   @id @default(cuid())
+  /** SALES | PURCHASE | RECEIPT | PAYMENT | RETURN_SALES | RETURN_PURCHASE | VALUATION_ADJUST */
+  code      String   @unique
+  label     String
+  note      String?
+  createdAt DateTime @default(now())
+
+  versions PostingRuleVersion[]
+}
+
+model PostingRuleVersion {
+  id            String   @id @default(cuid())
+  ruleId        String
+  rule          PostingRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  version       Int
+  effectiveFrom DateTime @db.Date
+  effectiveTo   DateTime? @db.Date
+  /**
+   * The line template: [{ slot, side, amountKey, description }]. `slot` resolves through
+   * AccountMapping and `amountKey` names a figure the caller supplies (supply, vat, total...),
+   * so a rule never hard-codes an account code or an amount.
+   */
+  template      Json
+  isActive      Boolean  @default(true)
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  entries JournalEntry[]
+
+  @@unique([ruleId, version])
+  @@index([ruleId, effectiveFrom])
+}
+
+/** MIG-06 / ACC-08: opening balances, both migrated and carried forward at year end. */
+model OpeningBalance {
+  id         String   @id @default(cuid())
+  /** YYYY-MM: the period this balance opens */
+  periodKey  String
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id])
+  divisionId String?
+  debit      Decimal  @default(0) @db.Decimal(18, 0)
+  credit     Decimal  @default(0) @db.Decimal(18, 0)
+  /** MIGRATION | CARRY_FORWARD */
+  origin     String   @default("CARRY_FORWARD")
+  createdAt  DateTime @default(now())
+
+  @@unique([periodKey, accountId, divisionId])
+  @@index([accountId])
+}
+
+/** ACC-08: one record per close attempt, so a close is auditable and repeatable. */
+model ClosingRun {
+  id            String   @id @default(cuid())
+  periodId      String
+  period        AccountingPeriod @relation(fields: [periodId], references: [id])
+  /** MONTH | YEAR */
+  kind          String   @default("MONTH")
+  /** the 손익 close entry, only for a year close */
+  closingEntryId String?
+  entriesLocked Int      @default(0)
+  carriedAccounts Int    @default(0)
+  runById       String?
+  runAt         DateTime @default(now())
+
+  @@index([periodId, runAt])
 }

@@ -33,7 +33,10 @@ export async function truncateBusinessData(): Promise<void> {
       "EmployeeChangeRequest", "CertificateIssue", "EmployeeDocument", "Assignment",
       "DepartmentHistory", "EmployeeSensitive",
       "InventoryPeriodCost", "InventoryValuationPeriod", "StockCountLine", "StockCount",
-      "StockDocumentLine", "StockDocument", "InventoryLedger", "StockSnapshot"
+      "StockDocumentLine", "StockDocument", "InventoryLedger", "StockSnapshot",
+      -- TRUNCATE, not DELETE: the journal guard triggers fire per row and would (correctly)
+      -- refuse to remove a confirmed entry. TRUNCATE bypasses row triggers.
+      "ClosingRun", "JournalLine", "JournalEntry", "AccountingPeriod", "OpeningBalance"
     RESTART IDENTITY CASCADE`);
   // Employee cannot be truncated with CASCADE without wiping the seeded users that
   // reference it, so detach and delete instead.

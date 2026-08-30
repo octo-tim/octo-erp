@@ -5,8 +5,6 @@ import { PrismaClient } from '@/generated/prisma/client';
 // 20260830_ledger_guards); this extension gives a clear application-level error first.
 const APPEND_ONLY = new Set([
   'InventoryLedger',
-  'JournalLine',
-  'JournalEntry',
   'LeaveUsage',
   'LeaveGrant',
   'AuditLog',
@@ -14,6 +12,12 @@ const APPEND_ONLY = new Set([
   'SensitiveAccessLog',
   'SettlementMatch',
 ]);
+
+// JournalEntry and JournalLine are deliberately NOT in the set above: a DRAFT entry is a
+// working document that may still be edited, and confirming or cancelling one is an update.
+// What must never change is a CONFIRMED entry, which is a status-dependent rule the flat
+// model check here cannot express — the erp_journal_entry_guard / erp_journal_line_guard
+// triggers (migration 20260830192500_journal_guard) enforce it in the database instead.
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 

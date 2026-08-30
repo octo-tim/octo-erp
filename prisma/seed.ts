@@ -5,6 +5,7 @@ import { moduleOf, PERMISSIONS, ROLE_PRESETS } from '../src/server/modules/rbac/
 import { DOC_TYPES } from '../src/server/modules/numbering/service';
 import { toDateOnly } from '../src/lib/dates';
 import { DEFAULT_FORMS } from '../src/server/modules/approval/form';
+import { DEFAULT_TEMPLATES, RULE_LABEL } from '../src/server/modules/accounting/posting-rule';
 
 const ADMIN_USERNAME = process.env['SEED_ADMIN_USERNAME'] ?? 'admin';
 const ADMIN_PASSWORD = process.env['SEED_ADMIN_PASSWORD'] ?? 'Admin!2345';
@@ -452,6 +453,102 @@ async function seedItemCategories() {
   }
 }
 
+/**
+ * ACC-01/ACC-03: a small standard chart of accounts, the slot mappings the posting rules
+ * resolve through, and the DEFAULT_TEMPLATES as version 1 of each rule. Standard accounts
+ * can be deactivated by the user but not renamed or deleted.
+ */
+async function seedAccounting() {
+  const accounts: [string, string, string, string | null][] = [
+    // code, name, type, parent code
+    ['100', '유동자산', 'ASSET', null],
+    ['101', '현금', 'ASSET', '100'],
+    ['102', '보통예금', 'ASSET', '100'],
+    ['110', '외상매출금', 'ASSET', '100'],
+    ['120', '부가세대급금', 'ASSET', '100'],
+    ['150', '재고자산', 'ASSET', '100'],
+    ['200', '유동부채', 'LIABILITY', null],
+    ['210', '외상매입금', 'LIABILITY', '200'],
+    ['220', '부가세예수금', 'LIABILITY', '200'],
+    ['300', '자본', 'EQUITY', null],
+    ['310', '자본금', 'EQUITY', '300'],
+    ['330', '이익잉여금', 'EQUITY', '300'],
+    ['400', '매출', 'REVENUE', null],
+    ['401', '상품매출', 'REVENUE', '400'],
+    ['402', '매출에누리', 'REVENUE', '400'],
+    ['500', '매출원가', 'EXPENSE', null],
+    ['501', '상품매출원가', 'EXPENSE', '500'],
+    ['600', '판매비와관리비', 'EXPENSE', null],
+    ['601', '급여', 'EXPENSE', '600'],
+    ['602', '복리후생비', 'EXPENSE', '600'],
+    ['603', '지급수수료', 'EXPENSE', '600'],
+    ['604', '운반비', 'EXPENSE', '600'],
+    ['605', '소모품비', 'EXPENSE', '600'],
+  ];
+
+  const idByCode = new Map<string, string>();
+  const hasChildren = new Set(accounts.map(([, , , parent]) => parent).filter(Boolean) as string[]);
+
+  for (const [code, name, accountType, parentCode] of accounts) {
+    const parentId = parentCode ? (idByCode.get(parentCode) ?? null) : null;
+    const normalSide = accountType === 'ASSET' || accountType === 'EXPENSE' ? 'DEBIT' : 'CREDIT';
+    const row = await prisma.account.upsert({
+      where: { code },
+      create: {
+        code,
+        name,
+        accountType,
+        normalSide,
+        parentId,
+        level: parentCode ? 2 : 1,
+        // only a leaf may be posted to
+        isPostable: !hasChildren.has(code),
+        isStandard: true,
+      },
+      update: { accountType, normalSide, parentId, isPostable: !hasChildren.has(code), isStandard: true },
+    });
+    idByCode.set(code, row.id);
+  }
+
+  const mappings: [string, string, string][] = [
+    ['SALES', '매출', '401'],
+    ['SALES_DISCOUNT', '매출에누리', '402'],
+    ['ACCOUNTS_RECEIVABLE', '외상매출금', '110'],
+    ['VAT_PAYABLE', '부가세예수금', '220'],
+    ['PURCHASE', '매입', '150'],
+    ['ACCOUNTS_PAYABLE', '외상매입금', '210'],
+    ['VAT_RECEIVABLE', '부가세대급금', '120'],
+    ['INVENTORY', '재고자산', '150'],
+    ['COGS', '매출원가', '501'],
+    ['CASH', '현금', '101'],
+    ['BANK', '보통예금', '102'],
+    ['RETAINED_EARNINGS', '이익잉여금', '330'],
+  ];
+  for (const [slot, label, code] of mappings) {
+    const accountId = idByCode.get(code)!;
+    await prisma.accountMapping.upsert({
+      where: { slot },
+      create: { slot, label, accountId },
+      update: { label, accountId },
+    });
+  }
+
+  const from = toDateOnly('2020-01-01');
+  for (const [code, template] of Object.entries(DEFAULT_TEMPLATES)) {
+    const rule = await prisma.postingRule.upsert({
+      where: { code },
+      create: { code, label: RULE_LABEL[code as keyof typeof RULE_LABEL] ?? code },
+      update: {},
+    });
+    const existing = await prisma.postingRuleVersion.findFirst({ where: { ruleId: rule.id, version: 1 } });
+    if (!existing) {
+      await prisma.postingRuleVersion.create({
+        data: { ruleId: rule.id, version: 1, effectiveFrom: from, template: template as never },
+      });
+    }
+  }
+}
+
 async function main() {
   await seedPermissionsAndRoles();
   await seedOrganization();
@@ -460,6 +557,7 @@ async function main() {
   await seedSystemSettings();
   await seedCommonCodes();
   await seedItemCategories();
+  await seedAccounting();
   await seedApproval();
   await seedAdminUser();
   console.log(`seed complete (admin user: ${ADMIN_USERNAME})`);

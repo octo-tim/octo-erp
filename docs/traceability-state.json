@@ -490,13 +490,26 @@
   },
   "DEC-04": {
     "status": "DONE",
-    "docs": [
-      "docs/adr/0006-accounting-period.md"
+    "services": [
+      "src/server/modules/accounting/period.ts",
+      "src/server/modules/accounting/closing.ts",
+      "src/server/modules/inventory/valuation.ts (재고 기간)"
+    ],
+    "api": [
+      "accounting.closeMonth",
+      "accounting.reopenPeriod"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/close/page.tsx"
+    ],
+    "tables": [
+      "AccountingPeriod"
     ],
     "tests": [
-      "tests/unit/dates.test.ts"
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
     ],
-    "notes": "기본안 임시승인"
+    "manual": "역분개 전표일이 원전표일 기간 마감 시 최초 열린 기간의 첫날로 이동하는지 확인"
   },
   "DEC-05": {
     "status": "DONE",
@@ -1265,6 +1278,29 @@
         "INV-02"
       ],
       "status": "FIXED"
+    },
+    {
+      "id": "CR-10",
+      "step": "STEP 8",
+      "text": "확정 전표를 취소하면 원전표가 CANCELED가 되고 역분개가 따로 생기는데, 원장·재무제표가 status='CONFIRMED'로만 집계해 원전표는 빠지고 역분개만 남아 계정 잔액이 반대 부호로 남는 결함을 발견했다. '한 번이라도 확정된 전표'(confirmedAt) 기준으로 바꿔 원전표와 역분개가 함께 집계되어 상계되도록 했다. 확정 없이 취소된 임시저장 전표는 여전히 제외된다.",
+      "related": [
+        "ACC-04",
+        "ACC-05",
+        "ACC-06",
+        "INT-07"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-11",
+      "step": "STEP 8",
+      "text": "reverseFromSource가 '확정 상태의 원전표'를 먼저 찾도록 되어 있어, 역분개 성공 후 재호출하면 원전표가 이미 CANCELED라 null을 반환했다. 호출자는 역분개가 없었다고 오해할 수 있다. 기존 역분개 확인을 먼저 수행하도록 순서를 바꿨다.",
+      "related": [
+        "ACC-03",
+        "INT-05",
+        "INT-07"
+      ],
+      "status": "FIXED"
     }
   ],
   "BAS-01": {
@@ -1753,5 +1789,234 @@
       "tests/integration/inventory.test.ts"
     ],
     "manual": "동시 출고 반복 경쟁시험에서 재고가 음수로 내려가지 않는지 확인"
+  },
+  "ACC-01": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/accounting/account.ts"
+    ],
+    "api": [
+      "accounting.accounts",
+      "accounting.postableAccounts",
+      "accounting.createAccount",
+      "accounting.updateAccount",
+      "accounting.deleteAccount"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/accounts/page.tsx"
+    ],
+    "tables": [
+      "Account"
+    ],
+    "tests": [
+      "tests/unit/accounting-journal.test.ts",
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "표준 계정과목의 명칭 변경·삭제가 거부되고, 하위 계정이 생기면 상위 계정이 전기 불가로 바뀌는지 확인"
+  },
+  "ACC-02": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/accounting/journal.ts (validateLines, create, update, confirm, cancel)"
+    ],
+    "api": [
+      "accounting.entries",
+      "accounting.entry",
+      "accounting.createEntry",
+      "accounting.updateEntry",
+      "accounting.confirmEntry",
+      "accounting.cancelEntry"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/journals/page.tsx",
+      "src/app/(app)/accounting/journals/[id]/page.tsx"
+    ],
+    "tables": [
+      "JournalEntry",
+      "JournalLine",
+      "prisma/migrations/20260830192500_journal_guard"
+    ],
+    "tests": [
+      "tests/unit/accounting-journal.test.ts",
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "불균형·양변 동시입력·0원 라인이 각각 다른 사유로 거부되는지, 화면에서 차액이 저장 전에 보이는지 확인"
+  },
+  "ACC-03": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/accounting/posting-rule.ts (DEFAULT_TEMPLATES, versionFor, publish, post, preview)",
+      "src/server/modules/accounting/account.ts (MAPPING_SLOTS, resolveSlot)"
+    ],
+    "api": [
+      "accounting.postingRules",
+      "accounting.publishPostingRule",
+      "accounting.previewPostingRule",
+      "accounting.accountMappings",
+      "accounting.setAccountMapping"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/rules/page.tsx"
+    ],
+    "tables": [
+      "PostingRule",
+      "PostingRuleVersion",
+      "AccountMapping"
+    ],
+    "tests": [
+      "tests/unit/accounting-journal.test.ts",
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "규칙 새 버전을 발행해도 기존 분개가 그대로인지, 부가세 0인 매출이 빈 라인을 만들지 않는지 확인"
+  },
+  "ACC-04": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/accounting/report.ts (accountLedger, trialBalance)"
+    ],
+    "api": [
+      "accounting.accountLedger",
+      "accounting.trialBalance"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/ledger/page.tsx"
+    ],
+    "tables": [
+      "JournalEntry",
+      "JournalLine"
+    ],
+    "tests": [
+      "tests/unit/accounting-journal.test.ts",
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "총계정원장 → 계정별원장 → 원천전표 드릴다운과 상대계정 표시를 확인"
+  },
+  "ACC-05": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/accounting/report.ts (incomeStatement)"
+    ],
+    "api": [
+      "accounting.incomeStatement"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/income-statement/page.tsx"
+    ],
+    "tables": [
+      "JournalEntry",
+      "JournalLine",
+      "Account"
+    ],
+    "tests": [
+      "tests/unit/accounting-journal.test.ts",
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "전월 비교와 증감이 맞는지, 손익 마감분개가 집계에서 제외되는지 확인"
+  },
+  "ACC-06": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/accounting/report.ts (balanceSheet)"
+    ],
+    "api": [
+      "accounting.balanceSheet"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/balance-sheet/page.tsx"
+    ],
+    "tables": [
+      "JournalEntry",
+      "JournalLine",
+      "Account"
+    ],
+    "tests": [
+      "tests/unit/accounting-journal.test.ts",
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "자산 = 부채 + 자본 + 당기순손익이 화면에서 검증되어 보이는지 확인"
+  },
+  "ACC-07": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/accounting/report.ts (incomeByDivision)",
+      "src/server/modules/accounting/journal.ts (라인 divisionId)"
+    ],
+    "api": [
+      "accounting.incomeByDivision",
+      "accounting.incomeStatement (divisionId)"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/income-statement/page.tsx"
+    ],
+    "tables": [
+      "JournalLine.divisionId"
+    ],
+    "tests": [
+      "tests/unit/accounting-journal.test.ts",
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "부문 합계 + 부문 미지정 = 전사 합계가 되는지 확인"
+  },
+  "ACC-08": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/accounting/period.ts (assertOpen, close, reopen, reversalDate)",
+      "src/server/modules/accounting/closing.ts (closeMonth, previewYear, closeYear, carryForward)"
+    ],
+    "api": [
+      "accounting.periods",
+      "accounting.closeMonth",
+      "accounting.reopenPeriod",
+      "accounting.yearClosePreview",
+      "accounting.closeYear",
+      "accounting.closingRuns",
+      "accounting.openingBalances"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/close/page.tsx"
+    ],
+    "tables": [
+      "AccountingPeriod",
+      "ClosingRun",
+      "OpeningBalance",
+      "JournalEntry.isClosingEntry"
+    ],
+    "tests": [
+      "tests/unit/accounting-journal.test.ts",
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "B-01: 마감기간 전표 거부, period.reopen 권한자만 사유 입력 후 해제, 해제 사유가 감사로그에 남는지 확인. 연 마감 후 손익 계정은 이월되지 않고 재무상태 계정만 이월되는지 확인"
+  },
+  "ACC-09": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/accounting/report.ts (trialBalanceToCsv, accountLedgerToCsv, INTERNAL_NOTICE)"
+    ],
+    "api": [
+      "accounting.trialBalanceCsv",
+      "accounting.accountLedgerCsv"
+    ],
+    "screens": [
+      "src/app/(app)/accounting/ledger/page.tsx",
+      "src/components/accounting/internal-notice.tsx"
+    ],
+    "tables": [
+      "JournalEntry",
+      "JournalLine"
+    ],
+    "tests": [
+      "tests/unit/accounting-journal.test.ts",
+      "tests/integration/accounting.test.ts",
+      "tests/e2e/accounting.spec.ts"
+    ],
+    "manual": "모든 회계 화면과 내보내기 파일에 내부관리용 표시가 나타나는지 확인"
   }
 }

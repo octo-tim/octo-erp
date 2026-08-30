@@ -32,6 +32,13 @@ const SCREENS: { path: string; open?: string }[] = [
   { path: '/inventory/ledger' },
   { path: '/inventory/counts', open: '실사 등록' },
   { path: '/inventory/valuation' },
+  { path: '/accounting/accounts', open: '계정 추가' },
+  { path: '/accounting/journals', open: '전표 등록' },
+  { path: '/accounting/rules' },
+  { path: '/accounting/ledger' },
+  { path: '/accounting/income-statement' },
+  { path: '/accounting/balance-sheet' },
+  { path: '/accounting/close' },
   { path: '/approval/inbox' },
   { path: '/hr/employees' },
 ];

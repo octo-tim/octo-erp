@@ -2,7 +2,7 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T19:03:02.534Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T19:58:19.943Z
 
 ## 집계
 
@@ -11,7 +11,7 @@
 | BAS 기초정보 | 8 | 1 | 9 | 8 | 0 | 0 | 0 | 0 | 1 |
 | SLS 매출·매입·발주 | 13 | 0 | 13 | 0 | 0 | 0 | 0 | 13 | 0 |
 | INV 재고 | 9 | 1 | 10 | 9 | 0 | 0 | 0 | 0 | 1 |
-| ACC 회계 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
+| ACC 회계 | 9 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
 | APV 전자결재 | 15 | 1 | 16 | 15 | 0 | 0 | 0 | 0 | 1 |
 | HRM 인사 | 13 | 1 | 14 | 13 | 0 | 0 | 0 | 0 | 1 |
 | RPT 보고서 | 10 | 1 | 11 | 0 | 0 | 0 | 0 | 10 | 1 |
@@ -20,7 +20,7 @@
 | NFR 비기능 | 22 | 0 | 22 | 8 | 6 | 0 | 0 | 8 | 0 |
 | MIG 데이터 이관 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | DEC 착수 시 확정 정책 | 0 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| **합계** | **128** | **6** | **143** | 80 | 8 | 0 | 0 | 49 | 6 |
+| **합계** | **128** | **6** | **143** | 89 | 8 | 0 | 0 | 40 | 6 |
 
 기능 요구사항(BAS·SLS·INV·ACC·APV·HRM·RPT·UIX): M 85개, O 6개 (RFP 5장 선언: 필수 85 / 선택 6).
 
@@ -75,15 +75,15 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| ACC-01 | M | **계정과목** — 표준 체계, 계층, 사용자 추가·수정·사용중지 | — | — | — | — | — | — | NOT_STARTED | — |
-| ACC-02 | M | **회계전표** — 대체·입금·출금, 차대변 균형, 적요, 부문 태그 | — | — | — | — | — | — | NOT_STARTED | — |
-| ACC-03 | M | **자동분개** — 매출·매입·수금·지급·반품·취소와 재고평가 마감조정을 설정 가능한 규칙으로 분개 | — | — | — | — | — | — | NOT_STARTED | — |
-| ACC-04 | M | **원장** — 총계정원장·계정별원장, 원천전표 드릴다운 | — | — | — | — | — | — | NOT_STARTED | — |
-| ACC-05 | M | **손익계산서** — 기간별 내부관리용 손익과 전기·전월 비교 | — | — | — | — | — | — | NOT_STARTED | — |
-| ACC-06 | M | **재무상태표** — 기준일 내부관리용 재무상태표 | — | — | — | — | — | — | NOT_STARTED | — |
-| ACC-07 | M | **부문별 손익** — 전표 라인의 사업부 기준 분리 | — | — | — | — | — | — | NOT_STARTED | — |
-| ACC-08 | M | **결산** — 기간 마감·해제, 손익 마감과 잔액 이월, 전표 잠금 | — | — | — | — | — | — | NOT_STARTED | — |
-| ACC-09 | M | **내보내기** — 세무대리인 제출용 전표·원장 엑셀 | — | — | — | — | — | — | NOT_STARTED | — |
+| ACC-01 | M | **계정과목** — 표준 체계, 계층, 사용자 추가·수정·사용중지 | `src/app/(app)/accounting/accounts/page.tsx` | `accounting.accounts`<br>`accounting.postableAccounts`<br>`accounting.createAccount`<br>`accounting.updateAccount`<br>`accounting.deleteAccount` | `src/server/modules/accounting/account.ts` | `Account` | `tests/unit/accounting-journal.test.ts`<br>`tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | 표준 계정과목의 명칭 변경·삭제가 거부되고, 하위 계정이 생기면 상위 계정이 전기 불가로 바뀌는지 확인 | DONE | — |
+| ACC-02 | M | **회계전표** — 대체·입금·출금, 차대변 균형, 적요, 부문 태그 | `src/app/(app)/accounting/journals/page.tsx`<br>`src/app/(app)/accounting/journals/[id]/page.tsx` | `accounting.entries`<br>`accounting.entry`<br>`accounting.createEntry`<br>`accounting.updateEntry`<br>`accounting.confirmEntry`<br>`accounting.cancelEntry` | `src/server/modules/accounting/journal.ts (validateLines, create, update, confirm, cancel)` | `JournalEntry`<br>`JournalLine`<br>`prisma/migrations/20260830192500_journal_guard` | `tests/unit/accounting-journal.test.ts`<br>`tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | 불균형·양변 동시입력·0원 라인이 각각 다른 사유로 거부되는지, 화면에서 차액이 저장 전에 보이는지 확인 | DONE | — |
+| ACC-03 | M | **자동분개** — 매출·매입·수금·지급·반품·취소와 재고평가 마감조정을 설정 가능한 규칙으로 분개 | `src/app/(app)/accounting/rules/page.tsx` | `accounting.postingRules`<br>`accounting.publishPostingRule`<br>`accounting.previewPostingRule`<br>`accounting.accountMappings`<br>`accounting.setAccountMapping` | `src/server/modules/accounting/posting-rule.ts (DEFAULT_TEMPLATES, versionFor, publish, post, preview)`<br>`src/server/modules/accounting/account.ts (MAPPING_SLOTS, resolveSlot)` | `PostingRule`<br>`PostingRuleVersion`<br>`AccountMapping` | `tests/unit/accounting-journal.test.ts`<br>`tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | 규칙 새 버전을 발행해도 기존 분개가 그대로인지, 부가세 0인 매출이 빈 라인을 만들지 않는지 확인 | DONE | — |
+| ACC-04 | M | **원장** — 총계정원장·계정별원장, 원천전표 드릴다운 | `src/app/(app)/accounting/ledger/page.tsx` | `accounting.accountLedger`<br>`accounting.trialBalance` | `src/server/modules/accounting/report.ts (accountLedger, trialBalance)` | `JournalEntry`<br>`JournalLine` | `tests/unit/accounting-journal.test.ts`<br>`tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | 총계정원장 → 계정별원장 → 원천전표 드릴다운과 상대계정 표시를 확인 | DONE | — |
+| ACC-05 | M | **손익계산서** — 기간별 내부관리용 손익과 전기·전월 비교 | `src/app/(app)/accounting/income-statement/page.tsx` | `accounting.incomeStatement` | `src/server/modules/accounting/report.ts (incomeStatement)` | `JournalEntry`<br>`JournalLine`<br>`Account` | `tests/unit/accounting-journal.test.ts`<br>`tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | 전월 비교와 증감이 맞는지, 손익 마감분개가 집계에서 제외되는지 확인 | DONE | — |
+| ACC-06 | M | **재무상태표** — 기준일 내부관리용 재무상태표 | `src/app/(app)/accounting/balance-sheet/page.tsx` | `accounting.balanceSheet` | `src/server/modules/accounting/report.ts (balanceSheet)` | `JournalEntry`<br>`JournalLine`<br>`Account` | `tests/unit/accounting-journal.test.ts`<br>`tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | 자산 = 부채 + 자본 + 당기순손익이 화면에서 검증되어 보이는지 확인 | DONE | — |
+| ACC-07 | M | **부문별 손익** — 전표 라인의 사업부 기준 분리 | `src/app/(app)/accounting/income-statement/page.tsx` | `accounting.incomeByDivision`<br>`accounting.incomeStatement (divisionId)` | `src/server/modules/accounting/report.ts (incomeByDivision)`<br>`src/server/modules/accounting/journal.ts (라인 divisionId)` | `JournalLine.divisionId` | `tests/unit/accounting-journal.test.ts`<br>`tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | 부문 합계 + 부문 미지정 = 전사 합계가 되는지 확인 | DONE | — |
+| ACC-08 | M | **결산** — 기간 마감·해제, 손익 마감과 잔액 이월, 전표 잠금 | `src/app/(app)/accounting/close/page.tsx` | `accounting.periods`<br>`accounting.closeMonth`<br>`accounting.reopenPeriod`<br>`accounting.yearClosePreview`<br>`accounting.closeYear`<br>`accounting.closingRuns`<br>`accounting.openingBalances` | `src/server/modules/accounting/period.ts (assertOpen, close, reopen, reversalDate)`<br>`src/server/modules/accounting/closing.ts (closeMonth, previewYear, closeYear, carryForward)` | `AccountingPeriod`<br>`ClosingRun`<br>`OpeningBalance`<br>`JournalEntry.isClosingEntry` | `tests/unit/accounting-journal.test.ts`<br>`tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | B-01: 마감기간 전표 거부, period.reopen 권한자만 사유 입력 후 해제, 해제 사유가 감사로그에 남는지 확인. 연 마감 후 손익 계정은 이월되지 않고 재무상태 계정만 이월되는지 확인 | DONE | — |
+| ACC-09 | M | **내보내기** — 세무대리인 제출용 전표·원장 엑셀 | `src/app/(app)/accounting/ledger/page.tsx`<br>`src/components/accounting/internal-notice.tsx` | `accounting.trialBalanceCsv`<br>`accounting.accountLedgerCsv` | `src/server/modules/accounting/report.ts (trialBalanceToCsv, accountLedgerToCsv, INTERNAL_NOTICE)` | `JournalEntry`<br>`JournalLine` | `tests/unit/accounting-journal.test.ts`<br>`tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | 모든 회계 화면과 내보내기 파일에 내부관리용 표시가 나타나는지 확인 | DONE | — |
 
 ## APV — 전자결재
 
@@ -220,7 +220,7 @@
 | DEC-01 | D | **재고 평가** — 월 총평균법, 당월 잠정평가, 월 마감 확정·차이조정 | — | — | — | — | `docs/acceptance-scenarios.md B-11` | — | DONE | 기본안 임시승인, PolicyVersion inventory.valuation v1 시드 |
 | DEC-02 | D | **금액·부가세** — KRW 정수, 라인별 공급가·부가세 10% 원단위 절사 후 합산 | — | — | — | — | `tests/unit/money.test.ts` | — | DONE | 기본안 임시승인, PolicyVersion money v1 시드 |
 | DEC-03 | D | **전표별 결재 정책** — 전표 유형·금액 구간별 결재 필수/선택/면제 | `src/app/(app)/inventory/documents/[id]/page.tsx` | `inventory.confirmDocument` | `src/server/modules/approval/matrix.ts`<br>`src/server/modules/inventory/stock-document.ts (confirm 게이트)` | `PolicyVersion (approval.matrix)` | `tests/integration/inventory.test.ts` | STOCK_OUT 1,000,000원 이상 전표가 직접 확정되지 않고 결재를 요구하는지 확인 | DONE | — |
-| DEC-04 | D | **회계기간·전표일** — 달력 월 기준 마감·해제·역분개 | — | — | — | — | `tests/unit/dates.test.ts` | — | DONE | 기본안 임시승인 |
+| DEC-04 | D | **회계기간·전표일** — 달력 월 기준 마감·해제·역분개 | `src/app/(app)/accounting/close/page.tsx` | `accounting.closeMonth`<br>`accounting.reopenPeriod` | `src/server/modules/accounting/period.ts`<br>`src/server/modules/accounting/closing.ts`<br>`src/server/modules/inventory/valuation.ts (재고 기간)` | `AccountingPeriod` | `tests/integration/accounting.test.ts`<br>`tests/e2e/accounting.spec.ts` | 역분개 전표일이 원전표일 기간 마감 시 최초 열린 기간의 첫날로 이동하는지 확인 | DONE | — |
 | DEC-05 | D | **연차·근태** — 입사일 기준, 취업규칙·법령 반영 정책 버전 | — | — | — | — | `prisma/seed.ts leave v1` | — | DONE | 기본안 임시승인, 노무 검토 후 v2 예정 |
 | DEC-06 | D | **개인정보 보유·파기** — 정보 항목별 보유기간표 | — | — | — | — | `prisma/seed.ts retention v1` | — | DONE | 기본안 임시승인 |
 | DEC-07 | D | **배포·인증·파일 저장** — Railway, 자체 세션, 외부 객체 저장소 | — | — | — | — | `tests/integration/auth.test.ts`<br>`tests/integration/storage.test.ts` | — | DONE | Railway + 자체 세션 + S3 호환 저장소 구현 완료 |
@@ -240,3 +240,5 @@
 | CR-07 | STEP 7 | 알림 dedupKey가 아웃박스(이메일)에만 적용되고 인앱 알림 행은 매번 생성되어, 같은 품목의 안전재고 미달 알림이 출고 건마다 쌓이는 결함을 발견했다. Notification에 dedupKey와 (userId, dedupKey) 유일 제약을 추가해 알림센터에도 동일 규칙을 적용했다. 재고뿐 아니라 모든 알림 유형에 해당된다. | INV-07, UIX-08, DEC-09 | FIXED |
 | CR-08 | STEP 7 | 입출고 화면에서 조회조건의 종료일과 등록 폼의 입고 창고가 같은 DOM id(sd-to)를 사용해, label이 엉뚱한 컨트롤을 가리키는 접근성 결함을 E2E로 발견했다. 조회조건 id를 분리하고, 같은 유형이 재발하지 않도록 주요 화면 전체를 훑는 중복 id·미연결 label 점검 시험(tests/e2e/dom-integrity.spec.ts)을 추가했다. | UIX-02, UIX-05, NFR-UX-03 | FIXED |
 | CR-09 | STEP 7 | 전표 라인 편집기의 자동완성 datalist가 선택 시 셀에 내부 id(cuid)를 넣어, 사용자가 알아볼 수 없는 값이 표시되는 문제를 발견했다. 표시 라벨을 option 값으로 바꾸고, 이름만 입력해도 유일하게 일치하면 품목을 인식하도록 했다. | UIX-04, INV-01, INV-02 | FIXED |
+| CR-10 | STEP 8 | 확정 전표를 취소하면 원전표가 CANCELED가 되고 역분개가 따로 생기는데, 원장·재무제표가 status='CONFIRMED'로만 집계해 원전표는 빠지고 역분개만 남아 계정 잔액이 반대 부호로 남는 결함을 발견했다. '한 번이라도 확정된 전표'(confirmedAt) 기준으로 바꿔 원전표와 역분개가 함께 집계되어 상계되도록 했다. 확정 없이 취소된 임시저장 전표는 여전히 제외된다. | ACC-04, ACC-05, ACC-06, INT-07 | FIXED |
+| CR-11 | STEP 8 | reverseFromSource가 '확정 상태의 원전표'를 먼저 찾도록 되어 있어, 역분개 성공 후 재호출하면 원전표가 이미 CANCELED라 null을 반환했다. 호출자는 역분개가 없었다고 오해할 수 있다. 기존 역분개 확인을 먼저 수행하도록 순서를 바꿨다. | ACC-03, INT-05, INT-07 | FIXED |
