@@ -83,7 +83,7 @@ test('APV-15: 결재문서에 인쇄·PDF 버튼과 결재선·이력이 표시�
   await expect(page).toHaveURL(/\/approval\/documents\//);
 
   await expect(page.getByRole('button', { name: /인쇄/ })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '결재선' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '결재선', exact: true })).toBeVisible();
   await expect(page.getByText('아직 결재선이 없습니다.')).toBeVisible();
   await expect(page.getByRole('heading', { name: '처리 이력' })).toBeVisible();
 });

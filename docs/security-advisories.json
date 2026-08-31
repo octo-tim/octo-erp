@@ -1,0 +1,31 @@
+{
+  "note": "NFR-SEC-05 의존성 취약점 점검 기준선. tools/audit-check.mjs가 이 파일과 npm audit 결과를 대조해, 여기에 없는 새 취약점이 나오면 CI를 실패시킨다. 항목을 추가할 때는 반드시 사유·영향·해소 조건·재검토일을 함께 적는다. 사유 없이 추가하면 이 파일은 취약점을 숨기는 도구가 된다.",
+  "reviewedAt": "2026-08-31",
+  "accepted": [
+    {
+      "severity": "high",
+      "via": "next 15.5.24",
+      "advisories": [
+        "GHSA-qx2v-qp2m-jg93",
+        "GHSA-6g55-p6wh-862q",
+        "GHSA-fxqj-rqcc-2cmp",
+        "GHSA-r28c-9q8g-f849"
+      ],
+      "reason": "빌드 시점에만 실행된다. postcss는 이 저장소의 CSS만 처리하며 사용자 입력이나 외부 CSS를 파싱하는 경로가 없다. 취약점이 요구하는 '신뢰할 수 없는 CSS 입력'이 성립하지 않는다.",
+      "resolution": "Next.js 16으로 올리면 해소된다. 메이저 업그레이드이므로 전 화면 회귀시험과 함께 별도 작업으로 진행한다.",
+      "owner": "개발팀",
+      "reviewBy": "2026-11-30",
+      "packages": ["postcss"]
+    },
+    {
+      "severity": "high",
+      "via": "prisma 7.10.0 -> @prisma/config",
+      "advisories": ["GHSA-ggr8-5vv4-36mx"],
+      "reason": "prisma CLI가 설정 파일을 읽을 때만 쓰인다. 재귀 객체 그래프를 병합할 때의 스택 고갈이며, 입력은 저장소가 소유한 prisma 설정 하나뿐이라 공격자가 넣을 수 있는 값이 없다. 런타임 서버 번들에 포함되지 않는다. prisma와 @prisma/config는 같은 원인을 전이로 물려받은 것이라 함께 적는다.",
+      "resolution": "prisma 8 정식 릴리스에서 해소 예정. 현재 8.0.0은 RC이므로 운영에 올리지 않는다.",
+      "owner": "개발팀",
+      "reviewBy": "2026-11-30",
+      "packages": ["deepmerge-ts", "@prisma/config", "prisma"]
+    }
+  ]
+}

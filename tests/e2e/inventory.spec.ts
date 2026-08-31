@@ -38,12 +38,12 @@ async function createItem(page: Page, name: string, opts: { safetyStock?: string
 }
 
 /** Fills the shared stock-document form. The item cell is an autocomplete on the label. */
-async function fillLine(page: Page, itemName: string, quantity: string, unitCost?: string) {
+async function fillLine(page: Page, itemName: string, quantity: string, unitCost?: string, lineIndex = 0) {
   const grid = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: '품목' }) });
-  const firstRow = grid.locator('tbody tr').first();
-  await firstRow.locator('[data-col="0"]').fill(itemName);
-  await firstRow.locator('[data-col="1"]').fill(quantity);
-  if (unitCost !== undefined) await firstRow.locator('[data-col="2"]').fill(unitCost);
+  const row = grid.locator('tbody tr').nth(lineIndex);
+  await row.locator('[data-col="0"]').fill(itemName);
+  await row.locator('[data-col="1"]').fill(quantity);
+  if (unitCost !== undefined) await row.locator('[data-col="2"]').fill(unitCost);
 }
 
 test('INV-01/INV-04: 입고를 확정하면 재고현황과 원장에 반영된다', async ({ page }) => {
@@ -195,31 +195,55 @@ test('INV-07: 안전재고 미달이 재고현황에서 강조된다', async ({ 
 
 test('INV-08: 실사 차이를 승인하면 조정전표가 생성된다', async ({ page }) => {
   desktopEntryOnly();
-  const name = `실사품${Date.now().toString().slice(-6)}`;
-  await createItem(page, name);
+  const stamp = Date.now().toString().slice(-6);
+  const name = `실사품${stamp}`;
+  const other = `실사동반품${stamp}`;
+  /**
+   * Its own warehouse, holding exactly two items.
+   *
+   * The count sheet lists every item in the warehouse and approval is refused until each has
+   * a number, so counting a shared warehouse meant filling one row per item ever received
+   * there — which grew with every run until the test timed out. Two items still exercise the
+   * rule that every row must be counted; the number of rows just no longer depends on how
+   * many times the suite has been run before.
+   */
+  const warehouseName = `실사창고${stamp}`;
+  await page.goto('/master/warehouses');
+  await page.getByLabel('창고코드').fill(`WC${stamp}`);
+  await page.getByLabel('창고명').fill(warehouseName);
+  await page.getByRole('button', { name: '등록', exact: true }).click();
+  await expect(page.getByRole('cell', { name: warehouseName })).toBeVisible();
 
-  await page.goto('/inventory/stock-in');
-  await page.getByRole('button', { name: '입고 등록' }).click();
-  await page.getByLabel('입고 창고').selectOption({ index: 1 });
-  await page.getByLabel('사유').selectOption({ index: 1 });
-  await fillLine(page, name, '10', '1000');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
-  await page.getByRole('button', { name: '확정', exact: true }).click();
-  await expect(page.getByText('재고 원장에 반영되었습니다.')).toBeVisible();
+  await createItem(page, name);
+  await createItem(page, other);
+
+  for (const [item, qty] of [
+    [name, '10'],
+    [other, '5'],
+  ] as const) {
+    await page.goto('/inventory/stock-in');
+    await page.getByRole('button', { name: '입고 등록' }).click();
+    await page.getByLabel('입고 창고').selectOption({ label: warehouseName });
+    await page.getByLabel('사유').selectOption({ index: 1 });
+    await fillLine(page, item, qty, '1000');
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await page.getByRole('button', { name: '확정', exact: true }).click();
+    await expect(page.getByText('재고 원장에 반영되었습니다.')).toBeVisible();
+  }
 
   await page.goto('/inventory/counts');
   await page.getByRole('button', { name: '실사 등록' }).click();
-  await page.getByLabel('실사 창고').selectOption({ index: 1 });
+  await page.getByLabel('실사 창고').selectOption({ label: warehouseName });
   await page.getByRole('button', { name: '등록', exact: true }).click();
 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('재고실사');
   await page.getByRole('button', { name: '실사 시작' }).click();
   await expect(page.getByText('전산재고를 동결했습니다.')).toBeVisible();
 
-  // a real count walks every shelf: the warehouse holds items from earlier runs too, and
-  // approval is refused until each one has a number, so fill them all with what the system
-  // says and then record the one genuine difference.
+  // a real count walks every shelf: approval is refused until every row has a number, so
+  // fill them all with what the system says and then record the one genuine difference.
   const rows = page.getByRole('main').locator('tbody tr');
+  await expect(rows).toHaveCount(2);
   for (let i = 0; i < (await rows.count()); i++) {
     const row = rows.nth(i);
     const systemQty = (await row.locator('td').nth(2).innerText()).trim().split(' ')[0]!;

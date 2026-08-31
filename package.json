@@ -27,7 +27,8 @@
     "docs:schema": "node tools/docs-schema.mjs",
     "docs:api": "node tools/docs-api.mjs",
     "docs:permissions": "node tools/docs-permissions.mjs",
-    "docs:check": "node tools/docs-schema.mjs --check && node tools/docs-api.mjs --check && node tools/docs-permissions.mjs --check"
+    "docs:check": "node tools/docs-schema.mjs --check && node tools/docs-api.mjs --check && node tools/docs-permissions.mjs --check",
+    "audit:check": "node tools/audit-check.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",
@@ -43,7 +44,6 @@
     "@types/pg": "^8.23.1",
     "clsx": "2.1.1",
     "decimal.js": "10.6.0",
-    "exceljs": "4.4.0",
     "lucide-react": "1.37.0",
     "next": "15.5.24",
     "nodemailer": "^9.0.6",

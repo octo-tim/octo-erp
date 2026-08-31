@@ -10,12 +10,14 @@ import { actorFor, prepareDatabase, prisma, runTx, truncateBusinessData } from '
 import { registerScheduledJobs } from '@/server/jobs/register';
 import { runScheduledJob } from '@/server/jobs/handlers/scheduled';
 import { enqueueDueJobs } from '@/server/jobs/scheduler';
-import { businessDate } from '@/lib/dates';
+import { addDays, businessDate } from '@/lib/dates';
 import * as approval from '@/server/modules/approval/service';
 import * as organization from '@/server/modules/hrm/organization';
 import * as employee from '@/server/modules/hrm/employee';
 import * as notification from '@/server/modules/notification/service';
 import * as audit from '@/server/modules/audit/service';
+import * as policy from '@/server/modules/policy/service';
+import type { NotificationPolicy } from '@/server/modules/policy/service';
 import * as item from '@/server/modules/master/item';
 import * as partnerModule from '@/server/modules/master/partner';
 import * as salesOrder from '@/server/modules/sales/sales-order';
@@ -24,6 +26,8 @@ import { changePassword, login, resolveSession } from '@/server/modules/auth/ser
 import { hashPassword } from '@/server/core/crypto';
 import { AppError } from '@/server/core/errors';
 import type { Actor } from '@/server/core/context';
+import { contractExpiryJob } from '@/server/jobs/handlers/contract-expiry';
+import { longPendingApprovalJob } from '@/server/jobs/handlers/long-pending';
 
 let admin: Actor;
 
@@ -574,5 +578,291 @@ describe('스케줄 작업 발생 (src/server/jobs/scheduler.ts)', () => {
     expect(await enqueueDueJobs(now)).toBe(2);
     expect(await prisma.outboxEvent.count({ where: { topic: RETENTION_TOPIC, dedupKey: day } })).toBe(1);
     expect(await prisma.outboxEvent.count({ where: { topic: LONG_PENDING_TOPIC, dedupKey: day } })).toBe(1);
+  });
+});
+
+// ── 10. HRM-08: contract expiry reminder actually reaches HR ──
+//
+// Group 1 above proves the job topic is wired to a handler and runs without throwing.
+// That is plumbing, not the promise: HRM-08 promises that HR is told when a fixed-term
+// contract is about to end. These tests call the handler directly and check the
+// Notification row it must produce — and the cases the handler's own comment says must
+// NOT produce one, because it re-reads the employee instead of trusting the queued
+// payload.
+describe('HRM-08: 계약 만료 알림이 실제로 인사담당자에게 도달한다', () => {
+  async function hrRecipient(): Promise<Actor> {
+    const hash = await hashPassword('Regress!123456');
+    const hrRole = await prisma.role.findUniqueOrThrow({ where: { code: 'hr' } });
+    await prisma.user.upsert({
+      where: { username: 'reg-contract-hr' },
+      create: {
+        username: 'reg-contract-hr',
+        displayName: '계약알림담당자',
+        passwordHash: hash,
+        roles: { create: [{ roleId: hrRole.id }] },
+      },
+      update: { isActive: true },
+    });
+    return actorFor('reg-contract-hr');
+  }
+
+  it('공지 기간 내 만료되는 계약직 사원은 hr.write 보유자에게 사원명과 만료일이 포함된 알림을 남긴다', async () => {
+    const hr = await hrRecipient();
+    const endDate = addDays(businessDate(new Date()), 10); // well inside the 30-day notice window
+
+    const emp = await runTx(admin, (t) =>
+      employee.create(t, {
+        name: '계약만료임박',
+        hireDate: '2024-01-02',
+        employmentType: 'CONTRACT',
+        contractEndDate: endDate,
+      }),
+    );
+
+    await contractExpiryJob({ employeeId: emp.id });
+
+    const rows = await prisma.notification.findMany({
+      where: { userId: hr.userId, category: 'HR', linkUrl: `/hr/employees/${emp.id}` },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.title).toContain(emp.name);
+    expect(rows[0]!.body).toContain(emp.name);
+    expect(rows[0]!.body).toContain(endDate);
+    expect(rows[0]!.dedupKey).toBe(`contract-expiry:${emp.id}:${endDate}`);
+  });
+
+  it('큐에 남아있던 이벤트라도, 그사이 퇴사 처리된 사원에게는 알림이 발생하지 않는다', async () => {
+    await hrRecipient();
+    const endDate = addDays(businessDate(new Date()), 10);
+
+    const emp = await runTx(admin, (t) =>
+      employee.create(t, {
+        name: '퇴사자',
+        hireDate: '2024-01-02',
+        employmentType: 'CONTRACT',
+        contractEndDate: endDate,
+      }),
+    );
+    await runTx(admin, (t) =>
+      employee.resign(t, { employeeId: emp.id, leaveDate: businessDate(new Date()) }),
+    );
+
+    // the job is handed the same employeeId the (now-stale) outbox event carried
+    await contractExpiryJob({ employeeId: emp.id });
+
+    expect(
+      await prisma.notification.count({ where: { category: 'HR', linkUrl: `/hr/employees/${emp.id}` } }),
+    ).toBe(0);
+  });
+
+  it('그사이 계약이 만료 기간 밖으로 갱신된 사원에게는 알림이 발생하지 않는다', async () => {
+    await hrRecipient();
+    const soon = addDays(businessDate(new Date()), 10);
+    const renewed = addDays(businessDate(new Date()), 45); // past the 30-day notice window
+
+    const emp = await runTx(admin, (t) =>
+      employee.create(t, {
+        name: '계약갱신자',
+        hireDate: '2024-01-02',
+        employmentType: 'CONTRACT',
+        contractEndDate: soon,
+      }),
+    );
+    await runTx(admin, (t) => employee.update(t, emp.id, { contractEndDate: renewed }, emp.version));
+
+    await contractExpiryJob({ employeeId: emp.id });
+
+    expect(
+      await prisma.notification.count({ where: { category: 'HR', linkUrl: `/hr/employees/${emp.id}` } }),
+    ).toBe(0);
+  });
+
+  it('같은 작업을 두 번 실행해도 알림은 한 번만 남는다 (dedupKey)', async () => {
+    const hr = await hrRecipient();
+    const endDate = addDays(businessDate(new Date()), 10);
+
+    const emp = await runTx(admin, (t) =>
+      employee.create(t, {
+        name: '중복실행대상',
+        hireDate: '2024-01-02',
+        employmentType: 'CONTRACT',
+        contractEndDate: endDate,
+      }),
+    );
+
+    await contractExpiryJob({ employeeId: emp.id });
+    await contractExpiryJob({ employeeId: emp.id });
+
+    expect(
+      await prisma.notification.count({
+        where: { userId: hr.userId, dedupKey: `contract-expiry:${emp.id}:${endDate}` },
+      }),
+    ).toBe(1);
+  });
+
+  it('계약종료일이 없는 사원에게는 알림이 발생하지 않는다', async () => {
+    await hrRecipient();
+    const emp = await runTx(admin, (t) => employee.create(t, { name: '무기계약직', hireDate: '2024-01-02' }));
+
+    await contractExpiryJob({ employeeId: emp.id });
+
+    expect(
+      await prisma.notification.count({ where: { category: 'HR', linkUrl: `/hr/employees/${emp.id}` } }),
+    ).toBe(0);
+  });
+});
+
+// ── 11. APV-11: long-pending approval reminder actually reaches the approver ──
+//
+// Group 9 above proves `job.long_pending_approval` gets enqueued once a day. That is still
+// only plumbing: APV-11 promises that the approver currently holding up a stale document
+// gets nudged. These tests call the handler directly and check the Notification row,
+// including the handler's own point (see its file comment) that the reminder must go to
+// the approver whose step is pending — not to everyone on the approval line — and that the
+// staleness threshold is a policy value, not a number baked into the handler.
+describe('APV-11: 장기 미결 결재 알림이 실제로 결재자에게 도달한다', () => {
+  async function lineActors(): Promise<{ drafter: Actor; approver1: Actor; approver2: Actor }> {
+    const hash = await hashPassword('Regress!123456');
+    const salesRole = await prisma.role.findUniqueOrThrow({ where: { code: 'sales' } });
+    const managerRole = await prisma.role.findUniqueOrThrow({ where: { code: 'manager' } });
+    for (const [username, roleId, displayName] of [
+      ['reg-lp-drafter', salesRole.id, '기안자'],
+      ['reg-lp-approver1', managerRole.id, '1차결재자'],
+      ['reg-lp-approver2', managerRole.id, '2차결재자'],
+    ] as const) {
+      await prisma.user.upsert({
+        where: { username },
+        create: { username, displayName, passwordHash: hash, roles: { create: [{ roleId }] } },
+        update: { isActive: true },
+      });
+    }
+    return {
+      drafter: await actorFor('reg-lp-drafter'),
+      approver1: await actorFor('reg-lp-approver1'),
+      approver2: await actorFor('reg-lp-approver2'),
+    };
+  }
+
+  /** Drafts and submits an EXPENSE document with a hand-picked approval line, then backdates
+   *  submittedAt directly (submit() always stamps it with the real "now" of the call). */
+  async function submitStaleDocument(
+    drafter: Actor,
+    approverIds: { approverId: string; role: 'APPROVE' }[],
+    daysAgo: number,
+  ) {
+    const doc = await runTx(drafter, (t) =>
+      approval.draft(t, {
+        docNo: `AP-LP-${randomUUID().slice(0, 8)}`,
+        formCode: 'EXPENSE',
+        title: '장기미결 회귀시험 지출결의',
+        content: { purpose: '테스트', amount: '100000', paymentDate: '2026-09-10', payee: '테스트업체' },
+        amount: '100000',
+      }),
+    );
+    const submitted = await runTx(drafter, (t) =>
+      approval.submit(t, { documentId: doc.id, version: doc.version, lineOverride: approverIds }),
+    );
+    await prisma.approvalDocument.update({
+      where: { id: doc.id },
+      data: { submittedAt: new Date(Date.now() - daysAgo * 86_400_000) },
+    });
+    return { id: doc.id, docNo: submitted.docNo, title: submitted.title };
+  }
+
+  it('임계값을 넘겨 대기 중인 문서는 현재 차례인 결재자에게만 알림을 남기고, 이미 승인한 다른 결재자에게는 남기지 않는다', async () => {
+    const { drafter, approver1, approver2 } = await lineActors();
+    const doc = await submitStaleDocument(
+      drafter,
+      [
+        { approverId: approver1.userId, role: 'APPROVE' },
+        { approverId: approver2.userId, role: 'APPROVE' },
+      ],
+      6, // seeded policy: 3 business days ~= 4.2 real days — well past the threshold
+    );
+    const current = await prisma.approvalDocument.findUniqueOrThrow({ where: { id: doc.id } });
+    // approve() only touches status/currentStepNo/version/completedAt — submittedAt (backdated
+    // above) is untouched, so the document is still stale after step 1 clears.
+    await runTx(approver1, (t) => approval.approve(t, { documentId: doc.id, version: current.version }));
+
+    await longPendingApprovalJob();
+
+    // `notifyPending` (submit/approve's own "결재 요청" notice, dedupKey `approval:...`) fires
+    // to the current step's approver on every submit/advance regardless of staleness — that is
+    // a different promise than APV-11's. Scope to the long-pending job's own dedupKey so this
+    // test can only pass because THAT job notified, not because the document advanced.
+    const forApprover2 = await prisma.notification.findMany({
+      where: { userId: approver2.userId, dedupKey: { startsWith: `long-pending:${doc.id}:` } },
+    });
+    expect(forApprover2).toHaveLength(1);
+    expect(forApprover2[0]!.category).toBe('APPROVAL');
+    expect(forApprover2[0]!.title).toContain(doc.title);
+    expect(forApprover2[0]!.body).toContain(doc.docNo);
+
+    const forApprover1 = await prisma.notification.count({
+      where: { userId: approver1.userId, dedupKey: { startsWith: `long-pending:${doc.id}:` } },
+    });
+    expect(forApprover1).toBe(0);
+  });
+
+  it('최근에 상신된 문서는 알림이 발생하지 않는다', async () => {
+    const { drafter, approver1 } = await lineActors();
+    const doc = await submitStaleDocument(drafter, [{ approverId: approver1.userId, role: 'APPROVE' }], 0);
+
+    await longPendingApprovalJob();
+
+    expect(
+      await prisma.notification.count({
+        where: { userId: approver1.userId, dedupKey: { startsWith: `long-pending:${doc.id}:` } },
+      }),
+    ).toBe(0);
+  });
+
+  it('같은 날 두 번 실행해도 문서당 알림은 한 번만 남는다', async () => {
+    const { drafter, approver1 } = await lineActors();
+    const doc = await submitStaleDocument(drafter, [{ approverId: approver1.userId, role: 'APPROVE' }], 6);
+
+    await longPendingApprovalJob();
+    await longPendingApprovalJob();
+
+    expect(
+      await prisma.notification.count({
+        where: { userId: approver1.userId, dedupKey: { startsWith: `long-pending:${doc.id}:` } },
+      }),
+    ).toBe(1);
+  });
+
+  it('임계값은 하드코딩된 상수가 아니라 알림 정책(notification)에서 가져온다', async () => {
+    const { drafter, approver1 } = await lineActors();
+    // 2 days old: inside the seeded 3-business-day threshold (~4.2 real days), so no alert yet.
+    const doc = await submitStaleDocument(drafter, [{ approverId: approver1.userId, role: 'APPROVE' }], 2);
+
+    await longPendingApprovalJob();
+    expect(
+      await prisma.notification.count({
+        where: { userId: approver1.userId, dedupKey: { startsWith: `long-pending:${doc.id}:` } },
+      }),
+    ).toBe(0);
+
+    // Tighten the policy to 1 business day (~1.4 real days) — the same 2-day-old document
+    // must now be flagged. If the handler used a hardcoded constant, this would stay 0.
+    await runTx(admin, (t) =>
+      policy.publish<NotificationPolicy>(t, {
+        key: 'notification',
+        effectiveFrom: businessDate(new Date()),
+        config: {
+          channels: { app: true, email: true, messenger: 'NONE' },
+          backoffMs: [60000, 300000, 1800000, 7200000, 43200000],
+          longPendingBusinessDays: 1,
+        },
+        note: '회귀시험: 장기미결 임계값 단축',
+      }),
+    );
+
+    await longPendingApprovalJob();
+    expect(
+      await prisma.notification.count({
+        where: { userId: approver1.userId, dedupKey: { startsWith: `long-pending:${doc.id}:` } },
+      }),
+    ).toBe(1);
   });
 });
