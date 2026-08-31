@@ -64,6 +64,13 @@ export const salesRouter = router({
       }),
     ),
 
+  // UIX-03: server-side export — calls quotation.list itself, same permission and filters.
+  quotationsCsv: permissionProcedure('sales.read')
+    .input(
+      z.object({ status: z.string().optional(), partnerId: cuid.optional(), q: searchText, ...dateRange }),
+    )
+    .query(({ ctx, input }) => readTx(ctx, (t) => quotation.listCsv(t, input))),
+
   quotation: permissionProcedure('sales.read')
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => quotation.detail(t, input.id))),
@@ -169,6 +176,13 @@ export const salesRouter = router({
       }),
     ),
 
+  // UIX-03: server-side export — calls salesOrder.list itself, same permission and filters.
+  salesOrdersCsv: permissionProcedure('sales.read')
+    .input(
+      z.object({ status: z.string().optional(), partnerId: cuid.optional(), q: searchText, ...dateRange }),
+    )
+    .query(({ ctx, input }) => readTx(ctx, (t) => salesOrder.listCsv(t, input))),
+
   salesOrder: permissionProcedure('sales.read')
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => salesOrder.detail(t, input.id))),
@@ -220,6 +234,19 @@ export const salesRouter = router({
         return { rows, total, page: input.page, pageSize: input.pageSize };
       }),
     ),
+
+  // UIX-03: server-side export — calls salesDocument.list itself, same permission/filters.
+  salesDocumentsCsv: permissionProcedure('sales.read')
+    .input(
+      z.object({
+        docType: z.enum(['SALES', 'RETURN_SALES']).optional(),
+        status: z.string().optional(),
+        partnerId: cuid.optional(),
+        q: searchText,
+        ...dateRange,
+      }),
+    )
+    .query(({ ctx, input }) => readTx(ctx, (t) => salesDocument.listCsv(t, input))),
 
   salesDocument: permissionProcedure('sales.read')
     .input(z.object({ id: cuid }))
@@ -400,6 +427,11 @@ export const salesRouter = router({
       }),
     ),
 
+  // UIX-03: server-side export — calls purchase.listRequests itself, same permission/filters.
+  purchaseRequestsCsv: permissionProcedure('purchase.read')
+    .input(z.object({ status: z.string().optional(), q: searchText, ...dateRange }))
+    .query(({ ctx, input }) => readTx(ctx, (t) => purchase.listRequestsCsv(t, input))),
+
   purchaseRequest: permissionProcedure('purchase.read')
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => purchase.requestDetail(t, input.id))),
@@ -468,6 +500,13 @@ export const salesRouter = router({
       }),
     ),
 
+  // UIX-03: server-side export — calls purchase.listOrders itself, same permission/filters.
+  purchaseOrdersCsv: permissionProcedure('purchase.read')
+    .input(
+      z.object({ status: z.string().optional(), partnerId: cuid.optional(), q: searchText, ...dateRange }),
+    )
+    .query(({ ctx, input }) => readTx(ctx, (t) => purchase.listOrdersCsv(t, input))),
+
   purchaseOrder: permissionProcedure('purchase.read')
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => purchase.orderDetail(t, input.id))),
@@ -490,6 +529,19 @@ export const salesRouter = router({
         return { rows, total, page: input.page, pageSize: input.pageSize };
       }),
     ),
+
+  // UIX-03: server-side export — calls purchase.listDocuments itself, same permission/filters.
+  purchaseDocumentsCsv: permissionProcedure('purchase.read')
+    .input(
+      z.object({
+        docType: z.enum(['PURCHASE', 'RETURN_PURCHASE']).optional(),
+        status: z.string().optional(),
+        partnerId: cuid.optional(),
+        q: searchText,
+        ...dateRange,
+      }),
+    )
+    .query(({ ctx, input }) => readTx(ctx, (t) => purchase.listDocumentsCsv(t, input))),
 
   purchaseDocument: permissionProcedure('purchase.read')
     .input(z.object({ id: cuid }))

@@ -1,4 +1,5 @@
 import type { TransactionContext } from '@/server/core/context';
+import { AppError } from '@/server/core/errors';
 import { requirePermission } from '@/server/modules/rbac/service';
 import { isProfitAndLoss } from './account';
 import { amount, D, ZERO } from '@/lib/money';
@@ -27,10 +28,22 @@ export const INTERNAL_NOTICE = '내부 관리용이며 세무신고·외부공�
  */
 const POSTED = { confirmedAt: { not: null } };
 
-/** INT-12: a division-scoped user only ever sees lines tagged with their divisions. */
+/**
+ * INT-12. A requested division narrows the actor's scope; it never replaces it.
+ *
+ * This used to return `{ divisionId }` as soon as one was requested, before looking at the
+ * actor at all — so a user scoped to one division could read another division's ledger just
+ * by naming it in the filter. The scope was enforced only for the caller who did not ask for
+ * anything in particular, which is the caller least likely to be probing.
+ */
 function divisionFilter(ctx: TransactionContext, divisionId?: string) {
-  if (divisionId) return { divisionId };
-  if (ctx.actor.isAdmin) return {};
+  if (ctx.actor.isAdmin) return divisionId ? { divisionId } : {};
+  if (divisionId) {
+    if (!ctx.actor.divisionIds.includes(divisionId)) {
+      throw new AppError('OUT_OF_SCOPE', '해당 사업부의 자료에 접근할 수 없습니다.', { divisionId });
+    }
+    return { divisionId };
+  }
   return { OR: [{ divisionId: { in: ctx.actor.divisionIds } }, { divisionId: null }] };
 }
 

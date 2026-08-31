@@ -2,7 +2,7 @@
 
 > 생성: `node tools/docs-permissions.mjs` — 원본은 `src/server/modules/rbac/permissions.ts`(권한 카탈로그·역할 프리셋, 정적 AST 분석)와 `src/server/api/routers/*.ts`(프로시저별 필요 권한, `tools/lib/router-permissions.mjs`를 `tests/integration/permissions.test.ts`의 전수 호출시험과 공유). 이 파일을 직접 편집하지 않는다.
 
-생성 시각: 2026-08-31T05:29:48.428Z · 권한 47개 · 역할 8개 · 라우터 13개 · 프로시저 244개
+생성 시각: 2026-08-31T07:06:26.409Z · 권한 47개 · 역할 8개 · 라우터 13개 · 프로시저 258개
 
 ## 1. 권한 카탈로그
 
@@ -154,6 +154,7 @@
 | `accounting.publishPostingRule`      | mutation | `accounting.rules`   |
 | `accounting.previewPostingRule`      | query    | `accounting.read`    |
 | `accounting.entries`                 | query    | `accounting.read`    |
+| `accounting.entriesCsv`              | query    | `accounting.read`    |
 | `accounting.entry`                   | query    | `accounting.read`    |
 | `accounting.createEntry`             | mutation | `accounting.write`   |
 | `accounting.updateEntry`             | mutation | `accounting.write`   |
@@ -203,11 +204,14 @@
 | 프로시저                      | 종류     | 필요 권한        |
 | ----------------------------- | -------- | ---------------- |
 | `approval.inbox`              | query    | `approval.use`   |
+| `approval.inboxCsv`           | query    | `approval.use`   |
 | `approval.pendingCount`       | query    | `approval.use`   |
 | `approval.detail`             | query    | `approval.use`   |
 | `approval.forms`              | query    | `approval.use`   |
 | `approval.draft`              | mutation | `approval.use`   |
 | `approval.submit`             | mutation | `approval.use`   |
+| `approval.previewLine`        | query    | `approval.use`   |
+| `approval.listApprovers`      | query    | `approval.use`   |
 | `approval.approve`            | mutation | `approval.use`   |
 | `approval.reject`             | mutation | `approval.use`   |
 | `approval.hold`               | mutation | `approval.use`   |
@@ -250,6 +254,7 @@
 | 프로시저                    | 종류     | 필요 권한                         |
 | --------------------------- | -------- | --------------------------------- |
 | `hrm.list`                  | query    | `hr.self`                         |
+| `hrm.listCsv`               | query    | `hr.self`                         |
 | `hrm.detail`                | query    | `hr.self`                         |
 | `hrm.me`                    | query    | (인증 필요 — 별도 업무 권한 없음) |
 | `hrm.create`                | mutation | `hr.write`                        |
@@ -304,6 +309,7 @@
 | `inventory.bookCsv`            | query    | `inventory.export`    |
 | `inventory.safetyStock`        | query    | `inventory.read`      |
 | `inventory.counts`             | query    | `inventory.read`      |
+| `inventory.countsCsv`          | query    | `inventory.read`      |
 | `inventory.count`              | query    | `inventory.read`      |
 | `inventory.createCount`        | mutation | `inventory.count`     |
 | `inventory.startCount`         | mutation | `inventory.count`     |
@@ -322,6 +328,7 @@
 | 프로시저                     | 종류     | 필요 권한        |
 | ---------------------------- | -------- | ---------------- |
 | `master.items`               | query    | `master.read`    |
+| `master.itemsCsv`            | query    | `master.read`    |
 | `master.item`                | query    | `master.read`    |
 | `master.searchItems`         | query    | `master.read`    |
 | `master.createItem`          | mutation | `master.write`   |
@@ -331,6 +338,7 @@
 | `master.itemCategories`      | query    | `master.read`    |
 | `master.createItemCategory`  | mutation | `master.write`   |
 | `master.partners`            | query    | `master.read`    |
+| `master.partnersCsv`         | query    | `master.read`    |
 | `master.partner`             | query    | `master.read`    |
 | `master.searchPartners`      | query    | `master.read`    |
 | `master.createPartner`       | mutation | `master.write`   |
@@ -403,6 +411,7 @@
 | 프로시저                                   | 종류     | 필요 권한            |
 | ------------------------------------------ | -------- | -------------------- |
 | `sales.quotations`                         | query    | `sales.read`         |
+| `sales.quotationsCsv`                      | query    | `sales.read`         |
 | `sales.quotation`                          | query    | `sales.read`         |
 | `sales.createQuotation`                    | mutation | `sales.write`        |
 | `sales.updateQuotation`                    | mutation | `sales.write`        |
@@ -410,10 +419,12 @@
 | `sales.setQuotationStatus`                 | mutation | `sales.write`        |
 | `sales.convertQuotationToOrder`            | mutation | `sales.write`        |
 | `sales.salesOrders`                        | query    | `sales.read`         |
+| `sales.salesOrdersCsv`                     | query    | `sales.read`         |
 | `sales.salesOrder`                         | query    | `sales.read`         |
 | `sales.createSalesOrder`                   | mutation | `sales.write`        |
 | `sales.cancelSalesOrder`                   | mutation | `sales.write`        |
 | `sales.salesDocuments`                     | query    | `sales.read`         |
+| `sales.salesDocumentsCsv`                  | query    | `sales.read`         |
 | `sales.salesDocument`                      | query    | `sales.read`         |
 | `sales.createSalesDocument`                | mutation | `sales.write`        |
 | `sales.updateSalesDocument`                | mutation | `sales.write`        |
@@ -427,12 +438,15 @@
 | `sales.issueTaxInvoice`                    | mutation | `sales.write`        |
 | `sales.taxInvoiceHistory`                  | query    | `sales.read`         |
 | `sales.purchaseRequests`                   | query    | `purchase.read`      |
+| `sales.purchaseRequestsCsv`                | query    | `purchase.read`      |
 | `sales.purchaseRequest`                    | query    | `purchase.read`      |
 | `sales.createPurchaseRequest`              | mutation | `purchase.write`     |
 | `sales.convertRequestToOrder`              | mutation | `purchase.write`     |
 | `sales.purchaseOrders`                     | query    | `purchase.read`      |
+| `sales.purchaseOrdersCsv`                  | query    | `purchase.read`      |
 | `sales.purchaseOrder`                      | query    | `purchase.read`      |
 | `sales.purchaseDocuments`                  | query    | `purchase.read`      |
+| `sales.purchaseDocumentsCsv`               | query    | `purchase.read`      |
 | `sales.purchaseDocument`                   | query    | `purchase.read`      |
 | `sales.createPurchaseDocument`             | mutation | `purchase.write`     |
 | `sales.confirmPurchaseDocument`            | mutation | `purchase.confirm`   |

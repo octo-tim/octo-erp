@@ -66,6 +66,28 @@ export function divisionScopeFilter(actor: Actor): { divisionId?: { in: string[]
   return { divisionId: { in: actor.divisionIds } };
 }
 
+export type DivisionScopeWhere =
+  Record<string, never> | { OR: [{ divisionId: { in: string[] } }, { divisionId: null }] };
+
+/**
+ * INT-12 for documents that carry an optional division.
+ *
+ * A scoped user sees their own divisions and documents with no division set — the same rule
+ * the sales-document and report queries already applied inline. It is a function now for two
+ * reasons. Five list queries (quotations, sales orders, purchase requests, purchase orders,
+ * purchase documents) never applied it at all, so a user scoped to one division could list
+ * another division's documents. And the inline version was spread into a `where` object next
+ * to the keyword search's own `OR`, where the later `OR` key simply replaced the earlier one:
+ * for a scoped user the search term was silently dropped and the list came back unfiltered.
+ *
+ * Callers must compose this under `AND` rather than spreading it, so it cannot collide with
+ * another `OR` again.
+ */
+export function divisionScopeWhere(actor: Actor): DivisionScopeWhere {
+  if (actor.isAdmin) return {};
+  return { OR: [{ divisionId: { in: actor.divisionIds } }, { divisionId: null }] };
+}
+
 export function warehouseScopeFilter(actor: Actor): { warehouseId?: { in: string[] } } {
   if (actor.isAdmin) return {};
   return { warehouseId: { in: actor.warehouseIds } };

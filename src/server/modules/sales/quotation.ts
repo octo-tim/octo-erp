@@ -1,6 +1,6 @@
 import type { TransactionContext } from '@/server/core/context';
 import { AppError } from '@/server/core/errors';
-import { requirePermission } from '@/server/modules/rbac/service';
+import { requirePermission, divisionScopeWhere } from '@/server/modules/rbac/service';
 import * as audit from '@/server/modules/audit/service';
 import * as conversion from './conversion';
 import { priceLines, type PricedLineInput } from './pricing';
@@ -8,6 +8,7 @@ import { nextDocNo, DOC_TYPES } from '@/server/modules/numbering/service';
 import { assertVersion } from '@/server/core/state-machine';
 import { D, quantity } from '@/lib/money';
 import { businessDate, toDateOnly } from '@/lib/dates';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
 
 /**
  * SLS-01 / SLS-02 / SLS-03 — quotations and sales orders.
@@ -360,6 +361,9 @@ export async function list(
   },
 ) {
   requirePermission(ctx.actor, 'sales.read');
+  // INT-12: composed under AND so the division scope can never collide with the keyword
+  // search's own OR (see divisionScopeWhere in rbac/service.ts).
+  const scope = divisionScopeWhere(ctx.actor);
   const where = {
     ...(input.status ? { status: input.status } : {}),
     ...(input.partnerId ? { partnerId: input.partnerId } : {}),
@@ -371,15 +375,20 @@ export async function list(
           },
         }
       : {}),
-    ...(input.q
-      ? {
-          OR: [
-            { docNo: { contains: input.q, mode: 'insensitive' as const } },
-            { title: { contains: input.q, mode: 'insensitive' as const } },
-            { partner: { name: { contains: input.q, mode: 'insensitive' as const } } },
-          ],
-        }
-      : {}),
+    AND: [
+      ...(input.q
+        ? [
+            {
+              OR: [
+                { docNo: { contains: input.q, mode: 'insensitive' as const } },
+                { title: { contains: input.q, mode: 'insensitive' as const } },
+                { partner: { name: { contains: input.q, mode: 'insensitive' as const } } },
+              ],
+            },
+          ]
+        : []),
+      scope,
+    ],
   };
   const [rows, total] = await Promise.all([
     ctx.tx.quotation.findMany({
@@ -392,6 +401,28 @@ export async function list(
     ctx.tx.quotation.count({ where }),
   ]);
   return { rows, total };
+}
+
+const QUOTATION_CSV_HEADERS = ['견적번호', '견적일', '거래처', '제목', '유효기한', '합계', '상태'];
+
+/** UIX-03: server-side export for the 견적서 grid — same permission and rows as `list`. */
+export async function listCsv(
+  ctx: TransactionContext,
+  input: { status?: string; partnerId?: string; from?: string; to?: string; q?: string },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => list(ctx, { ...input, ...paging }),
+    QUOTATION_CSV_HEADERS,
+    (r) => [
+      r.docNo,
+      r.docDate.toISOString().slice(0, 10),
+      r.partner.name,
+      r.title ?? '',
+      r.validUntil ? r.validUntil.toISOString().slice(0, 10) : '',
+      r.totalAmount.toString(),
+      r.status,
+    ],
+  );
 }
 
 export async function detail(ctx: TransactionContext, id: string) {

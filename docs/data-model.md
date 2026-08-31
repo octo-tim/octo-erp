@@ -3,7 +3,7 @@
 > 생성: `node tools/docs-schema.mjs` — 원본은 `prisma/schema.prisma`. 이 파일을 직접 편집하지 않는다.
 > 민감정보 표시는 `src/server/modules/migration/templates.ts`의 `sensitive: true` 컬럼과 스키마 자체 주석(NFR-SEC-06)에서만 가져온다 — 추정하지 않는다.
 
-모델 수: 92 · 생성 시각: 2026-08-31T05:09:55.208Z
+모델 수: 92 · 생성 시각: 2026-08-31T07:06:26.942Z
 
 ## 도메인
 

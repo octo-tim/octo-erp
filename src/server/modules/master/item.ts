@@ -3,8 +3,9 @@ import { AppError } from '@/server/core/errors';
 import { requirePermission } from '@/server/modules/rbac/service';
 import * as audit from '@/server/modules/audit/service';
 import { nextDocNo } from '@/server/modules/numbering/service';
-import { validateBarcode, TAX_TYPES } from './validation';
+import { validateBarcode, TAX_TYPES, TAX_TYPE_LABEL } from './validation';
 import { quantity, unitPrice } from '@/lib/money';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
 
 /** BAS-01/BAS-02/BAS-09: items, their supplementary fields, and the no-hard-delete rule. */
 
@@ -248,6 +249,45 @@ export async function list(
     ctx.tx.item.count({ where }),
   ]);
   return { rows, total };
+}
+
+const ITEM_CSV_HEADERS = [
+  '품목코드',
+  '품목명',
+  '규격',
+  '단위',
+  '분류',
+  '과세구분',
+  '입고단가',
+  '출고단가',
+  '안전재고',
+  '사용여부',
+];
+
+/**
+ * UIX-03: server-side export for the 품목 grid. Calls `list` itself — same permission
+ * (master.read), same rows, just uncapped up to EXPORT_ROW_LIMIT instead of one page.
+ */
+export async function listCsv(
+  ctx: TransactionContext,
+  input: { q?: string; categoryId?: string; taxType?: string; activeOnly?: boolean },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => list(ctx, { ...input, ...paging }),
+    ITEM_CSV_HEADERS,
+    (r) => [
+      r.code,
+      r.name,
+      r.spec ?? '',
+      r.unitCode,
+      r.category?.name ?? '',
+      TAX_TYPE_LABEL[r.taxType as keyof typeof TAX_TYPE_LABEL] ?? r.taxType,
+      r.purchasePrice?.toString() ?? '',
+      r.salesPrice?.toString() ?? '',
+      r.safetyStock?.toString() ?? '',
+      r.isActive ? 'Y' : 'N',
+    ],
+  );
 }
 
 export async function detail(ctx: TransactionContext, id: string) {

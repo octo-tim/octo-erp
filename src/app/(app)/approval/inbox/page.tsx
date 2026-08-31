@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { api } from '@/lib/trpc';
 import { StandardListPage, useSavedFilters } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Field, Input, StatusBadge } from '@/components/ui/primitives';
+import { Button, ExportNotice, Field, Input, StatusBadge } from '@/components/ui/primitives';
 import { cn } from '@/lib/cn';
+import { businessDate } from '@/lib/dates';
+import { runServerCsvExport } from '@/lib/csv';
 
 /** APV-10: the six approval inboxes with the pending badge. */
 type Inbox = 'PENDING' | 'DRAFTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REFERENCE';
@@ -46,6 +48,23 @@ export default function ApprovalInboxPage() {
     ...(applied.from ? { from: applied.from } : {}),
     ...(applied.to ? { to: applied.to } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.approval.inboxCsv.useQuery(
+    {
+      inbox,
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.from ? { from: applied.from } : {}),
+      ...(applied.to ? { to: applied.to } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    const tabLabel = TABS.find((t) => t.key === inbox)?.label ?? inbox;
+    const period = `${applied.from || '처음'}_${applied.to || businessDate(new Date())}`;
+    setExportNotice(await runServerCsvExport(() => csvQuery.refetch(), `결재함_${tabLabel}_${period}.csv`));
+  }
 
   const columns: Column<Row>[] = [
     { key: 'docNo', header: '문서번호', width: 160 },
@@ -137,6 +156,8 @@ export default function ApprovalInboxPage() {
         ))}
       </div>
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="approval.inbox"
         columns={columns}
@@ -158,6 +179,7 @@ export default function ApprovalInboxPage() {
         }}
         emptyTitle={inbox === 'PENDING' ? '처리할 결재가 없습니다.' : '해당 결재함에 문서가 없습니다.'}
         emptyDescription="다른 결재함 탭을 확인하거나 조회 기간을 넓혀 보세요."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

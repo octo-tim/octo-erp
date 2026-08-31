@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage, useSavedFilters } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
+import { runServerCsvExport } from '@/lib/csv';
+import { businessDate } from '@/lib/dates';
 
 /** HRM-01: employee list and registration. */
 interface Row {
@@ -48,6 +50,22 @@ export default function EmployeeListPage() {
     ...(applied.status ? { status: applied.status } : {}),
     ...(applied.departmentId ? { departmentId: applied.departmentId } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.hrm.listCsv.useQuery(
+    {
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.status ? { status: applied.status } : {}),
+      ...(applied.departmentId ? { departmentId: applied.departmentId } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    setExportNotice(
+      await runServerCsvExport(() => csvQuery.refetch(), `사원_${businessDate(new Date())}.csv`),
+    );
+  }
 
   const flatDepartments = (departments.data ?? []).flatMap(function flatten(n): {
     id: string;
@@ -146,6 +164,8 @@ export default function EmployeeListPage() {
         />
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="hr.employees"
         columns={columns}
@@ -167,6 +187,7 @@ export default function EmployeeListPage() {
         }}
         emptyTitle="조회된 사원이 없습니다."
         emptyDescription="재직상태를 '전체'로 바꾸거나 검색어를 지우고 다시 조회하세요."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

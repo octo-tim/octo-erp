@@ -15,6 +15,7 @@ import {
   type StepRole,
 } from './line';
 import { resolveHandler, type ApprovalTarget } from './handlers';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
 
 /**
  * APV-13: each form gets its own numbering sequence — docType `APPROVAL:<formCode>` — so two
@@ -976,6 +977,27 @@ export async function listInbox(
     ctx.tx.approvalDocument.count({ where }),
   ]);
   return { rows, total };
+}
+
+const INBOX_CSV_HEADERS = ['문서번호', '제목', '금액', '상태', '상신일시', '작성일시'];
+
+/** UIX-03: server-side export for the 결재함 grid — same permission and rows as `listInbox`. */
+export async function listInboxCsv(
+  ctx: TransactionContext,
+  input: { inbox: Inbox; q?: string; from?: string; to?: string },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => listInbox(ctx, { ...input, ...paging }),
+    INBOX_CSV_HEADERS,
+    (r) => [
+      r.docNo,
+      r.title,
+      r.amount?.toString() ?? '',
+      r.status,
+      r.submittedAt ? r.submittedAt.toISOString() : '',
+      r.createdAt.toISOString(),
+    ],
+  );
 }
 
 /** APV-10: the unread badge count. */

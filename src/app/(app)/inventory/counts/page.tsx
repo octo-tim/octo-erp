@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { fmt } from '@/lib/format';
 import { businessDate } from '@/lib/dates';
+import { runServerCsvExport } from '@/lib/csv';
 
 /** INV-08: physical counts. */
 interface Row {
@@ -47,6 +48,21 @@ export default function StockCountListPage() {
     ...(applied.warehouseId ? { warehouseId: applied.warehouseId } : {}),
     ...(applied.status ? { status: applied.status } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.inventory.countsCsv.useQuery(
+    {
+      ...(applied.warehouseId ? { warehouseId: applied.warehouseId } : {}),
+      ...(applied.status ? { status: applied.status } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    setExportNotice(
+      await runServerCsvExport(() => csvQuery.refetch(), `재고실사_${businessDate(new Date())}.csv`),
+    );
+  }
 
   const columns: Column<Row>[] = [
     { key: 'countNo', header: '실사번호', width: 140 },
@@ -178,6 +194,8 @@ export default function StockCountListPage() {
         </Card>
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="inventory.counts"
         columns={columns}
@@ -197,6 +215,7 @@ export default function StockCountListPage() {
         onRowOpen={(r) => router.push(`/inventory/counts/${r.id}`)}
         emptyTitle="실사 내역이 없습니다."
         emptyDescription="'실사 등록'으로 시작하세요."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

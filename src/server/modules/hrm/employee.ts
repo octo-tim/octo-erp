@@ -8,6 +8,7 @@ import * as outbox from '@/server/modules/outbox/service';
 import { deactivateUserForEmployee } from '@/server/modules/auth/service';
 import { businessDate, fromDateOnly, toDateOnly } from '@/lib/dates';
 import { getEnv } from '@/server/env';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
 
 /** HRM-01, HRM-11, HRM-12. Sensitive columns live in EmployeeSensitive, never on Employee. */
 
@@ -174,6 +175,33 @@ export async function list(
     ctx.tx.employee.count({ where }),
   ]);
   return { rows, total };
+}
+
+const EMPLOYEE_CSV_HEADERS = ['사번', '성명', '부서', '직위', '고용형태', '입사일', '재직상태', '계정'];
+
+/**
+ * UIX-03: server-side export for the 사원 grid — same permission (hr.self) and HR scope as
+ * `list`. `list` never joins EmployeeSensitive, so 주민등록번호/계좌번호 cannot reach this
+ * export even indirectly: there is no column here to mask, only ordinary employee fields.
+ */
+export async function listCsv(
+  ctx: TransactionContext,
+  input: { q?: string; departmentId?: string; status?: string },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => list(ctx, { ...input, ...paging }),
+    EMPLOYEE_CSV_HEADERS,
+    (r) => [
+      r.employeeNo,
+      r.name,
+      r.department?.name ?? '',
+      r.jobTitle ?? '',
+      r.employmentType,
+      r.hireDate.toISOString().slice(0, 10),
+      r.status,
+      r.user ? `${r.user.username}${r.user.isActive ? '' : ' (비활성)'}` : '',
+    ],
+  );
 }
 
 export async function detail(ctx: TransactionContext, id: string) {

@@ -10,6 +10,7 @@ import { idempotent } from '@/server/core/idempotency';
 import { assertVersion } from '@/server/core/state-machine';
 import { amount, cmp, D, ZERO } from '@/lib/money';
 import { businessDate, periodKey as periodOf, toDateOnly } from '@/lib/dates';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
 
 /**
  * ACC-02 / ACC-04 / ACC-08 — journal entries.
@@ -513,6 +514,17 @@ export async function list(
   requirePermission(ctx.actor, 'accounting.read');
   const scope = ctx.actor.isAdmin ? undefined : ctx.actor.divisionIds;
 
+  /**
+   * INT-12. A requested division narrows the scope; it never replaces it. The branch below
+   * used to take `input.divisionId` in preference to the scope, so naming another division
+   * in the filter was enough to read its entries.
+   */
+  if (input.divisionId && scope && !scope.includes(input.divisionId)) {
+    throw new AppError('OUT_OF_SCOPE', '해당 사업부의 자료에 접근할 수 없습니다.', {
+      divisionId: input.divisionId,
+    });
+  }
+
   const where = {
     ...(input.status ? { status: input.status } : {}),
     ...(input.entryType ? { entryType: input.entryType } : {}),
@@ -560,6 +572,36 @@ export async function list(
     ctx.tx.journalEntry.count({ where }),
   ]);
   return { rows, total };
+}
+
+const JOURNAL_CSV_HEADERS = ['전표번호', '전표일', '유형', '적요', '원천', '금액', '상태'];
+
+/** UIX-03: server-side export for the 회계전표 grid — same permission and rows as `list`. */
+export async function listCsv(
+  ctx: TransactionContext,
+  input: {
+    from?: string;
+    to?: string;
+    status?: string;
+    entryType?: string;
+    accountId?: string;
+    divisionId?: string;
+    q?: string;
+  },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => list(ctx, { ...input, ...paging }),
+    JOURNAL_CSV_HEADERS,
+    (r) => [
+      r.entryNo,
+      r.entryDate.toISOString().slice(0, 10),
+      r.entryType,
+      r.description ?? '',
+      r.sourceType ? r.sourceType : '수동',
+      r.totalDebit.toString(),
+      r.status,
+    ],
+  );
 }
 
 export async function detail(ctx: TransactionContext, id: string) {

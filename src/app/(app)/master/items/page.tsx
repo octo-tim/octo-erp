@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage, useSavedFilters } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
+import { runServerCsvExport } from '@/lib/csv';
+import { businessDate } from '@/lib/dates';
 
 /** BAS-01/BAS-02: item list and registration. */
 const TAX_LABEL: Record<string, string> = { TAXABLE: '과세', ZERO: '영세', EXEMPT: '면세' };
@@ -49,6 +51,23 @@ export default function ItemListPage() {
     ...(applied.categoryId ? { categoryId: applied.categoryId } : {}),
     ...(applied.taxType ? { taxType: applied.taxType as 'TAXABLE' } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.master.itemsCsv.useQuery(
+    {
+      activeOnly: applied.activeOnly,
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.categoryId ? { categoryId: applied.categoryId } : {}),
+      ...(applied.taxType ? { taxType: applied.taxType as 'TAXABLE' } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    setExportNotice(
+      await runServerCsvExport(() => csvQuery.refetch(), `품목_${businessDate(new Date())}.csv`),
+    );
+  }
 
   const columns: Column<Row>[] = [
     { key: 'code', header: '품목코드', width: 120 },
@@ -158,6 +177,8 @@ export default function ItemListPage() {
         />
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="master.items"
         columns={columns}
@@ -177,6 +198,7 @@ export default function ItemListPage() {
         onRowOpen={(r) => router.push(`/master/items/${r.id}`)}
         emptyTitle="등록된 품목이 없습니다."
         emptyDescription="'품목 등록'으로 한 건씩 등록하거나 '일괄등록'으로 엑셀 양식을 올릴 수 있습니다."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

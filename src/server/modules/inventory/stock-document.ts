@@ -628,6 +628,17 @@ export async function list(
   requirePermission(ctx.actor, 'inventory.read');
   const scope = ctx.actor.isAdmin ? undefined : ctx.actor.warehouseIds;
 
+  /**
+   * INT-12. A requested warehouse narrows the scope; it never replaces it. The branch below
+   * took `input.warehouseId` in preference to the scope, so naming a warehouse the user has
+   * no access to was enough to list its documents.
+   */
+  if (input.warehouseId && scope && !scope.includes(input.warehouseId)) {
+    throw new AppError('OUT_OF_SCOPE', '해당 창고의 자료에 접근할 수 없습니다.', {
+      warehouseId: input.warehouseId,
+    });
+  }
+
   const where = {
     ...(input.docType ? { docType: input.docType } : {}),
     ...(input.status ? { status: input.status } : {}),

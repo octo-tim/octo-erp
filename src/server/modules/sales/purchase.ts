@@ -1,6 +1,10 @@
 import type { TransactionContext } from '@/server/core/context';
 import { AppError } from '@/server/core/errors';
-import { requirePermission, requirePermissionUnlessApproval } from '@/server/modules/rbac/service';
+import {
+  requirePermission,
+  requirePermissionUnlessApproval,
+  divisionScopeWhere,
+} from '@/server/modules/rbac/service';
 import * as audit from '@/server/modules/audit/service';
 import * as matrix from '@/server/modules/approval/matrix';
 import * as ledger from '@/server/modules/inventory/ledger';
@@ -18,6 +22,7 @@ import { idempotent } from '@/server/core/idempotency';
 import { assertVersion } from '@/server/core/state-machine';
 import { amount, D, floorTo, quantity, ZERO } from '@/lib/money';
 import { businessDate, toDateOnly } from '@/lib/dates';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
 
 /**
  * SLS-06 / SLS-11 / SLS-13 — purchase requests, purchase orders and purchase documents.
@@ -523,6 +528,9 @@ export async function listRequests(
   input: { status?: string; from?: string; to?: string; q?: string; skip: number; take: number },
 ) {
   requirePermission(ctx.actor, 'purchase.read');
+  // INT-12: this list never applied division scope at all — a user scoped to one division
+  // could list another division's purchase requests. Composed under AND, matching the
+  // divisionScopeWhere contract, so it never collides with a keyword OR added later.
   const where = {
     ...(input.status ? { status: input.status } : {}),
     ...(input.from || input.to
@@ -534,6 +542,7 @@ export async function listRequests(
         }
       : {}),
     ...(input.q ? { docNo: { contains: input.q, mode: 'insensitive' as const } } : {}),
+    AND: [divisionScopeWhere(ctx.actor)],
   };
   const [rows, total] = await Promise.all([
     ctx.tx.purchaseRequest.findMany({
@@ -546,6 +555,28 @@ export async function listRequests(
     ctx.tx.purchaseRequest.count({ where }),
   ]);
   return { rows, total };
+}
+
+const PURCHASE_REQUEST_CSV_HEADERS = ['요청번호', '요청일', '목적', '사업부', '필요일', '합계', '상태'];
+
+/** UIX-03: server-side export for the 구매요청 grid — same permission and rows as `listRequests`. */
+export async function listRequestsCsv(
+  ctx: TransactionContext,
+  input: { status?: string; from?: string; to?: string; q?: string },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => listRequests(ctx, { ...input, ...paging }),
+    PURCHASE_REQUEST_CSV_HEADERS,
+    (r) => [
+      r.docNo,
+      r.docDate.toISOString().slice(0, 10),
+      r.purpose ?? '',
+      r.division?.name ?? '',
+      r.requiredDate ? r.requiredDate.toISOString().slice(0, 10) : '',
+      r.totalAmount.toString(),
+      r.status,
+    ],
+  );
 }
 
 export async function requestDetail(ctx: TransactionContext, id: string) {
@@ -588,6 +619,9 @@ export async function listOrders(
   },
 ) {
   requirePermission(ctx.actor, 'purchase.read');
+  // INT-12: this list never applied division scope at all — a user scoped to one division
+  // could list another division's purchase orders. Composed under AND, matching the
+  // divisionScopeWhere contract, so it never collides with a keyword OR added later.
   const where = {
     ...(input.status ? { status: input.status } : {}),
     ...(input.partnerId ? { partnerId: input.partnerId } : {}),
@@ -600,6 +634,7 @@ export async function listOrders(
         }
       : {}),
     ...(input.q ? { docNo: { contains: input.q, mode: 'insensitive' as const } } : {}),
+    AND: [divisionScopeWhere(ctx.actor)],
   };
   const [rows, total] = await Promise.all([
     ctx.tx.purchaseOrder.findMany({
@@ -612,6 +647,27 @@ export async function listOrders(
     ctx.tx.purchaseOrder.count({ where }),
   ]);
   return { rows, total };
+}
+
+const PURCHASE_ORDER_CSV_HEADERS = ['발주번호', '발주일', '발주처', '납기일', '합계', '상태'];
+
+/** UIX-03: server-side export for the 발주서 grid — same permission and rows as `listOrders`. */
+export async function listOrdersCsv(
+  ctx: TransactionContext,
+  input: { status?: string; partnerId?: string; from?: string; to?: string; q?: string },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => listOrders(ctx, { ...input, ...paging }),
+    PURCHASE_ORDER_CSV_HEADERS,
+    (r) => [
+      r.docNo,
+      r.docDate.toISOString().slice(0, 10),
+      r.partner.name,
+      r.dueDate ? r.dueDate.toISOString().slice(0, 10) : '',
+      r.totalAmount.toString(),
+      r.status,
+    ],
+  );
 }
 
 export async function orderDetail(ctx: TransactionContext, id: string) {
@@ -655,6 +711,10 @@ export async function listDocuments(
   },
 ) {
   requirePermission(ctx.actor, 'purchase.read');
+  // INT-12: this list never applied division scope at all — a user scoped to one division
+  // could list another division's purchase documents. Composed under AND so the scope can
+  // never collide with the keyword search's own OR.
+  const scope = divisionScopeWhere(ctx.actor);
   const where = {
     ...(input.docType ? { docType: input.docType } : {}),
     ...(input.status ? { status: input.status } : {}),
@@ -667,14 +727,19 @@ export async function listDocuments(
           },
         }
       : {}),
-    ...(input.q
-      ? {
-          OR: [
-            { docNo: { contains: input.q, mode: 'insensitive' as const } },
-            { partner: { name: { contains: input.q, mode: 'insensitive' as const } } },
-          ],
-        }
-      : {}),
+    AND: [
+      ...(input.q
+        ? [
+            {
+              OR: [
+                { docNo: { contains: input.q, mode: 'insensitive' as const } },
+                { partner: { name: { contains: input.q, mode: 'insensitive' as const } } },
+              ],
+            },
+          ]
+        : []),
+      scope,
+    ],
   };
   const [rows, total] = await Promise.all([
     ctx.tx.purchaseDocument.findMany({
@@ -691,6 +756,45 @@ export async function listDocuments(
     ctx.tx.purchaseDocument.count({ where }),
   ]);
   return { rows, total };
+}
+
+const PURCHASE_DOCUMENT_CSV_HEADERS = [
+  '전표번호',
+  '전표일',
+  '매입처',
+  '입고창고',
+  '공급가액',
+  '세액',
+  '합계',
+  '상태',
+];
+
+/** UIX-03: server-side export for the 매입전표 grid — same permission and rows as `listDocuments`. */
+export async function listDocumentsCsv(
+  ctx: TransactionContext,
+  input: {
+    docType?: PurchaseDocType;
+    status?: string;
+    partnerId?: string;
+    from?: string;
+    to?: string;
+    q?: string;
+  },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => listDocuments(ctx, { ...input, ...paging }),
+    PURCHASE_DOCUMENT_CSV_HEADERS,
+    (r) => [
+      r.docNo,
+      r.docDate.toISOString().slice(0, 10),
+      r.partner.name,
+      r.warehouse.name,
+      r.supplyAmount.toString(),
+      r.vatAmount.toString(),
+      r.totalAmount.toString(),
+      r.status,
+    ],
+  );
 }
 
 export async function documentDetail(ctx: TransactionContext, id: string) {

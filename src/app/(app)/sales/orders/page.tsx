@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
 import { PartnerSelect } from '@/components/sales/partner-select';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/components/sales/trade-line-editor';
 import { fmt } from '@/lib/format';
 import { businessDate } from '@/lib/dates';
+import { runServerCsvExport } from '@/lib/csv';
 
 /** SLS-03: sales orders. Created from a quotation, delivered by one or more sales documents. */
 interface Row {
@@ -64,6 +65,22 @@ export default function SalesOrdersPage() {
     ...(applied.status ? { status: applied.status } : {}),
     ...(applied.partnerId ? { partnerId: applied.partnerId } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.sales.salesOrdersCsv.useQuery(
+    {
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.status ? { status: applied.status } : {}),
+      ...(applied.partnerId ? { partnerId: applied.partnerId } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    setExportNotice(
+      await runServerCsvExport(() => csvQuery.refetch(), `주문서_${businessDate(new Date())}.csv`),
+    );
+  }
 
   const columns: Column<Row>[] = [
     { key: 'docNo', header: '주문번호', width: 150 },
@@ -243,6 +260,8 @@ export default function SalesOrdersPage() {
         </Card>
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="sales.orders"
         columns={columns}
@@ -262,6 +281,7 @@ export default function SalesOrdersPage() {
         onRowOpen={(r) => router.push(`/sales/orders/${r.id}`)}
         emptyTitle="주문서가 없습니다."
         emptyDescription="견적서에서 '주문으로 전환'하거나 '주문 등록'으로 직접 생성할 수 있습니다."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

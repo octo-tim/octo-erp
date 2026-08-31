@@ -212,6 +212,46 @@ describe('BAS-09: deletion policy', () => {
   });
 });
 
+describe('UIX-03: server-side CSV export', () => {
+  it('item.listCsv returns every matching row, not a page, and respects a filter', async () => {
+    for (let i = 0; i < 30; i++) {
+      await runTx(admin, (t) =>
+        item.create(t, {
+          name: `내보내기품목 ${i}`,
+          categoryId: leafCategoryId,
+          taxType: i % 2 === 0 ? 'TAXABLE' : 'ZERO',
+        }),
+      );
+    }
+    const all = await runTx(admin, (t) => item.listCsv(t, {}));
+    expect(all.total).toBe(30);
+    expect(all.rowCount).toBe(30);
+    expect(all.truncated).toBe(false);
+    // one header line + 30 data lines (server csv carries no BOM; downloadCsv adds it client-side)
+    expect(all.csv.trim().split('\r\n')).toHaveLength(31);
+    expect(all.csv).toContain('품목코드');
+
+    const zeroOnly = await runTx(admin, (t) => item.listCsv(t, { taxType: 'ZERO' }));
+    expect(zeroOnly.total).toBe(15);
+    expect(zeroOnly.csv).not.toContain('내보내기품목 0,');
+  });
+
+  it('partner.listCsv returns every matching row and respects a filter', async () => {
+    for (let i = 0; i < 5; i++) {
+      await runTx(admin, (t) =>
+        partner.create(t, { name: `내보내기거래처 ${i}`, partnerType: i === 0 ? 'SUPPLIER' : 'CUSTOMER' }),
+      );
+    }
+    const all = await runTx(admin, (t) => partner.listCsv(t, {}));
+    expect(all.total).toBe(5);
+    expect(all.csv.trim().split('\r\n')).toHaveLength(6);
+
+    const suppliersOnly = await runTx(admin, (t) => partner.listCsv(t, { partnerType: 'SUPPLIER' }));
+    expect(suppliersOnly.total).toBe(1);
+    expect(suppliersOnly.csv).toContain('내보내기거래처 0');
+  });
+});
+
 describe('BAS-06/BAS-07 + INT-12: reference data and scope', () => {
   it('a non-admin only sees warehouses in their scope', async () => {
     const all = await runTx(admin, (t) => reference.listWarehouses(t));

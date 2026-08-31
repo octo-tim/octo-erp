@@ -506,6 +506,110 @@ describe('APV-13: 다조건 검색 (listInbox의 q/from/to)', () => {
   });
 });
 
+describe('UIX-03: server-side CSV export', () => {
+  it('listInboxCsv returns every matching row, not a page, and respects a filter', async () => {
+    for (let i = 0; i < 6; i++) {
+      await runTx(drafter, (t) =>
+        approval.draft(t, {
+          docNo: `AP-${randomUUID().slice(0, 8)}`,
+          formCode: 'EXPENSE',
+          title: `내보내기문서 ${i}`,
+          content: { purpose: '경비', amount: '10000', paymentDate: '2026-09-10', payee: '거래처' },
+          amount: '10000',
+          departmentId: deptId,
+        }),
+      );
+    }
+    const drafted = await runTx(drafter, (t) =>
+      approval.draft(t, {
+        docNo: `AP-${randomUUID().slice(0, 8)}`,
+        formCode: 'EXPENSE',
+        title: '검색용문서',
+        content: { purpose: '경비', amount: '10000', paymentDate: '2026-09-10', payee: '거래처' },
+        amount: '10000',
+        departmentId: deptId,
+      }),
+    );
+
+    const all = await runTx(drafter, (t) => approval.listInboxCsv(t, { inbox: 'DRAFTED' }));
+    expect(all.total).toBe(7);
+    expect(all.rowCount).toBe(7);
+    expect(all.truncated).toBe(false);
+    expect(all.csv.trim().split('\r\n')).toHaveLength(8);
+    expect(all.csv).toContain('문서번호');
+
+    const filtered = await runTx(drafter, (t) =>
+      approval.listInboxCsv(t, { inbox: 'DRAFTED', q: '검색용문서' }),
+    );
+    expect(filtered.total).toBe(1);
+    expect(filtered.csv).toContain(drafted.docNo);
+  });
+
+  it('a user does not get another approver’s pending document in their export (identity scope)', async () => {
+    const dept2 = await runTx(admin, (t) =>
+      organization.createDepartment(t, {
+        code: 'APV-DEPT-CSV',
+        name: '결재시험팀CSV',
+        validFrom: '2020-01-01',
+      }),
+    );
+    const ceoEmployee = await prisma.employee.findFirstOrThrow({ where: { name: '대표이사' } });
+    await prisma.department.update({ where: { id: dept2.id }, data: { headEmployeeId: ceoEmployee.id } });
+    const otherDrafterEmployee = await runTx(admin, (t) =>
+      employee.create(t, { name: '내보내기 타부서 기안자', hireDate: '2022-01-01', departmentId: dept2.id }),
+    );
+    await prisma.user.upsert({
+      where: { username: 'drafter-csv2' },
+      create: {
+        username: 'drafter-csv2',
+        displayName: '내보내기 타부서 기안자',
+        passwordHash: await hashPassword('Approve!123456'),
+        employeeId: otherDrafterEmployee.id,
+        roles: {
+          create: [{ roleId: (await prisma.role.findUniqueOrThrow({ where: { code: 'sales' } })).id }],
+        },
+      },
+      update: { employeeId: otherDrafterEmployee.id, isActive: true },
+    });
+    const drafter2 = await actorFor('drafter-csv2');
+
+    const mine = await runTx(drafter, (t) =>
+      approval.draft(t, {
+        docNo: `AP-${randomUUID().slice(0, 8)}`,
+        formCode: 'EXPENSE',
+        title: '결재대상 내보내기 문서',
+        content: { purpose: '경비', amount: '10000', paymentDate: '2026-09-10', payee: '거래처' },
+        amount: '10000',
+        departmentId: deptId,
+      }),
+    );
+    await runTx(drafter, (t) => approval.submit(t, { documentId: mine.id, version: mine.version }));
+
+    const theirs = await runTx(drafter2, (t) =>
+      approval.draft(t, {
+        docNo: `AP-${randomUUID().slice(0, 8)}`,
+        formCode: 'EXPENSE',
+        title: '결재대상 내보내기 문서',
+        content: { purpose: '경비', amount: '10000', paymentDate: '2026-09-10', payee: '거래처' },
+        amount: '10000',
+        departmentId: dept2.id,
+      }),
+    );
+    await runTx(drafter2, (t) => approval.submit(t, { documentId: theirs.id, version: theirs.version }));
+
+    // `theirs` is pending on ceo (dept2's head), never on manager
+    const managerExport = await runTx(manager, (t) => approval.listInboxCsv(t, { inbox: 'PENDING' }));
+    expect(managerExport.total).toBe(1);
+    expect(managerExport.csv).toContain(mine.docNo);
+    expect(managerExport.csv).not.toContain(theirs.docNo);
+
+    const ceoExport = await runTx(ceo, (t) => approval.listInboxCsv(t, { inbox: 'PENDING' }));
+    expect(ceoExport.total).toBe(1);
+    expect(ceoExport.csv).toContain(theirs.docNo);
+    expect(ceoExport.csv).not.toContain(mine.docNo);
+  });
+});
+
 describe('APV-04: 전결 and 대결', () => {
   it('전결: a finalising step completes the document and skips later steps', async () => {
     const doc = await draftExpense('5000000');

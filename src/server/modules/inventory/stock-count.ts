@@ -9,6 +9,7 @@ import * as valuation from './valuation';
 import * as stockDocument from './stock-document';
 import { D, quantity } from '@/lib/money';
 import { businessDate, toDateOnly } from '@/lib/dates';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
 
 /**
  * INV-08 — physical count, differences, approval, adjustment.
@@ -301,6 +302,20 @@ export async function list(
     ctx.tx.stockCount.count({ where }),
   ]);
   return { rows, total };
+}
+
+const STOCK_COUNT_CSV_HEADERS = ['실사번호', '실사일', '창고', '품목수', '상태'];
+
+/** UIX-03: server-side export for the 재고실사 grid — same permission and rows as `list`. */
+export async function listCsv(
+  ctx: TransactionContext,
+  input: { warehouseId?: string; status?: string },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => list(ctx, { ...input, ...paging }),
+    STOCK_COUNT_CSV_HEADERS,
+    (r) => [r.countNo, r.countDate.toISOString().slice(0, 10), r.warehouse.name, r._count.lines, r.status],
+  );
 }
 
 export async function detail(ctx: TransactionContext, id: string) {

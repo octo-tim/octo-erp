@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
 import { PartnerSelect } from '@/components/sales/partner-select';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/components/sales/trade-line-editor';
 import { fmt } from '@/lib/format';
 import { businessDate } from '@/lib/dates';
+import { runServerCsvExport } from '@/lib/csv';
 
 /** SLS-05: sales documents. Confirming one issues stock, raises the receivable and posts. */
 interface Row {
@@ -73,6 +74,24 @@ export default function SalesDocumentsPage() {
     ...(applied.from ? { from: applied.from } : {}),
     ...(applied.to ? { to: applied.to } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.sales.salesDocumentsCsv.useQuery(
+    {
+      docType: 'SALES',
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.status ? { status: applied.status } : {}),
+      ...(applied.partnerId ? { partnerId: applied.partnerId } : {}),
+      ...(applied.from ? { from: applied.from } : {}),
+      ...(applied.to ? { to: applied.to } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    const period = `${applied.from || '처음'}_${applied.to || businessDate(new Date())}`;
+    setExportNotice(await runServerCsvExport(() => csvQuery.refetch(), `매출전표_${period}.csv`));
+  }
 
   const columns: Column<Row>[] = [
     { key: 'docNo', header: '전표번호', width: 150 },
@@ -275,6 +294,8 @@ export default function SalesDocumentsPage() {
         </Card>
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="sales.documents"
         columns={columns}
@@ -294,6 +315,7 @@ export default function SalesDocumentsPage() {
         onRowOpen={(r) => router.push(`/sales/sales-documents/${r.id}`)}
         emptyTitle="매출전표가 없습니다."
         emptyDescription="'매출전표 등록'으로 등록하거나 주문에서 전환하세요."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

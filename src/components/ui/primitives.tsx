@@ -159,6 +159,23 @@ export function EmptyState({
   );
 }
 
+/**
+ * UIX-03: the one banner every server-side grid export shares for the "capped" case — shown
+ * when `src/lib/csv.ts`'s `runServerCsvExport` reports the server truncated the file, so the
+ * user is told rather than handed a silently incomplete download.
+ */
+export function ExportNotice({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <p
+      role="status"
+      className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+    >
+      {message}
+    </p>
+  );
+}
+
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div role="alert" className="flex flex-col items-center gap-3 px-4 py-10 text-center">

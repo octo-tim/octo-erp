@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { PartnerSelect } from '@/components/sales/partner-select';
 import { fmt } from '@/lib/format';
+import { businessDate } from '@/lib/dates';
+import { runServerCsvExport } from '@/lib/csv';
 
 /** SLS-13: purchase orders, received against by one or more purchase documents. */
 interface Row {
@@ -42,6 +44,22 @@ export default function PurchaseOrdersPage() {
     ...(applied.status ? { status: applied.status } : {}),
     ...(applied.partnerId ? { partnerId: applied.partnerId } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.sales.purchaseOrdersCsv.useQuery(
+    {
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.status ? { status: applied.status } : {}),
+      ...(applied.partnerId ? { partnerId: applied.partnerId } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    setExportNotice(
+      await runServerCsvExport(() => csvQuery.refetch(), `발주서_${businessDate(new Date())}.csv`),
+    );
+  }
 
   const columns: Column<Row>[] = [
     { key: 'docNo', header: '발주번호', width: 150 },
@@ -111,6 +129,8 @@ export default function PurchaseOrdersPage() {
         setApplied(empty);
       }}
     >
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="sales.purchaseOrders"
         columns={columns}
@@ -130,6 +150,7 @@ export default function PurchaseOrdersPage() {
         onRowOpen={(r) => router.push(`/sales/purchase-orders/${r.id}`)}
         emptyTitle="발주서가 없습니다."
         emptyDescription="구매요청 승인 후 '발주서 생성'하면 여기에 나타납니다."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

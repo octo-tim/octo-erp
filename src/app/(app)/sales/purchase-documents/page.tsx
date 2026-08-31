@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
 import { PartnerSelect } from '@/components/sales/partner-select';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/components/sales/trade-line-editor';
 import { fmt } from '@/lib/format';
 import { businessDate } from '@/lib/dates';
+import { runServerCsvExport } from '@/lib/csv';
 
 /** SLS-06: purchase documents. The unit price entered here is what sets the stock cost. */
 interface Row {
@@ -70,6 +71,23 @@ export default function PurchaseDocumentsPage() {
     ...(applied.status ? { status: applied.status } : {}),
     ...(applied.partnerId ? { partnerId: applied.partnerId } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.sales.purchaseDocumentsCsv.useQuery(
+    {
+      docType: 'PURCHASE',
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.status ? { status: applied.status } : {}),
+      ...(applied.partnerId ? { partnerId: applied.partnerId } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    setExportNotice(
+      await runServerCsvExport(() => csvQuery.refetch(), `매입전표_${businessDate(new Date())}.csv`),
+    );
+  }
 
   const columns: Column<Row>[] = [
     { key: 'docNo', header: '전표번호', width: 150 },
@@ -254,6 +272,8 @@ export default function PurchaseDocumentsPage() {
         </Card>
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="sales.purchaseDocuments"
         columns={columns}
@@ -273,6 +293,7 @@ export default function PurchaseDocumentsPage() {
         onRowOpen={(r) => router.push(`/sales/purchase-documents/${r.id}`)}
         emptyTitle="매입전표가 없습니다."
         emptyDescription="'매입전표 등록'으로 등록하거나 발주에서 입고 처리하세요."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

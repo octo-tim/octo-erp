@@ -175,6 +175,21 @@ export const accountingRouter = router({
       }),
     ),
 
+  // UIX-03: server-side export — calls journal.list itself, same permission and filters.
+  entriesCsv: permissionProcedure('accounting.read')
+    .input(
+      z.object({
+        from: dateString.optional(),
+        to: dateString.optional(),
+        status: z.string().optional(),
+        entryType: entryType.optional(),
+        accountId: cuid.optional(),
+        divisionId: cuid.optional(),
+        q: searchText,
+      }),
+    )
+    .query(({ ctx, input }) => readTx(ctx, (t) => journal.listCsv(t, input))),
+
   entry: permissionProcedure('accounting.read')
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => journal.detail(t, input.id))),

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
 import { PartnerSelect } from '@/components/sales/partner-select';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/components/sales/trade-line-editor';
 import { fmt } from '@/lib/format';
 import { businessDate } from '@/lib/dates';
+import { runServerCsvExport } from '@/lib/csv';
 
 /** SLS-01: quotations. Converted partially into orders; never touch stock or the books. */
 interface Row {
@@ -66,6 +67,22 @@ export default function QuotationsPage() {
     ...(applied.status ? { status: applied.status } : {}),
     ...(applied.partnerId ? { partnerId: applied.partnerId } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.sales.quotationsCsv.useQuery(
+    {
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.status ? { status: applied.status } : {}),
+      ...(applied.partnerId ? { partnerId: applied.partnerId } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    setExportNotice(
+      await runServerCsvExport(() => csvQuery.refetch(), `견적서_${businessDate(new Date())}.csv`),
+    );
+  }
 
   const columns: Column<Row>[] = [
     { key: 'docNo', header: '견적번호', width: 150 },
@@ -246,6 +263,8 @@ export default function QuotationsPage() {
         </Card>
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="sales.quotations"
         columns={columns}
@@ -265,6 +284,7 @@ export default function QuotationsPage() {
         onRowOpen={(r) => router.push(`/sales/quotations/${r.id}`)}
         emptyTitle="견적서가 없습니다."
         emptyDescription="'견적 등록'으로 시작하세요."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

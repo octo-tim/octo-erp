@@ -1,4 +1,4 @@
-// covers: ACC-01..ACC-09, INT-05, INT-07, DEC-04, B-01
+// covers: ACC-01..ACC-09, INT-05, INT-07, INT-12, DEC-04, B-01
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { actorFor, prepareDatabase, prisma, runTx, truncateBusinessData } from '../helpers/db';
@@ -9,7 +9,17 @@ import * as postingRule from '@/server/modules/accounting/posting-rule';
 import * as report from '@/server/modules/accounting/report';
 import * as closing from '@/server/modules/accounting/closing';
 import { hashPassword } from '@/server/core/crypto';
+import { AppError } from '@/server/core/errors';
 import type { Actor } from '@/server/core/context';
+
+/** INT-12: assert the app code, not just that something threw — a bypass that reverts to
+ *  preferring the requested id would fail differently (wrong rows, not a thrown error) and a
+ *  bare `.rejects.toThrow()` would not catch it either way. */
+function expectOutOfScope(promise: Promise<unknown>) {
+  return expect(promise).rejects.toSatisfy(
+    (err: unknown) => err instanceof AppError && err.code === 'OUT_OF_SCOPE',
+  );
+}
 
 let admin: Actor;
 let clerk: Actor;
@@ -539,6 +549,64 @@ describe('ACC-04: ledgers', () => {
   });
 });
 
+describe('UIX-03: server-side CSV export', () => {
+  it('journal.listCsv returns every matching row, not a page, and respects a filter', async () => {
+    for (let i = 0; i < 6; i++) {
+      await post([
+        { accountId: acc['110']!, debit: '10000' },
+        { accountId: acc['401']!, credit: '10000' },
+      ]);
+    }
+    for (let i = 0; i < 4; i++) {
+      await post([
+        { accountId: acc['120']!, debit: '5000' },
+        { accountId: acc['501']!, credit: '5000' },
+      ]);
+    }
+    const all = await runTx(admin, (t) => journal.listCsv(t, {}));
+    expect(all.total).toBe(10);
+    expect(all.rowCount).toBe(10);
+    expect(all.truncated).toBe(false);
+    expect(all.csv.trim().split('\r\n')).toHaveLength(11);
+    expect(all.csv).toContain('전표번호');
+
+    const filtered = await runTx(admin, (t) => journal.listCsv(t, { accountId: acc['120']! }));
+    expect(filtered.total).toBe(4);
+  });
+
+  it('a division-scoped user does not get another division’s entries in their export', async () => {
+    const [divA, divB] = await prisma.division.findMany({ orderBy: { code: 'asc' }, take: 2 });
+    const entryA = await post([
+      { accountId: acc['110']!, debit: '10000', divisionId: divA!.id },
+      { accountId: acc['401']!, credit: '10000', divisionId: divA!.id },
+    ]);
+    const entryB = await post([
+      { accountId: acc['110']!, debit: '10000', divisionId: divB!.id },
+      { accountId: acc['401']!, credit: '10000', divisionId: divB!.id },
+    ]);
+
+    const viewerRole = await prisma.role.findUniqueOrThrow({ where: { code: 'viewer' } });
+    const scopedUser = await prisma.user.upsert({
+      where: { username: 'acc-div-scoped' },
+      create: {
+        username: 'acc-div-scoped',
+        displayName: '사업부범위회계',
+        passwordHash: await hashPassword('Scoped!123456'),
+        roles: { create: [{ roleId: viewerRole.id }] },
+        divisionScopes: { create: [{ divisionId: divA!.id }] },
+      },
+      update: { isActive: true },
+    });
+    const scoped = await actorFor('acc-div-scoped');
+    const scopedExport = await runTx(scoped, (t) => journal.listCsv(t, {}));
+    expect(scopedExport.total).toBe(1);
+    expect(scopedExport.csv).toContain(entryA.entryNo);
+    expect(scopedExport.csv).not.toContain(entryB.entryNo);
+
+    await prisma.userDivisionScope.deleteMany({ where: { userId: scopedUser.id } });
+  });
+});
+
 describe('ACC-05 / ACC-07: income statement', () => {
   it('reports revenue, expense and the comparison period', async () => {
     await post(
@@ -842,6 +910,174 @@ describe('ACC-09: export carries the internal-use notice', () => {
 
     // the large amount survives character-for-character
     expect(csv).toContain(big);
+  });
+});
+
+describe('INT-12: 요청한 사업부는 범위를 대체하지 않는다', () => {
+  let divA = '';
+  let divB = '';
+  let scoped: Actor;
+
+  beforeAll(async () => {
+    const divisions = await prisma.division.findMany({ orderBy: { code: 'asc' }, take: 2 });
+    divA = divisions[0]!.id;
+    divB = divisions[1]!.id;
+
+    const viewerRole = await prisma.role.findUniqueOrThrow({ where: { code: 'viewer' } });
+    await prisma.user.upsert({
+      where: { username: 'acc-div-int12' },
+      create: {
+        username: 'acc-div-int12',
+        displayName: 'INT12 사업부범위',
+        passwordHash: await hashPassword('Scoped!123456'),
+        roles: { create: [{ roleId: viewerRole.id }] },
+        divisionScopes: { create: [{ divisionId: divA }] },
+      },
+      update: { isActive: true },
+    });
+    scoped = await actorFor('acc-div-int12');
+  });
+
+  afterAll(async () => {
+    await prisma.userDivisionScope.deleteMany({ where: { user: { username: 'acc-div-int12' } } });
+  });
+
+  /** One entry tagged to divA, one to divB, one untagged (belongs to the company, no division). */
+  async function seedDivisionEntries() {
+    const entryA = await post(
+      [
+        { accountId: acc['110']!, debit: '100000', divisionId: divA },
+        { accountId: acc['401']!, credit: '100000', divisionId: divA },
+      ],
+      '2026-06-10',
+      'A 사업부 전표',
+    );
+    const entryB = await post(
+      [
+        { accountId: acc['110']!, debit: '70000', divisionId: divB },
+        { accountId: acc['401']!, credit: '70000', divisionId: divB },
+      ],
+      '2026-06-11',
+      'B 사업부 전표',
+    );
+    const entryU = await post(
+      [
+        { accountId: acc['110']!, debit: '30000' },
+        { accountId: acc['401']!, credit: '30000' },
+      ],
+      '2026-06-12',
+      '미배정 전표',
+    );
+    return { entryA, entryB, entryU };
+  }
+
+  describe('report.accountLedger / trialBalance (divisionFilter)', () => {
+    it('범위 밖 사업부(divB)를 지정하면 OUT_OF_SCOPE로 거부된다', async () => {
+      await seedDivisionEntries();
+      await expectOutOfScope(
+        runTx(scoped, (t) =>
+          report.accountLedger(t, {
+            accountId: acc['110']!,
+            from: '2026-06-01',
+            to: '2026-06-30',
+            divisionId: divB,
+          }),
+        ),
+      );
+    });
+
+    it('범위 안 사업부(divA)를 지정하면 그 사업부로만 좁혀진다', async () => {
+      const { entryA } = await seedDivisionEntries();
+      const ledger = await runTx(scoped, (t) =>
+        report.accountLedger(t, {
+          accountId: acc['110']!,
+          from: '2026-06-01',
+          to: '2026-06-30',
+          divisionId: divA,
+        }),
+      );
+      expect(ledger.rows).toHaveLength(1);
+      expect(ledger.rows[0]!.entryNo).toBe(entryA.entryNo);
+      expect(ledger.rows[0]!.debit).toBe('100000');
+    });
+
+    it('아무 사업부도 지정하지 않으면 본인 범위와 미배정 전표만 보인다', async () => {
+      const { entryA, entryB, entryU } = await seedDivisionEntries();
+      const ledger = await runTx(scoped, (t) =>
+        report.accountLedger(t, { accountId: acc['110']!, from: '2026-06-01', to: '2026-06-30' }),
+      );
+      const entryNos = ledger.rows.map((r) => r.entryNo);
+      expect(entryNos).toEqual(expect.arrayContaining([entryA.entryNo, entryU.entryNo]));
+      expect(entryNos).not.toContain(entryB.entryNo);
+      expect(ledger.rows).toHaveLength(2);
+    });
+
+    it('admin은 어떤 사업부를 지정해도 영향받지 않는다', async () => {
+      const { entryA, entryB, entryU } = await seedDivisionEntries();
+      const all = await runTx(admin, (t) =>
+        report.accountLedger(t, { accountId: acc['110']!, from: '2026-06-01', to: '2026-06-30' }),
+      );
+      expect(all.rows.map((r) => r.entryNo)).toEqual(
+        expect.arrayContaining([entryA.entryNo, entryB.entryNo, entryU.entryNo]),
+      );
+
+      const filtered = await runTx(admin, (t) =>
+        report.accountLedger(t, {
+          accountId: acc['110']!,
+          from: '2026-06-01',
+          to: '2026-06-30',
+          divisionId: divB,
+        }),
+      );
+      expect(filtered.rows).toHaveLength(1);
+      expect(filtered.rows[0]!.entryNo).toBe(entryB.entryNo);
+    });
+
+    it('trialBalance에도 동일한 규칙이 적용된다 (같은 divisionFilter를 공유)', async () => {
+      await seedDivisionEntries();
+      await expectOutOfScope(
+        runTx(scoped, (t) =>
+          report.trialBalance(t, { from: '2026-06-01', to: '2026-06-30', divisionId: divB }),
+        ),
+      );
+
+      const tb = await runTx(scoped, (t) =>
+        report.trialBalance(t, { from: '2026-06-01', to: '2026-06-30', divisionId: divA }),
+      );
+      expect(tb.rows.find((r) => r.code === '110')!.debit).toBe('100000');
+    });
+  });
+
+  describe('journal.list', () => {
+    it('범위 밖 사업부(divB)를 지정하면 OUT_OF_SCOPE로 거부된다', async () => {
+      await seedDivisionEntries();
+      await expectOutOfScope(runTx(scoped, (t) => journal.list(t, { divisionId: divB, skip: 0, take: 20 })));
+    });
+
+    it('범위 안 사업부(divA)를 지정하면 그 사업부로만 좁혀진다', async () => {
+      const { entryA } = await seedDivisionEntries();
+      const result = await runTx(scoped, (t) => journal.list(t, { divisionId: divA, skip: 0, take: 20 }));
+      expect(result.rows.map((r) => r.entryNo)).toEqual([entryA.entryNo]);
+    });
+
+    it('아무 사업부도 지정하지 않으면 본인 범위와 미배정 전표만 보인다', async () => {
+      const { entryA, entryB, entryU } = await seedDivisionEntries();
+      const result = await runTx(scoped, (t) => journal.list(t, { skip: 0, take: 20 }));
+      const entryNos = result.rows.map((r) => r.entryNo);
+      expect(entryNos).toEqual(expect.arrayContaining([entryA.entryNo, entryU.entryNo]));
+      expect(entryNos).not.toContain(entryB.entryNo);
+    });
+
+    it('admin은 divisionId 필터와 무관하게 모든 사업부의 전표를 볼 수 있다', async () => {
+      const { entryA, entryB, entryU } = await seedDivisionEntries();
+      const all = await runTx(admin, (t) => journal.list(t, { skip: 0, take: 20 }));
+      expect(all.rows.map((r) => r.entryNo)).toEqual(
+        expect.arrayContaining([entryA.entryNo, entryB.entryNo, entryU.entryNo]),
+      );
+
+      const filtered = await runTx(admin, (t) => journal.list(t, { divisionId: divB, skip: 0, take: 20 }));
+      expect(filtered.rows.map((r) => r.entryNo)).toEqual([entryB.entryNo]);
+    });
   });
 });
 

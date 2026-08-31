@@ -55,6 +55,25 @@ export const hrmRouter = router({
       }),
     ),
 
+  // UIX-03: server-side export — calls employee.list itself, same permission and HR scope.
+  listCsv: permissionProcedure('hr.self')
+    .input(
+      z.object({
+        q: z.string().trim().optional(),
+        departmentId: cuid.optional(),
+        status: z.string().optional(),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      readTx(ctx, (t) =>
+        employee.listCsv(t, {
+          ...(input.q ? { q: input.q } : {}),
+          ...(input.departmentId ? { departmentId: input.departmentId } : {}),
+          ...(input.status ? { status: input.status } : {}),
+        }),
+      ),
+    ),
+
   detail: permissionProcedure('hr.self')
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => employee.detail(t, input.id))),

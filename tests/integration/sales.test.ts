@@ -1,4 +1,4 @@
-// covers: SLS-01..SLS-13, E2E-01, E2E-02, E2E-04, INT-05, INT-06, INT-07, B-01
+// covers: SLS-01..SLS-13, E2E-01, E2E-02, E2E-04, INT-05, INT-06, INT-07, INT-12, B-01
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { actorFor, prepareDatabase, prisma, runTx, truncateBusinessData } from '../helpers/db';
@@ -14,6 +14,7 @@ import * as partnerModule from '@/server/modules/master/partner';
 import * as closing from '@/server/modules/accounting/closing';
 import { withTransaction } from '@/server/core/context';
 import type { Actor } from '@/server/core/context';
+import { hashPassword } from '@/server/core/crypto';
 
 let admin: Actor;
 let warehouseId = '';
@@ -1138,5 +1139,687 @@ describe('SLS-05: 매출전표 수정', () => {
       },
     });
     expect(active).toBe(1);
+  });
+});
+
+describe('UIX-03: server-side CSV export', () => {
+  it('quotation.listCsv returns every matching row, not a page, and respects a filter', async () => {
+    const other = await runTx(admin, (t) =>
+      partnerModule.create(t, { name: '다른거래처', partnerType: 'CUSTOMER' }),
+    );
+    for (let i = 0; i < 12; i++) {
+      await runTx(admin, (t) =>
+        quotation.create(t, {
+          partnerId: customerId,
+          lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+        }),
+      );
+    }
+    for (let i = 0; i < 3; i++) {
+      await runTx(admin, (t) =>
+        quotation.create(t, {
+          partnerId: other.id,
+          lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+        }),
+      );
+    }
+    const all = await runTx(admin, (t) => quotation.listCsv(t, {}));
+    expect(all.total).toBe(15);
+    expect(all.rowCount).toBe(15);
+    expect(all.truncated).toBe(false);
+    expect(all.csv.trim().split('\r\n')).toHaveLength(16);
+    expect(all.csv).toContain('견적번호');
+
+    const filtered = await runTx(admin, (t) => quotation.listCsv(t, { partnerId: other.id }));
+    expect(filtered.total).toBe(3);
+  });
+
+  it('salesOrder.listCsv returns every matching row and respects a filter', async () => {
+    const other = await runTx(admin, (t) =>
+      partnerModule.create(t, { name: '다른주문처', partnerType: 'CUSTOMER' }),
+    );
+    for (let i = 0; i < 8; i++) {
+      await runTx(admin, (t) =>
+        salesOrder.create(t, {
+          partnerId: customerId,
+          lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+        }),
+      );
+    }
+    await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: other.id,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const all = await runTx(admin, (t) => salesOrder.listCsv(t, {}));
+    expect(all.total).toBe(9);
+    expect(all.csv.trim().split('\r\n')).toHaveLength(10);
+
+    const filtered = await runTx(admin, (t) => salesOrder.listCsv(t, { partnerId: other.id }));
+    expect(filtered.total).toBe(1);
+  });
+
+  it('salesDocument.listCsv respects a filter, and a division-scoped user does not see another division', async () => {
+    const [divA, divB] = await prisma.division.findMany({ orderBy: { code: 'asc' }, take: 2 });
+    await stockUp(itemA, '100', '1000');
+
+    const docA = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        divisionId: divA!.id,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '5000' }],
+      }),
+    );
+    const docB = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        divisionId: divB!.id,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '5000' }],
+      }),
+    );
+
+    // filter: a search term that matches only docB's document number
+    const byDocNo = await runTx(admin, (t) => salesDocument.listCsv(t, { q: docB.docNo }));
+    expect(byDocNo.total).toBe(1);
+    expect(byDocNo.csv).toContain(docB.docNo);
+    expect(byDocNo.csv).not.toContain(docA.docNo);
+
+    // scope: a user whose division scope is limited to divA must not see divB's document
+    const viewerRole = await prisma.role.findUniqueOrThrow({ where: { code: 'viewer' } });
+    const scopedUser = await prisma.user.upsert({
+      where: { username: 'sales-div-scoped' },
+      create: {
+        username: 'sales-div-scoped',
+        displayName: '사업부범위영업',
+        passwordHash: await hashPassword('Scoped!123456'),
+        roles: { create: [{ roleId: viewerRole.id }] },
+        divisionScopes: { create: [{ divisionId: divA!.id }] },
+      },
+      update: { isActive: true },
+    });
+    const scoped = await actorFor('sales-div-scoped');
+    const scopedExport = await runTx(scoped, (t) => salesDocument.listCsv(t, {}));
+    expect(scopedExport.total).toBe(1);
+    expect(scopedExport.csv).toContain(docA.docNo);
+    expect(scopedExport.csv).not.toContain(docB.docNo);
+
+    await prisma.userDivisionScope.deleteMany({ where: { userId: scopedUser.id } });
+  });
+
+  it('purchase.listRequestsCsv / listOrdersCsv / listDocumentsCsv return every matching row and respect a filter', async () => {
+    // requests: one left DRAFT, one approved
+    const draftReq = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        lines: [{ itemId: itemA, quantity: '10', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const approvedReq = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        lines: [{ itemId: itemA, quantity: '20', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    await runTx(admin, (t) => purchase.markRequestApproved(t, approvedReq.id));
+
+    const allRequests = await runTx(admin, (t) => purchase.listRequestsCsv(t, {}));
+    expect(allRequests.total).toBe(2);
+    expect(allRequests.csv).toContain('요청번호');
+
+    const approvedOnly = await runTx(admin, (t) => purchase.listRequestsCsv(t, { status: 'APPROVED' }));
+    expect(approvedOnly.total).toBe(1);
+    expect(approvedOnly.csv).toContain(approvedReq.docNo);
+    expect(approvedOnly.csv).not.toContain(draftReq.docNo);
+
+    // orders: convert the approved request into an order
+    const order = await runTx(admin, (t) =>
+      purchase.convertRequestToOrder(t, approvedReq.id, {
+        partnerId: supplierId,
+        lines: [{ sourceLineId: approvedReq.lines[0]!.id, quantity: '20' }],
+      }),
+    );
+    const allOrders = await runTx(admin, (t) => purchase.listOrdersCsv(t, {}));
+    expect(allOrders.total).toBe(1);
+    expect(allOrders.csv).toContain(order.docNo);
+
+    const otherSupplier = await runTx(admin, (t) =>
+      partnerModule.create(t, { name: '다른매입처', partnerType: 'SUPPLIER' }),
+    );
+    const noMatch = await runTx(admin, (t) => purchase.listOrdersCsv(t, { partnerId: otherSupplier.id }));
+    expect(noMatch.total).toBe(0);
+
+    // documents: two purchase documents, filtered by partner
+    const doc1 = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: supplierId,
+        warehouseId,
+        lines: [{ itemId: itemA, quantity: '5', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const otherSupplierDoc = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: otherSupplier.id,
+        warehouseId,
+        lines: [{ itemId: itemA, quantity: '5', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const allDocs = await runTx(admin, (t) => purchase.listDocumentsCsv(t, {}));
+    expect(allDocs.total).toBe(2);
+
+    const supplierOnly = await runTx(admin, (t) => purchase.listDocumentsCsv(t, { partnerId: supplierId }));
+    expect(supplierOnly.total).toBe(1);
+    expect(supplierOnly.csv).toContain(doc1.docNo);
+    expect(supplierOnly.csv).not.toContain(otherSupplierDoc.docNo);
+  });
+});
+
+/**
+ * INT-12: five list queries never applied division scope at all (quotation.list,
+ * salesOrder.list, purchase.listRequests/listOrders/listDocuments), and salesDocument.list
+ * applied it by spreading an `OR` key next to the keyword search's own `OR` key, so the
+ * later key silently replaced the earlier one and a scoped user's keyword search came back
+ * unfiltered. Each fixture set below has two documents in the scoped user's own division —
+ * one that matches the search keyword and one that does not — so the collision case fails
+ * loudly if the fix ever regresses to a spread: a dropped keyword filter would let the
+ * non-matching same-division document leak into the results.
+ */
+describe('INT-12: 목록 조회에 사업부 범위가 적용된다', () => {
+  let divA = '';
+  let divB = '';
+  let scoped: Actor;
+
+  beforeAll(async () => {
+    const divisions = await prisma.division.findMany({ orderBy: { code: 'asc' }, take: 2 });
+    divA = divisions[0]!.id;
+    divB = divisions[1]!.id;
+
+    const viewerRole = await prisma.role.findUniqueOrThrow({ where: { code: 'viewer' } });
+    await prisma.user.upsert({
+      where: { username: 'int12-list-scoped' },
+      create: {
+        username: 'int12-list-scoped',
+        displayName: '사업부범위조회자',
+        passwordHash: await hashPassword('Scoped!123456'),
+        roles: { create: [{ roleId: viewerRole.id }] },
+        divisionScopes: { create: [{ divisionId: divA }] },
+      },
+      update: { isActive: true },
+    });
+    scoped = await actorFor('int12-list-scoped');
+  });
+
+  afterAll(async () => {
+    const user = await prisma.user.findUnique({ where: { username: 'int12-list-scoped' } });
+    if (user) await prisma.userDivisionScope.deleteMany({ where: { userId: user.id } });
+  });
+
+  it('quotation.list: 사업부 범위 밖 문서는 제외되고 미지정 문서는 포함되며 관리자는 전체를 본다', async () => {
+    const a1 = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        divisionId: divB,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+
+    const scopedIds = (await runTx(scoped, (t) => quotation.list(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(scopedIds).toEqual(expect.arrayContaining([a1.id, a2.id, n.id]));
+    expect(scopedIds).not.toContain(b.id);
+
+    const adminIds = (await runTx(admin, (t) => quotation.list(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(adminIds).toEqual(expect.arrayContaining([a1.id, a2.id, b.id, n.id]));
+  });
+
+  it('quotation.list: 검색어와 사업부 범위가 함께(AND) 적용된다 — OR 충돌 회귀 방지', async () => {
+    const a1 = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        divisionId: divB,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+
+    const ids = (await runTx(scoped, (t) => quotation.list(t, { q: a1.docNo, skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(ids).toEqual([a1.id]);
+    expect(ids).not.toContain(a2.id); // same division, wrong keyword — must not leak back in
+    expect(ids).not.toContain(b.id);
+    expect(ids).not.toContain(n.id);
+  });
+
+  it('salesOrder.list: 사업부 범위 밖 문서는 제외되고 미지정 문서는 포함되며 관리자는 전체를 본다', async () => {
+    const a1 = await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: customerId,
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: customerId,
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: customerId,
+        divisionId: divB,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: customerId,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+
+    const scopedIds = (await runTx(scoped, (t) => salesOrder.list(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(scopedIds).toEqual(expect.arrayContaining([a1.id, a2.id, n.id]));
+    expect(scopedIds).not.toContain(b.id);
+
+    const adminIds = (await runTx(admin, (t) => salesOrder.list(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(adminIds).toEqual(expect.arrayContaining([a1.id, a2.id, b.id, n.id]));
+  });
+
+  it('salesOrder.list: 검색어와 사업부 범위가 함께(AND) 적용된다 — OR 충돌 회귀 방지', async () => {
+    const a1 = await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: customerId,
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: customerId,
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: customerId,
+        divisionId: divB,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: customerId,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+
+    const ids = (await runTx(scoped, (t) => salesOrder.list(t, { q: a1.docNo, skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(ids).toEqual([a1.id]);
+    expect(ids).not.toContain(a2.id);
+    expect(ids).not.toContain(b.id);
+    expect(ids).not.toContain(n.id);
+  });
+
+  it('salesDocument.list: 사업부 범위 밖 문서는 제외되고 미지정 문서는 포함되며 관리자는 전체를 본다', async () => {
+    const a1 = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        divisionId: divA,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        divisionId: divA,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        divisionId: divB,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+
+    const scopedIds = (await runTx(scoped, (t) => salesDocument.list(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(scopedIds).toEqual(expect.arrayContaining([a1.id, a2.id, n.id]));
+    expect(scopedIds).not.toContain(b.id);
+
+    const adminIds = (await runTx(admin, (t) => salesDocument.list(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(adminIds).toEqual(expect.arrayContaining([a1.id, a2.id, b.id, n.id]));
+  });
+
+  it('salesDocument.list: 검색어와 사업부 범위가 함께(AND) 적용된다 — OR 충돌 회귀 방지 (원 결함)', async () => {
+    const a1 = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        divisionId: divA,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        divisionId: divA,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        divisionId: divB,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+
+    const ids = (
+      await runTx(scoped, (t) => salesDocument.list(t, { q: a1.docNo, skip: 0, take: 50 }))
+    ).rows.map((r) => r.id);
+    expect(ids).toEqual([a1.id]);
+    expect(ids).not.toContain(a2.id);
+    expect(ids).not.toContain(b.id);
+    expect(ids).not.toContain(n.id);
+  });
+
+  /** Builds a PurchaseRequest, approves it and converts it into a PurchaseOrder in one division. */
+  async function purchaseOrderIn(divisionId?: string) {
+    const req = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        ...(divisionId ? { divisionId } : {}),
+        lines: [{ itemId: itemA, quantity: '5', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    await runTx(admin, (t) => purchase.markRequestApproved(t, req.id));
+    return runTx(admin, (t) =>
+      purchase.convertRequestToOrder(t, req.id, {
+        partnerId: supplierId,
+        lines: [{ sourceLineId: req.lines[0]!.id, quantity: '5' }],
+      }),
+    );
+  }
+
+  it('purchase.listRequests: 사업부 범위 밖 문서는 제외되고 미지정 문서는 포함되며 관리자는 전체를 본다', async () => {
+    const a1 = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        divisionId: divB,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+
+    const scopedIds = (await runTx(scoped, (t) => purchase.listRequests(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(scopedIds).toEqual(expect.arrayContaining([a1.id, a2.id, n.id]));
+    expect(scopedIds).not.toContain(b.id);
+
+    const adminIds = (await runTx(admin, (t) => purchase.listRequests(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(adminIds).toEqual(expect.arrayContaining([a1.id, a2.id, b.id, n.id]));
+  });
+
+  it('purchase.listRequests: 검색어와 사업부 범위가 함께(AND) 적용된다', async () => {
+    const a1 = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        divisionId: divA,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        divisionId: divB,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      purchase.createRequest(t, {
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+
+    const ids = (
+      await runTx(scoped, (t) => purchase.listRequests(t, { q: a1.docNo, skip: 0, take: 50 }))
+    ).rows.map((r) => r.id);
+    expect(ids).toEqual([a1.id]);
+    expect(ids).not.toContain(a2.id);
+    expect(ids).not.toContain(b.id);
+    expect(ids).not.toContain(n.id);
+  });
+
+  it('purchase.listOrders: 사업부 범위 밖 문서는 제외되고 미지정 문서는 포함되며 관리자는 전체를 본다', async () => {
+    const a1 = await purchaseOrderIn(divA);
+    const a2 = await purchaseOrderIn(divA);
+    const b = await purchaseOrderIn(divB);
+    const n = await purchaseOrderIn(undefined);
+
+    const scopedIds = (await runTx(scoped, (t) => purchase.listOrders(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(scopedIds).toEqual(expect.arrayContaining([a1.id, a2.id, n.id]));
+    expect(scopedIds).not.toContain(b.id);
+
+    const adminIds = (await runTx(admin, (t) => purchase.listOrders(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(adminIds).toEqual(expect.arrayContaining([a1.id, a2.id, b.id, n.id]));
+  });
+
+  it('purchase.listOrders: 검색어와 사업부 범위가 함께(AND) 적용된다', async () => {
+    const a1 = await purchaseOrderIn(divA);
+    const a2 = await purchaseOrderIn(divA);
+    const b = await purchaseOrderIn(divB);
+    const n = await purchaseOrderIn(undefined);
+
+    const ids = (
+      await runTx(scoped, (t) => purchase.listOrders(t, { q: a1.docNo, skip: 0, take: 50 }))
+    ).rows.map((r) => r.id);
+    expect(ids).toEqual([a1.id]);
+    expect(ids).not.toContain(a2.id);
+    expect(ids).not.toContain(b.id);
+    expect(ids).not.toContain(n.id);
+  });
+
+  it('purchase.listDocuments: 사업부 범위 밖 문서는 제외되고 미지정 문서는 포함되며 관리자는 전체를 본다', async () => {
+    const a1 = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: supplierId,
+        warehouseId,
+        divisionId: divA,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: supplierId,
+        warehouseId,
+        divisionId: divA,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: supplierId,
+        warehouseId,
+        divisionId: divB,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: supplierId,
+        warehouseId,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+
+    const scopedIds = (await runTx(scoped, (t) => purchase.listDocuments(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(scopedIds).toEqual(expect.arrayContaining([a1.id, a2.id, n.id]));
+    expect(scopedIds).not.toContain(b.id);
+
+    const adminIds = (await runTx(admin, (t) => purchase.listDocuments(t, { skip: 0, take: 50 }))).rows.map(
+      (r) => r.id,
+    );
+    expect(adminIds).toEqual(expect.arrayContaining([a1.id, a2.id, b.id, n.id]));
+  });
+
+  it('purchase.listDocuments: 검색어와 사업부 범위가 함께(AND) 적용된다 — OR 충돌 회귀 방지', async () => {
+    const a1 = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: supplierId,
+        warehouseId,
+        divisionId: divA,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const a2 = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: supplierId,
+        warehouseId,
+        divisionId: divA,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: supplierId,
+        warehouseId,
+        divisionId: divB,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+    const n = await runTx(admin, (t) =>
+      purchase.createDocument(t, {
+        partnerId: supplierId,
+        warehouseId,
+        docDate: '2026-06-01',
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000', taxType: 'TAXABLE' }],
+      }),
+    );
+
+    const ids = (
+      await runTx(scoped, (t) => purchase.listDocuments(t, { q: a1.docNo, skip: 0, take: 50 }))
+    ).rows.map((r) => r.id);
+    expect(ids).toEqual([a1.id]);
+    expect(ids).not.toContain(a2.id);
+    expect(ids).not.toContain(b.id);
+    expect(ids).not.toContain(n.id);
   });
 });

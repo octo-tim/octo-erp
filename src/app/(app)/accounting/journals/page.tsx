@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { VoucherLineEditor, type LineColumn } from '@/components/ui/voucher-line-editor';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
 import { InternalNotice } from '@/components/accounting/internal-notice';
 import { fmt } from '@/lib/format';
 import { add, D } from '@/lib/money';
 import { businessDate } from '@/lib/dates';
+import { runServerCsvExport } from '@/lib/csv';
 
 /** ACC-02: manual journal entries — 대체 / 입금 / 출금. */
 interface Row {
@@ -74,6 +75,23 @@ export default function JournalsPage() {
     ...(applied.from ? { from: applied.from } : {}),
     ...(applied.to ? { to: applied.to } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.accounting.entriesCsv.useQuery(
+    {
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.status ? { status: applied.status } : {}),
+      ...(applied.entryType ? { entryType: applied.entryType as 'TRANSFER' } : {}),
+      ...(applied.from ? { from: applied.from } : {}),
+      ...(applied.to ? { to: applied.to } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    const period = `${applied.from || '처음'}_${applied.to || businessDate(new Date())}`;
+    setExportNotice(await runServerCsvExport(() => csvQuery.refetch(), `회계전표_${period}.csv`));
+  }
 
   const suggestions = useMemo(
     () => (accounts.data ?? []).map((a) => ({ value: a.id, label: `${a.code} ${a.name}` })),
@@ -323,6 +341,8 @@ export default function JournalsPage() {
         </Card>
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="accounting.journals"
         columns={columns}
@@ -342,6 +362,7 @@ export default function JournalsPage() {
         onRowOpen={(r) => router.push(`/accounting/journals/${r.id}`)}
         emptyTitle="회계전표가 없습니다."
         emptyDescription="'전표 등록'으로 수동 전표를 만들거나, 업무전표를 확정하면 자동분개가 생성됩니다."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

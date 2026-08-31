@@ -3,8 +3,15 @@ import { AppError } from '@/server/core/errors';
 import { requirePermission } from '@/server/modules/rbac/service';
 import * as audit from '@/server/modules/audit/service';
 import { nextDocNo } from '@/server/modules/numbering/service';
-import { normalizeBusinessNo, PARTNER_TYPES, validateBusinessNo } from './validation';
+import { formatBusinessNo, normalizeBusinessNo, PARTNER_TYPES, validateBusinessNo } from './validation';
 import { amount } from '@/lib/money';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
+
+const PARTNER_TYPE_LABEL: Record<string, string> = {
+  CUSTOMER: '매출처',
+  SUPPLIER: '매입처',
+  BOTH: '매출·매입',
+};
 
 /** BAS-04/BAS-08/BAS-09: partners, contacts, change history and the no-hard-delete rule. */
 
@@ -280,6 +287,40 @@ export async function list(
     ctx.tx.partner.count({ where }),
   ]);
   return { rows, total };
+}
+
+const PARTNER_CSV_HEADERS = [
+  '거래처코드',
+  '거래처명',
+  '사업자번호',
+  '대표자',
+  '거래유형',
+  '결제조건',
+  '여신한도',
+  '담당자',
+  '사용여부',
+];
+
+/** UIX-03: server-side export for the 거래처 grid — same permission and rows as `list`. */
+export async function listCsv(
+  ctx: TransactionContext,
+  input: { q?: string; partnerType?: string; activeOnly?: boolean },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => list(ctx, { ...input, ...paging }),
+    PARTNER_CSV_HEADERS,
+    (r) => [
+      r.code,
+      r.name,
+      r.businessNo ? formatBusinessNo(r.businessNo) : '',
+      r.ceoName ?? '',
+      PARTNER_TYPE_LABEL[r.partnerType] ?? r.partnerType,
+      r.paymentTerms ?? '',
+      r.creditLimit?.toString() ?? '',
+      r.contacts[0]?.name ?? '',
+      r.isActive ? 'Y' : 'N',
+    ],
+  );
 }
 
 export async function detail(ctx: TransactionContext, id: string) {

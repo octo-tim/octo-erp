@@ -84,6 +84,28 @@ export const masterRouter = router({
       }),
     ),
 
+  // UIX-03: server-side export — calls item.list itself (skip/take replaced by the export
+  // cap), so the master.read permission and every filter apply exactly as they do above.
+  itemsCsv: permissionProcedure('master.read')
+    .input(
+      z.object({
+        q: z.string().trim().max(100).optional(),
+        categoryId: cuid.optional(),
+        taxType: taxType.optional(),
+        activeOnly: z.boolean().default(true),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      readTx(ctx, (t) =>
+        item.listCsv(t, {
+          ...(input.q ? { q: input.q } : {}),
+          ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+          ...(input.taxType ? { taxType: input.taxType } : {}),
+          activeOnly: input.activeOnly,
+        }),
+      ),
+    ),
+
   item: permissionProcedure('master.read')
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => item.detail(t, input.id))),
@@ -191,6 +213,25 @@ export const masterRouter = router({
         });
         return { rows, total, page: input.page, pageSize: input.pageSize };
       }),
+    ),
+
+  // UIX-03: server-side export — calls partner.list itself, same permission and filters.
+  partnersCsv: permissionProcedure('master.read')
+    .input(
+      z.object({
+        q: z.string().trim().max(100).optional(),
+        partnerType: partnerType.optional(),
+        activeOnly: z.boolean().default(true),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      readTx(ctx, (t) =>
+        partner.listCsv(t, {
+          ...(input.q ? { q: input.q } : {}),
+          ...(input.partnerType ? { partnerType: input.partnerType } : {}),
+          activeOnly: input.activeOnly,
+        }),
+      ),
     ),
 
   partner: permissionProcedure('master.read')

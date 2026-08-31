@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
 import {
   emptyTradeLine,
@@ -16,6 +16,7 @@ import {
 } from '@/components/sales/trade-line-editor';
 import { fmt } from '@/lib/format';
 import { businessDate } from '@/lib/dates';
+import { runServerCsvExport } from '@/lib/csv';
 
 /** SLS-13: purchase requests. Always require approval (DEC-03) before they can be ordered. */
 interface Row {
@@ -66,6 +67,21 @@ export default function PurchaseRequestsPage() {
     ...(applied.q ? { q: applied.q } : {}),
     ...(applied.status ? { status: applied.status } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.sales.purchaseRequestsCsv.useQuery(
+    {
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.status ? { status: applied.status } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    setExportNotice(
+      await runServerCsvExport(() => csvQuery.refetch(), `구매요청_${businessDate(new Date())}.csv`),
+    );
+  }
 
   const columns: Column<Row>[] = [
     { key: 'docNo', header: '요청번호', width: 150 },
@@ -224,6 +240,8 @@ export default function PurchaseRequestsPage() {
         </Card>
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="sales.purchaseRequests"
         columns={columns}
@@ -243,6 +261,7 @@ export default function PurchaseRequestsPage() {
         onRowOpen={(r) => router.push(`/sales/purchase-requests/${r.id}`)}
         emptyTitle="구매요청이 없습니다."
         emptyDescription="'구매요청 등록'으로 시작하세요."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

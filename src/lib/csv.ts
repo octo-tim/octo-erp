@@ -25,3 +25,31 @@ export function downloadCsv(csvBody: string, filename: string): void {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/** Shape every `xxxCsv` tRPC query returns (src/server/core/list-export.ts). */
+export interface ServerCsvExport {
+  csv: string;
+  total: number;
+  rowCount: number;
+  truncated: boolean;
+}
+
+/**
+ * UIX-03: the one client-side mechanism every paginated grid's 엑셀 button shares. `refetch`
+ * is a lazy (`enabled: false`) tRPC query's own `refetch`, so the request only happens on
+ * click, with whatever filters the screen already applied. Downloads through `downloadCsv`
+ * above (never a second Blob/anchor implementation). Returns a ready-to-show notice when the
+ * server truncated the result (feed it to `<ExportNotice>`, src/components/ui/primitives.tsx)
+ * so the screen warns the user instead of staying silent about a partial file, or `null` when
+ * the export was complete.
+ */
+export async function runServerCsvExport(
+  refetch: () => Promise<{ data?: ServerCsvExport | undefined }>,
+  filename: string,
+): Promise<string | null> {
+  const result = await refetch();
+  if (!result.data) return null;
+  downloadCsv(result.data.csv, filename);
+  if (!result.data.truncated) return null;
+  return `전체 ${result.data.total.toLocaleString('ko-KR')}건 중 ${result.data.rowCount.toLocaleString('ko-KR')}건만 내려받았습니다. 조회조건을 좁혀 다시 시도하세요.`;
+}

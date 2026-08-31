@@ -1,4 +1,4 @@
-// covers: INV-01..INV-09, INT-04, INT-05, INT-06, INT-07, INT-08, B-11
+// covers: INV-01..INV-09, INT-04, INT-05, INT-06, INT-07, INT-08, INT-12, B-11
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { actorFor, prepareDatabase, prisma, runTx, truncateBusinessData } from '../helpers/db';
@@ -11,6 +11,17 @@ import * as ledger from '@/server/modules/inventory/ledger';
 import * as item from '@/server/modules/master/item';
 import { withTransaction } from '@/server/core/context';
 import type { Actor } from '@/server/core/context';
+import { hashPassword } from '@/server/core/crypto';
+import { AppError } from '@/server/core/errors';
+
+/** INT-12: assert the app code, not just that something threw — a bypass that reverts to
+ *  preferring the requested id would fail differently (wrong rows, not a thrown error) and a
+ *  bare `.rejects.toThrow()` would not catch it either way. */
+function expectOutOfScope(promise: Promise<unknown>) {
+  return expect(promise).rejects.toSatisfy(
+    (err: unknown) => err instanceof AppError && err.code === 'OUT_OF_SCOPE',
+  );
+}
 
 let admin: Actor;
 let warehouseA = '';
@@ -594,6 +605,54 @@ describe('INV-08: physical count', () => {
   });
 });
 
+describe('UIX-03: server-side CSV export', () => {
+  it('stockCount.listCsv returns every matching row, not a page, and respects a filter', async () => {
+    const id = await makeItem('내보내기실사품');
+    await receipt(id, '10', '1000');
+    for (let i = 0; i < 5; i++) {
+      await runTx(admin, (t) => stockCount.create(t, { warehouseId: warehouseA }));
+    }
+    const started = await runTx(admin, (t) => stockCount.create(t, { warehouseId: warehouseA }));
+    await runTx(admin, (t) => stockCount.start(t, started.id, {}, started.version));
+
+    const all = await runTx(admin, (t) => stockCount.listCsv(t, {}));
+    expect(all.total).toBe(6);
+    expect(all.rowCount).toBe(6);
+    expect(all.truncated).toBe(false);
+    expect(all.csv.trim().split('\r\n')).toHaveLength(7);
+    expect(all.csv).toContain('실사번호');
+
+    const counting = await runTx(admin, (t) => stockCount.listCsv(t, { status: 'COUNTING' }));
+    expect(counting.total).toBe(1);
+    expect(counting.csv).toContain(started.countNo);
+  });
+
+  it('a warehouse-scoped user does not get another warehouse’s count in their export', async () => {
+    const countA = await runTx(admin, (t) => stockCount.create(t, { warehouseId: warehouseA }));
+    const countB = await runTx(admin, (t) => stockCount.create(t, { warehouseId: warehouseB }));
+
+    const viewerRole = await prisma.role.findUniqueOrThrow({ where: { code: 'viewer' } });
+    const scopedUser = await prisma.user.upsert({
+      where: { username: 'inv-wh-scoped' },
+      create: {
+        username: 'inv-wh-scoped',
+        displayName: '창고범위재고',
+        passwordHash: await hashPassword('Scoped!123456'),
+        roles: { create: [{ roleId: viewerRole.id }] },
+        warehouseScopes: { create: [{ warehouseId: warehouseA }] },
+      },
+      update: { isActive: true },
+    });
+    const scoped = await actorFor('inv-wh-scoped');
+    const scopedExport = await runTx(scoped, (t) => stockCount.listCsv(t, {}));
+    expect(scopedExport.total).toBe(1);
+    expect(scopedExport.csv).toContain(countA.countNo);
+    expect(scopedExport.csv).not.toContain(countB.countNo);
+
+    await prisma.userWarehouseScope.deleteMany({ where: { userId: scopedUser.id } });
+  });
+});
+
 describe('INV-09 / DEC-01: monthly total average close (B-11)', () => {
   it('reproduces the approved calculation example exactly', async () => {
     const id = await makeItem('B11품목');
@@ -716,6 +775,89 @@ describe('INT-06: the whole confirmation shares one transaction', () => {
     expect(await prisma.inventoryLedger.count({ where: { itemId: id } })).toBe(0);
     const after = await prisma.stockDocument.findUniqueOrThrow({ where: { id: doc.id } });
     expect(after.status).toBe('DRAFT');
+  });
+});
+
+describe('INT-12: 요청한 창고는 범위를 대체하지 않는다', () => {
+  let scoped: Actor;
+
+  beforeAll(async () => {
+    const viewerRole = await prisma.role.findUniqueOrThrow({ where: { code: 'viewer' } });
+    await prisma.user.upsert({
+      where: { username: 'inv-wh-int12' },
+      create: {
+        username: 'inv-wh-int12',
+        displayName: 'INT12 창고범위',
+        passwordHash: await hashPassword('Scoped!123456'),
+        roles: { create: [{ roleId: viewerRole.id }] },
+        warehouseScopes: { create: [{ warehouseId: warehouseA }] },
+      },
+      update: { isActive: true },
+    });
+    scoped = await actorFor('inv-wh-int12');
+  });
+
+  afterAll(async () => {
+    await prisma.userWarehouseScope.deleteMany({ where: { user: { username: 'inv-wh-int12' } } });
+  });
+
+  /** One receipt into warehouseA (in scope), one into warehouseB (out of scope). Every stock
+   *  document names a real warehouse — unlike a journal line there is no "unassigned" variant
+   *  here — so the no-filter case is checked against "not the other warehouse's", not against
+   *  an unassigned bucket. */
+  async function seedWarehouseDocs() {
+    const id = await makeItem('INT12 범위품목');
+    const a = await runTx(admin, (t) =>
+      stockDocument.create(t, {
+        docType: 'RECEIPT',
+        toWarehouseId: warehouseA,
+        reasonCode: 'PURCHASE',
+        lines: [{ itemId: id, quantity: '1', unitCost: '100' }],
+      }),
+    );
+    const b = await runTx(admin, (t) =>
+      stockDocument.create(t, {
+        docType: 'RECEIPT',
+        toWarehouseId: warehouseB,
+        reasonCode: 'PURCHASE',
+        lines: [{ itemId: id, quantity: '1', unitCost: '100' }],
+      }),
+    );
+    return { a, b };
+  }
+
+  it('범위 밖 창고(warehouseB)를 지정하면 OUT_OF_SCOPE로 거부된다', async () => {
+    await seedWarehouseDocs();
+    await expectOutOfScope(
+      runTx(scoped, (t) => stockDocument.list(t, { warehouseId: warehouseB, skip: 0, take: 20 })),
+    );
+  });
+
+  it('범위 안 창고(warehouseA)를 지정하면 그 창고로만 좁혀진다', async () => {
+    const { a } = await seedWarehouseDocs();
+    const result = await runTx(scoped, (t) =>
+      stockDocument.list(t, { warehouseId: warehouseA, skip: 0, take: 20 }),
+    );
+    expect(result.rows.map((r) => r.docNo)).toEqual([a.docNo]);
+  });
+
+  it('아무 창고도 지정하지 않으면 본인 범위 창고의 전표만 보인다', async () => {
+    const { a, b } = await seedWarehouseDocs();
+    const result = await runTx(scoped, (t) => stockDocument.list(t, { skip: 0, take: 20 }));
+    const docNos = result.rows.map((r) => r.docNo);
+    expect(docNos).toContain(a.docNo);
+    expect(docNos).not.toContain(b.docNo);
+  });
+
+  it('admin은 warehouseId 필터와 무관하게 모든 창고의 전표를 볼 수 있다', async () => {
+    const { a, b } = await seedWarehouseDocs();
+    const all = await runTx(admin, (t) => stockDocument.list(t, { skip: 0, take: 20 }));
+    expect(all.rows.map((r) => r.docNo)).toEqual(expect.arrayContaining([a.docNo, b.docNo]));
+
+    const filtered = await runTx(admin, (t) =>
+      stockDocument.list(t, { warehouseId: warehouseB, skip: 0, take: 20 }),
+    );
+    expect(filtered.rows.map((r) => r.docNo)).toEqual([b.docNo]);
   });
 });
 

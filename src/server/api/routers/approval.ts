@@ -35,6 +35,27 @@ export const approvalRouter = router({
       }),
     ),
 
+  // UIX-03: server-side export — calls approval.listInbox itself, same permission/filters.
+  inboxCsv: permissionProcedure('approval.use')
+    .input(
+      z.object({
+        inbox: z.enum(['DRAFTED', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED', 'REFERENCE']),
+        q: z.string().trim().max(100).optional(),
+        from: dateString.optional(),
+        to: dateString.optional(),
+      }),
+    )
+    .query(({ ctx, input }) =>
+      readTx(ctx, (t) =>
+        approval.listInboxCsv(t, {
+          inbox: input.inbox,
+          ...(input.q ? { q: input.q } : {}),
+          ...(input.from ? { from: input.from } : {}),
+          ...(input.to ? { to: input.to } : {}),
+        }),
+      ),
+    ),
+
   pendingCount: permissionProcedure('approval.use').query(({ ctx }) =>
     readTx(ctx, (t) => approval.pendingCount(t)),
   ),

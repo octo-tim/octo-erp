@@ -1,6 +1,6 @@
 import type { TransactionContext } from '@/server/core/context';
 import { AppError } from '@/server/core/errors';
-import { requirePermission } from '@/server/modules/rbac/service';
+import { requirePermission, divisionScopeWhere } from '@/server/modules/rbac/service';
 import * as audit from '@/server/modules/audit/service';
 import * as conversion from './conversion';
 import { priceLines } from './pricing';
@@ -9,6 +9,7 @@ import { assertVersion } from '@/server/core/state-machine';
 import { D, quantity } from '@/lib/money';
 import { businessDate, toDateOnly } from '@/lib/dates';
 import type { LineInput } from './quotation';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
 
 /** SLS-03 / SLS-04 — sales orders and their delivery progress. */
 
@@ -116,6 +117,9 @@ export async function list(
   },
 ) {
   requirePermission(ctx.actor, 'sales.read');
+  // INT-12: composed under AND so the division scope can never collide with the keyword
+  // search's own OR (see divisionScopeWhere in rbac/service.ts).
+  const scope = divisionScopeWhere(ctx.actor);
   const where = {
     ...(input.status ? { status: input.status } : {}),
     ...(input.partnerId ? { partnerId: input.partnerId } : {}),
@@ -127,14 +131,19 @@ export async function list(
           },
         }
       : {}),
-    ...(input.q
-      ? {
-          OR: [
-            { docNo: { contains: input.q, mode: 'insensitive' as const } },
-            { partner: { name: { contains: input.q, mode: 'insensitive' as const } } },
-          ],
-        }
-      : {}),
+    AND: [
+      ...(input.q
+        ? [
+            {
+              OR: [
+                { docNo: { contains: input.q, mode: 'insensitive' as const } },
+                { partner: { name: { contains: input.q, mode: 'insensitive' as const } } },
+              ],
+            },
+          ]
+        : []),
+      scope,
+    ],
   };
   const [rows, total] = await Promise.all([
     ctx.tx.salesOrder.findMany({
@@ -147,6 +156,27 @@ export async function list(
     ctx.tx.salesOrder.count({ where }),
   ]);
   return { rows, total };
+}
+
+const SALES_ORDER_CSV_HEADERS = ['주문번호', '주문일', '거래처', '납기일', '합계', '상태'];
+
+/** UIX-03: server-side export for the 주문서 grid — same permission and rows as `list`. */
+export async function listCsv(
+  ctx: TransactionContext,
+  input: { status?: string; partnerId?: string; from?: string; to?: string; q?: string },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => list(ctx, { ...input, ...paging }),
+    SALES_ORDER_CSV_HEADERS,
+    (r) => [
+      r.docNo,
+      r.docDate.toISOString().slice(0, 10),
+      r.partner.name,
+      r.deliveryDate ? r.deliveryDate.toISOString().slice(0, 10) : '',
+      r.totalAmount.toString(),
+      r.status,
+    ],
+  );
 }
 
 export async function detail(ctx: TransactionContext, id: string) {

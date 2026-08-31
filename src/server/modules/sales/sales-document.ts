@@ -1,6 +1,10 @@
 import type { TransactionContext } from '@/server/core/context';
 import { AppError } from '@/server/core/errors';
-import { requirePermission, requirePermissionUnlessApproval } from '@/server/modules/rbac/service';
+import {
+  requirePermission,
+  requirePermissionUnlessApproval,
+  divisionScopeWhere,
+} from '@/server/modules/rbac/service';
 import * as audit from '@/server/modules/audit/service';
 import * as matrix from '@/server/modules/approval/matrix';
 import * as ledger from '@/server/modules/inventory/ledger';
@@ -19,6 +23,7 @@ import { idempotent } from '@/server/core/idempotency';
 import { assertVersion } from '@/server/core/state-machine';
 import { amount, D, floorTo, quantity, ZERO } from '@/lib/money';
 import { businessDate, toDateOnly } from '@/lib/dates';
+import { buildCsvExport, type CsvExport } from '@/server/core/list-export';
 
 /**
  * SLS-05 / SLS-11 — sales documents and sales returns.
@@ -594,7 +599,10 @@ export async function list(
   },
 ) {
   requirePermission(ctx.actor, 'sales.read');
-  const scope = ctx.actor.isAdmin ? undefined : ctx.actor.divisionIds;
+  // INT-12: composed under AND so the division scope can never collide with the keyword
+  // search's own OR — the two used to be separate spread OR keys, and the later one silently
+  // replaced the earlier one, dropping the keyword filter for a scoped user.
+  const scope = divisionScopeWhere(ctx.actor);
 
   const where = {
     ...(input.docType ? { docType: input.docType } : {}),
@@ -608,16 +616,19 @@ export async function list(
           },
         }
       : {}),
-    ...(input.q
-      ? {
-          OR: [
-            { docNo: { contains: input.q, mode: 'insensitive' as const } },
-            { partner: { name: { contains: input.q, mode: 'insensitive' as const } } },
-          ],
-        }
-      : {}),
-    // INT-12: a division-scoped user does not see other divisions' documents
-    ...(scope ? { OR: [{ divisionId: { in: scope } }, { divisionId: null }] } : {}),
+    AND: [
+      ...(input.q
+        ? [
+            {
+              OR: [
+                { docNo: { contains: input.q, mode: 'insensitive' as const } },
+                { partner: { name: { contains: input.q, mode: 'insensitive' as const } } },
+              ],
+            },
+          ]
+        : []),
+      scope,
+    ],
   };
 
   const [rows, total] = await Promise.all([
@@ -635,6 +646,45 @@ export async function list(
     ctx.tx.salesDocument.count({ where }),
   ]);
   return { rows, total };
+}
+
+const SALES_DOCUMENT_CSV_HEADERS = [
+  '전표번호',
+  '전표일',
+  '거래처',
+  '창고',
+  '공급가액',
+  '세액',
+  '합계',
+  '상태',
+];
+
+/** UIX-03: server-side export for the 매출전표 grid — same permission and rows as `list`. */
+export async function listCsv(
+  ctx: TransactionContext,
+  input: {
+    docType?: SalesDocType;
+    status?: string;
+    partnerId?: string;
+    from?: string;
+    to?: string;
+    q?: string;
+  },
+): Promise<CsvExport> {
+  return buildCsvExport(
+    (paging) => list(ctx, { ...input, ...paging }),
+    SALES_DOCUMENT_CSV_HEADERS,
+    (r) => [
+      r.docNo,
+      r.docDate.toISOString().slice(0, 10),
+      r.partner.name,
+      r.warehouse.name,
+      r.supplyAmount.toString(),
+      r.vatAmount.toString(),
+      r.totalAmount.toString(),
+      r.status,
+    ],
+  );
 }
 
 export async function detail(ctx: TransactionContext, id: string) {

@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage, useSavedFilters } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, ExportNotice, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
 import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
 import { formatBusinessNo } from '@/server/modules/master/validation';
+import { runServerCsvExport } from '@/lib/csv';
+import { businessDate } from '@/lib/dates';
 
 /** BAS-04: partner list and registration with contacts. */
 const TYPE_LABEL: Record<string, string> = { CUSTOMER: '매출처', SUPPLIER: '매입처', BOTH: '매출·매입' };
@@ -45,6 +47,22 @@ export default function PartnerListPage() {
     ...(applied.q ? { q: applied.q } : {}),
     ...(applied.partnerType ? { partnerType: applied.partnerType as 'CUSTOMER' } : {}),
   });
+
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const csvQuery = api.master.partnersCsv.useQuery(
+    {
+      activeOnly: applied.activeOnly,
+      ...(applied.q ? { q: applied.q } : {}),
+      ...(applied.partnerType ? { partnerType: applied.partnerType as 'CUSTOMER' } : {}),
+    },
+    { enabled: false },
+  );
+
+  async function exportCsv() {
+    setExportNotice(
+      await runServerCsvExport(() => csvQuery.refetch(), `거래처_${businessDate(new Date())}.csv`),
+    );
+  }
 
   const columns: Column<Row>[] = [
     { key: 'code', header: '거래처코드', width: 120 },
@@ -137,6 +155,8 @@ export default function PartnerListPage() {
         />
       ) : null}
 
+      <ExportNotice message={exportNotice} />
+
       <DataGrid<Row>
         gridKey="master.partners"
         columns={columns}
@@ -156,6 +176,7 @@ export default function PartnerListPage() {
         onRowOpen={(r) => router.push(`/master/partners/${r.id}`)}
         emptyTitle="등록된 거래처가 없습니다."
         emptyDescription="'거래처 등록'으로 매출처·매입처를 추가하세요."
+        onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

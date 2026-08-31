@@ -2,7 +2,7 @@
 
 > 생성: `node tools/docs-api.mjs` — 원본은 `src/server/api/routers/*.ts`(정적 AST 분석, 실행하지 않음). 이 파일을 직접 편집하지 않는다.
 
-생성 시각: 2026-08-31T05:29:49.594Z · 라우터 13개 · 프로시저 244개
+생성 시각: 2026-08-31T07:06:24.532Z · 라우터 13개 · 프로시저 258개
 
 ## 전송 규약
 
@@ -57,6 +57,7 @@
 | `accounting`   | `publishPostingRule`                 | mutation | `accounting.rules`                | 예 (input.requestId)      |
 | `accounting`   | `previewPostingRule`                 | query    | `accounting.read`                 | —                         |
 | `accounting`   | `entries`                            | query    | `accounting.read`                 | —                         |
+| `accounting`   | `entriesCsv`                         | query    | `accounting.read`                 | —                         |
 | `accounting`   | `entry`                              | query    | `accounting.read`                 | —                         |
 | `accounting`   | `createEntry`                        | mutation | `accounting.write`                | 예 (input.requestId)      |
 | `accounting`   | `updateEntry`                        | mutation | `accounting.write`                | 예 (input.requestId)      |
@@ -96,11 +97,14 @@
 | `admin`        | `approveRetention`                   | mutation | `admin.settings`                  | 예 (input.requestId)      |
 | `admin`        | `executeRetention`                   | mutation | `admin.settings`                  | 예 (input.requestId)      |
 | `approval`     | `inbox`                              | query    | `approval.use`                    | —                         |
+| `approval`     | `inboxCsv`                           | query    | `approval.use`                    | —                         |
 | `approval`     | `pendingCount`                       | query    | `approval.use`                    | —                         |
 | `approval`     | `detail`                             | query    | `approval.use`                    | —                         |
 | `approval`     | `forms`                              | query    | `approval.use`                    | —                         |
 | `approval`     | `draft`                              | mutation | `approval.use`                    | 예 (input.requestId)      |
 | `approval`     | `submit`                             | mutation | `approval.use`                    | 예 (input.requestId)      |
+| `approval`     | `previewLine`                        | query    | `approval.use`                    | —                         |
+| `approval`     | `listApprovers`                      | query    | `approval.use`                    | —                         |
 | `approval`     | `approve`                            | mutation | `approval.use`                    | 예 (input.requestId)      |
 | `approval`     | `reject`                             | mutation | `approval.use`                    | 예 (input.requestId)      |
 | `approval`     | `hold`                               | mutation | `approval.use`                    | 예 (input.requestId)      |
@@ -128,6 +132,7 @@
 | `auth`         | `revokeMySessions`                   | mutation | (인증 필요 — 별도 업무 권한 없음) | 아니오                    |
 | `auth`         | `sessions`                           | query    | (인증 필요 — 별도 업무 권한 없음) | —                         |
 | `hrm`          | `list`                               | query    | `hr.self`                         | —                         |
+| `hrm`          | `listCsv`                            | query    | `hr.self`                         | —                         |
 | `hrm`          | `detail`                             | query    | `hr.self`                         | —                         |
 | `hrm`          | `me`                                 | query    | (인증 필요 — 별도 업무 권한 없음) | —                         |
 | `hrm`          | `create`                             | mutation | `hr.write`                        | 예 (input.requestId)      |
@@ -177,6 +182,7 @@
 | `inventory`    | `bookCsv`                            | query    | `inventory.export`                | —                         |
 | `inventory`    | `safetyStock`                        | query    | `inventory.read`                  | —                         |
 | `inventory`    | `counts`                             | query    | `inventory.read`                  | —                         |
+| `inventory`    | `countsCsv`                          | query    | `inventory.read`                  | —                         |
 | `inventory`    | `count`                              | query    | `inventory.read`                  | —                         |
 | `inventory`    | `createCount`                        | mutation | `inventory.count`                 | 예 (input.requestId)      |
 | `inventory`    | `startCount`                         | mutation | `inventory.count`                 | 예 (input.requestId)      |
@@ -190,6 +196,7 @@
 | `inventory`    | `reconcile`                          | query    | `inventory.valuation`             | —                         |
 | `inventory`    | `rebuildSnapshot`                    | mutation | `inventory.valuation`             | 예 (input.requestId)      |
 | `master`       | `items`                              | query    | `master.read`                     | —                         |
+| `master`       | `itemsCsv`                           | query    | `master.read`                     | —                         |
 | `master`       | `item`                               | query    | `master.read`                     | —                         |
 | `master`       | `searchItems`                        | query    | `master.read`                     | —                         |
 | `master`       | `createItem`                         | mutation | `master.write`                    | 예 (input.requestId)      |
@@ -199,6 +206,7 @@
 | `master`       | `itemCategories`                     | query    | `master.read`                     | —                         |
 | `master`       | `createItemCategory`                 | mutation | `master.write`                    | 예 (input.requestId)      |
 | `master`       | `partners`                           | query    | `master.read`                     | —                         |
+| `master`       | `partnersCsv`                        | query    | `master.read`                     | —                         |
 | `master`       | `partner`                            | query    | `master.read`                     | —                         |
 | `master`       | `searchPartners`                     | query    | `master.read`                     | —                         |
 | `master`       | `createPartner`                      | mutation | `master.write`                    | 예 (input.requestId)      |
@@ -246,6 +254,7 @@
 | `report`       | `dashboard`                          | query    | `report.read`                     | —                         |
 | `report`       | `drillDown`                          | query    | `report.read`                     | —                         |
 | `sales`        | `quotations`                         | query    | `sales.read`                      | —                         |
+| `sales`        | `quotationsCsv`                      | query    | `sales.read`                      | —                         |
 | `sales`        | `quotation`                          | query    | `sales.read`                      | —                         |
 | `sales`        | `createQuotation`                    | mutation | `sales.write`                     | 예 (input.requestId)      |
 | `sales`        | `updateQuotation`                    | mutation | `sales.write`                     | 예 (input.requestId)      |
@@ -253,10 +262,12 @@
 | `sales`        | `setQuotationStatus`                 | mutation | `sales.write`                     | 예 (input.requestId)      |
 | `sales`        | `convertQuotationToOrder`            | mutation | `sales.write`                     | 예 (input.requestId)      |
 | `sales`        | `salesOrders`                        | query    | `sales.read`                      | —                         |
+| `sales`        | `salesOrdersCsv`                     | query    | `sales.read`                      | —                         |
 | `sales`        | `salesOrder`                         | query    | `sales.read`                      | —                         |
 | `sales`        | `createSalesOrder`                   | mutation | `sales.write`                     | 예 (input.requestId)      |
 | `sales`        | `cancelSalesOrder`                   | mutation | `sales.write`                     | 예 (input.requestId)      |
 | `sales`        | `salesDocuments`                     | query    | `sales.read`                      | —                         |
+| `sales`        | `salesDocumentsCsv`                  | query    | `sales.read`                      | —                         |
 | `sales`        | `salesDocument`                      | query    | `sales.read`                      | —                         |
 | `sales`        | `createSalesDocument`                | mutation | `sales.write`                     | 예 (input.requestId)      |
 | `sales`        | `updateSalesDocument`                | mutation | `sales.write`                     | 예 (input.requestId)      |
@@ -270,12 +281,15 @@
 | `sales`        | `issueTaxInvoice`                    | mutation | `sales.write`                     | 예 (input.requestId)      |
 | `sales`        | `taxInvoiceHistory`                  | query    | `sales.read`                      | —                         |
 | `sales`        | `purchaseRequests`                   | query    | `purchase.read`                   | —                         |
+| `sales`        | `purchaseRequestsCsv`                | query    | `purchase.read`                   | —                         |
 | `sales`        | `purchaseRequest`                    | query    | `purchase.read`                   | —                         |
 | `sales`        | `createPurchaseRequest`              | mutation | `purchase.write`                  | 예 (input.requestId)      |
 | `sales`        | `convertRequestToOrder`              | mutation | `purchase.write`                  | 예 (input.idempotencyKey) |
 | `sales`        | `purchaseOrders`                     | query    | `purchase.read`                   | —                         |
+| `sales`        | `purchaseOrdersCsv`                  | query    | `purchase.read`                   | —                         |
 | `sales`        | `purchaseOrder`                      | query    | `purchase.read`                   | —                         |
 | `sales`        | `purchaseDocuments`                  | query    | `purchase.read`                   | —                         |
+| `sales`        | `purchaseDocumentsCsv`               | query    | `purchase.read`                   | —                         |
 | `sales`        | `purchaseDocument`                   | query    | `purchase.read`                   | —                         |
 | `sales`        | `createPurchaseDocument`             | mutation | `purchase.write`                  | 예 (input.requestId)      |
 | `sales`        | `confirmPurchaseDocument`            | mutation | `purchase.confirm`                | 예 (input.requestId)      |
@@ -400,6 +414,19 @@
   - `pageSize`: 숫자 (int, min 1, max 200) — 선택, 기본값=50
   - `sortBy`: 문자열 — 선택
   - `sortDir`: enum(asc | desc) — 선택, 기본값='desc'
+  - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+  - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+  - `status`: 문자열 — 선택
+  - `entryType`: enum(TRANSFER | RECEIPT | PAYMENT) — 선택
+  - `accountId`: 문자열 (min 1) — 선택
+  - `divisionId`: 문자열 (min 1) — 선택
+  - `q`: 문자열 (trim, max 200) — 선택
+
+#### `accounting.entriesCsv` — query
+
+- 권한: `accounting.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
   - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
   - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
   - `status`: 문자열 — 선택
@@ -797,6 +824,16 @@
   - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
   - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
 
+#### `approval.inboxCsv` — query
+
+- 권한: `approval.use`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
+  - `inbox`: enum(DRAFTED | PENDING | IN_PROGRESS | COMPLETED | REJECTED | REFERENCE) — 필수
+  - `q`: 문자열 (trim, max 100) — 선택
+  - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+  - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+
 #### `approval.pendingCount` — query
 
 - 권한: `approval.use`
@@ -843,7 +880,25 @@
   - `documentId`: 문자열 (min 1) — 필수
   - `version`: 숫자 (int) — 필수
   - `lineTemplateId`: 문자열 (min 1) — 선택
+  - `lineOverride`: 배열 (min 1, max 20) — 선택
+    배열 원소:
+    - `approverId`: 문자열 (min 1) — 필수
+    - `role`: enum(APPROVE | AGREE | REFERENCE) — 필수
   - `requestId`: 문자열 (uuid) — 필수, 멱등성 키
+
+#### `approval.previewLine` — query
+
+- 권한: `approval.use`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
+  - `documentId`: 문자열 (min 1) — 필수
+
+#### `approval.listApprovers` — query
+
+- 권한: `approval.use`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
+  (입력 없음)
 
 #### `approval.approve` — mutation
 
@@ -1092,6 +1147,15 @@
   - `pageSize`: 숫자 (int, min 1, max 200) — 선택, 기본값=50
   - `sortBy`: 문자열 — 선택
   - `sortDir`: enum(asc | desc) — 선택, 기본값='desc'
+  - `q`: 문자열 (trim) — 선택
+  - `departmentId`: 문자열 (min 1) — 선택
+  - `status`: 문자열 — 선택
+
+#### `hrm.listCsv` — query
+
+- 권한: `hr.self`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
   - `q`: 문자열 (trim) — 선택
   - `departmentId`: 문자열 (min 1) — 선택
   - `status`: 문자열 — 선택
@@ -1620,6 +1684,14 @@
   - `warehouseId`: 문자열 (min 1) — 선택
   - `status`: 문자열 — 선택
 
+#### `inventory.countsCsv` — query
+
+- 권한: `inventory.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
+  - `warehouseId`: 문자열 (min 1) — 선택
+  - `status`: 문자열 — 선택
+
 #### `inventory.count` — query
 
 - 권한: `inventory.read`
@@ -1742,6 +1814,16 @@
   - `taxType`: enum(TAXABLE | ZERO | EXEMPT) — 선택
   - `activeOnly`: 불리언 — 선택, 기본값=true
 
+#### `master.itemsCsv` — query
+
+- 권한: `master.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
+  - `q`: 문자열 (trim, max 100) — 선택
+  - `categoryId`: 문자열 (min 1) — 선택
+  - `taxType`: enum(TAXABLE | ZERO | EXEMPT) — 선택
+  - `activeOnly`: 불리언 — 선택, 기본값=true
+
 #### `master.item` — query
 
 - 권한: `master.read`
@@ -1843,6 +1925,15 @@
   - `pageSize`: 숫자 (int, min 1, max 200) — 선택, 기본값=50
   - `sortBy`: 문자열 — 선택
   - `sortDir`: enum(asc | desc) — 선택, 기본값='desc'
+  - `q`: 문자열 (trim, max 100) — 선택
+  - `partnerType`: enum(CUSTOMER | SUPPLIER | BOTH) — 선택
+  - `activeOnly`: 불리언 — 선택, 기본값=true
+
+#### `master.partnersCsv` — query
+
+- 권한: `master.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
   - `q`: 문자열 (trim, max 100) — 선택
   - `partnerType`: enum(CUSTOMER | SUPPLIER | BOTH) — 선택
   - `activeOnly`: 불리언 — 선택, 기본값=true
@@ -2370,6 +2461,17 @@
   - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
   - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
 
+#### `sales.quotationsCsv` — query
+
+- 권한: `sales.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
+  - `status`: 문자열 — 선택
+  - `partnerId`: 문자열 (min 1) — 선택
+  - `q`: 문자열 (trim, max 200) — 선택
+  - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+  - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+
 #### `sales.quotation` — query
 
 - 권한: `sales.read`
@@ -2473,6 +2575,17 @@
   - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
   - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
 
+#### `sales.salesOrdersCsv` — query
+
+- 권한: `sales.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
+  - `status`: 문자열 — 선택
+  - `partnerId`: 문자열 (min 1) — 선택
+  - `q`: 문자열 (trim, max 200) — 선택
+  - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+  - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+
 #### `sales.salesOrder` — query
 
 - 권한: `sales.read`
@@ -2521,6 +2634,18 @@
   - `pageSize`: 숫자 (int, min 1, max 200) — 선택, 기본값=50
   - `sortBy`: 문자열 — 선택
   - `sortDir`: enum(asc | desc) — 선택, 기본값='desc'
+  - `docType`: enum(SALES | RETURN_SALES) — 선택
+  - `status`: 문자열 — 선택
+  - `partnerId`: 문자열 (min 1) — 선택
+  - `q`: 문자열 (trim, max 200) — 선택
+  - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+  - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+
+#### `sales.salesDocumentsCsv` — query
+
+- 권한: `sales.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
   - `docType`: enum(SALES | RETURN_SALES) — 선택
   - `status`: 문자열 — 선택
   - `partnerId`: 문자열 (min 1) — 선택
@@ -2680,6 +2805,16 @@
   - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
   - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
 
+#### `sales.purchaseRequestsCsv` — query
+
+- 권한: `purchase.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
+  - `status`: 문자열 — 선택
+  - `q`: 문자열 (trim, max 200) — 선택
+  - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+  - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+
 #### `sales.purchaseRequest` — query
 
 - 권한: `purchase.read`
@@ -2740,6 +2875,17 @@
   - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
   - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
 
+#### `sales.purchaseOrdersCsv` — query
+
+- 권한: `purchase.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
+  - `status`: 문자열 — 선택
+  - `partnerId`: 문자열 (min 1) — 선택
+  - `q`: 문자열 (trim, max 200) — 선택
+  - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+  - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+
 #### `sales.purchaseOrder` — query
 
 - 권한: `purchase.read`
@@ -2756,6 +2902,18 @@
   - `pageSize`: 숫자 (int, min 1, max 200) — 선택, 기본값=50
   - `sortBy`: 문자열 — 선택
   - `sortDir`: enum(asc | desc) — 선택, 기본값='desc'
+  - `docType`: enum(PURCHASE | RETURN_PURCHASE) — 선택
+  - `status`: 문자열 — 선택
+  - `partnerId`: 문자열 (min 1) — 선택
+  - `q`: 문자열 (trim, max 200) — 선택
+  - `from`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+  - `to`: 문자열 (regex /^\d{4}-\d{2}-\d{2}$/) — 선택
+
+#### `sales.purchaseDocumentsCsv` — query
+
+- 권한: `purchase.read`
+- 멱등(requestId): 해당 없음 (query)
+- 입력:
   - `docType`: enum(PURCHASE | RETURN_PURCHASE) — 선택
   - `status`: 문자열 — 선택
   - `partnerId`: 문자열 (min 1) — 선택

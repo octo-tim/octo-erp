@@ -194,6 +194,11 @@ export const inventoryRouter = router({
       }),
     ),
 
+  // UIX-03: server-side export — calls stockCount.list itself, same permission and filters.
+  countsCsv: permissionProcedure('inventory.read')
+    .input(z.object({ warehouseId: cuid.optional(), status: z.string().optional() }))
+    .query(({ ctx, input }) => readTx(ctx, (t) => stockCount.listCsv(t, input))),
+
   count: permissionProcedure('inventory.read')
     .input(z.object({ id: cuid }))
     .query(({ ctx, input }) => readTx(ctx, (t) => stockCount.detail(t, input.id))),

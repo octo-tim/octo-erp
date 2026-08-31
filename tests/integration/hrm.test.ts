@@ -171,6 +171,73 @@ describe('HRM-12 / NFR-SEC-06: sensitive data', () => {
   });
 });
 
+describe('UIX-03: server-side CSV export', () => {
+  it('the export never carries a raw 주민등록번호 or bank account — matters most: fails loudly if a raw column is ever added', async () => {
+    const e = await seedEmployee();
+    await runTx(admin, (t) =>
+      employee.setSensitive(t, {
+        employeeId: e.id,
+        residentNo: '900101-1234567',
+        bankName: '국민',
+        bankAccount: '110-123-456789',
+      }),
+    );
+
+    const csvExport = await runTx(admin, (t) => employee.listCsv(t, {}));
+    expect(csvExport.total).toBeGreaterThanOrEqual(1);
+
+    // neither the plaintext nor the normalised (hyphen-stripped) form appears anywhere
+    expect(csvExport.csv).not.toContain('900101-1234567');
+    expect(csvExport.csv).not.toContain('9001011234567');
+    expect(csvExport.csv).not.toContain('110-123-456789');
+    expect(csvExport.csv).not.toContain('110123456789');
+
+    // shape-based guard: no resident-number- or bank-account-shaped value at all, masked or not —
+    // this is what catches a future column added without reading this test
+    expect(csvExport.csv).not.toMatch(/\d{6}-\d{7}/); // 주민등록번호 형식 (마스킹 없이)
+    expect(csvExport.csv).not.toMatch(/\d{3}-\d{2,3}-\d{5,}/); // 계좌번호 형식
+
+    // the header row names no such column either
+    const header = csvExport.csv.split('\r\n')[0]!;
+    expect(header).not.toMatch(/주민|계좌/);
+  });
+
+  it('returns every matching row, not a page, and respects a filter', async () => {
+    const dept = await runTx(admin, (t) =>
+      organization.createDepartment(t, { code: 'EXPDEPT', name: '내보내기부서', validFrom: '2024-01-01' }),
+    );
+    for (let i = 0; i < 10; i++) {
+      await seedEmployee({ name: `내보내기사원${i}`, departmentId: i < 4 ? dept.id : undefined });
+    }
+    const all = await runTx(admin, (t) => employee.listCsv(t, {}));
+    expect(all.total).toBe(10);
+    expect(all.rowCount).toBe(10);
+    expect(all.truncated).toBe(false);
+    expect(all.csv.trim().split('\r\n')).toHaveLength(11);
+    expect(all.csv).toContain('사번');
+
+    const byDept = await runTx(admin, (t) => employee.listCsv(t, { departmentId: dept.id }));
+    expect(byDept.total).toBe(4);
+  });
+
+  it('a user scoped to only their own record does not get another employee in their export', async () => {
+    const mine = await seedEmployee({ name: '본인' });
+    await seedEmployee({ name: '타인' });
+    await prisma.user.update({ where: { username: 'sales9' }, data: { employeeId: mine.id } });
+    const self = await actorFor('sales9');
+
+    const own = await runTx(self, (t) => employee.listCsv(t, {}));
+    expect(own.total).toBe(1);
+    expect(own.csv).toContain('본인');
+    expect(own.csv).not.toContain('타인');
+
+    const admin_all = await runTx(admin, (t) => employee.listCsv(t, {}));
+    expect(admin_all.total).toBe(2);
+
+    await prisma.user.update({ where: { username: 'sales9' }, data: { employeeId: null } });
+  });
+});
+
 describe('HRM-11 / NFR-SEC-04: resignation is atomic with account deactivation', () => {
   it('deactivates the account and kills live sessions in the same transaction', async () => {
     const e = await seedEmployee({ name: '퇴사자' });
