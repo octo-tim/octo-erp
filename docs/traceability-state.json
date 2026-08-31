@@ -279,7 +279,7 @@
     "notes": "20MB 제한, MIME 허용목록+매직바이트, 비공개 저장, 5분 만료 URL"
   },
   "NFR-OPS-01": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/env.ts",
       ".env.example"
@@ -288,10 +288,11 @@
       "tests/unit/crypto.test.ts"
     ],
     "manual": "환경변수 누락 시 부팅 실패 확인",
-    "notes": "APP_ENV로 development/test/staging/production 분리, zod 검증"
+    "notes": "APP_ENV로 development/test/staging/production 분리, zod 검증",
+    "reason": "src/server/env.ts 시험 없음, 근거 시험이 다른 ID"
   },
   "NFR-OPS-02": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "docs": [
       "Dockerfile",
       "railway.json",
@@ -301,7 +302,8 @@
       ".github/workflows/ci.yml (verify, e2e job)"
     ],
     "manual": "CI에서 lint/typecheck/unit/integration/build/traceability 실행",
-    "notes": "웹·워커 동일 이미지, 배포 시 prisma migrate deploy"
+    "notes": "웹·워커 동일 이미지, 배포 시 prisma migrate deploy",
+    "reason": "근거 시험 없음 - 수동 확인만"
   },
   "NFR-OPS-05": {
     "status": "IN_PROGRESS",
@@ -355,7 +357,7 @@
     "notes": "StatusBadge는 색상 외 라벨 병기. 전수 점검은 STEP 11"
   },
   "UIX-07": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/storage/attachment.ts"
     ],
@@ -372,7 +374,8 @@
       "tests/integration/storage.test.ts",
       "tests/e2e/components.spec.ts"
     ],
-    "manual": "권한 없는 첨부 접근 차단, 만료 URL 거부 확인"
+    "manual": "권한 없는 첨부 접근 차단, 만료 URL 거부 확인",
+    "reason": "전표 화면에 첨부 패널 없음, 미리보기 없음"
   },
   "UIX-08": {
     "status": "DONE",
@@ -452,7 +455,8 @@
       "tests/integration/transaction.test.ts",
       "tests/e2e/master.spec.ts"
     ],
-    "manual": "품목 단가 수정 후 변경 이력에 '출고단가: 1000 → 1500'이 새로고침 없이 나타나는지 확인"
+    "manual": "품목 단가 수정 후 변경 이력에 '출고단가: 1000 → 1500'이 새로고침 없이 나타나는지 확인",
+    "gap": "admin.auditLog 미도달, /system/audit 404"
   },
   "DEC-01": {
     "status": "DONE",
@@ -583,7 +587,7 @@
     "notes": "앱+이메일 구현, 메신저 NONE"
   },
   "UIX-03": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "screens": [
       "src/components/ui/data-grid.tsx"
     ],
@@ -591,7 +595,8 @@
       "tests/e2e/components.spec.ts"
     ],
     "manual": "정렬·다중선택·합계·페이징·컬럼설정·엑셀 버튼 확인",
-    "notes": "서버 페이징 전제(페이지당 최대 200). 1만건 전체 전송 없음"
+    "notes": "서버 페이징 전제(페이지당 최대 200). 1만건 전체 전송 없음",
+    "reason": "엑셀 onExport를 넘기는 업무 화면 없음, 가상스크롤 없음"
   },
   "UIX-04": {
     "status": "DONE",
@@ -663,7 +668,7 @@
     "notes": "빈 상태·오류에 다음 행동 안내. 업무 용어 전수 점검은 STEP 11"
   },
   "HRM-01": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/hrm/employee.ts"
     ],
@@ -684,10 +689,11 @@
       "tests/integration/hrm.test.ts",
       "tests/e2e/hrm.spec.ts"
     ],
-    "manual": "사원 등록·수정·자동채번·낙관적 잠금 확인"
+    "manual": "사원 등록·수정·자동채번·낙관적 잠금 확인",
+    "reason": "hrm.update 미도달 - 사원정보 수정 불가"
   },
   "HRM-02": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/hrm/organization.ts"
     ],
@@ -708,10 +714,11 @@
       "tests/integration/hrm.test.ts",
       "tests/e2e/hrm.spec.ts"
     ],
-    "manual": "기준일 변경 시 개편 전후 조직도 재현 확인 (B-15)"
+    "manual": "기준일 변경 시 개편 전후 조직도 재현 확인 (B-15)",
+    "reason": "hrm.createDepartment/reorganize 미도달 - 조직 생성/개편 불가"
   },
   "HRM-03": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/hrm/organization.ts (assign, positionAt)"
     ],
@@ -729,10 +736,11 @@
     "tests": [
       "tests/integration/hrm.test.ts"
     ],
-    "manual": "발령 시 이전 발령 종료·현재값 동기화 확인"
+    "manual": "발령 시 이전 발령 종료·현재값 동기화 확인",
+    "reason": "hrm.assign/positionAt 미도달, /hr/assignments 404"
   },
   "HRM-04": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/hrm/attendance.ts"
     ],
@@ -755,10 +763,11 @@
       "tests/integration/hrm.test.ts"
     ],
     "manual": "체크인·아웃, 엑셀 업로드 행별 오류, 정정신청 확인",
-    "notes": "정정 승인 콜백 연결은 STEP 5"
+    "notes": "정정 승인 콜백 연결은 STEP 5",
+    "reason": "hrm.attendanceUpload 미도달 - 엑셀 업로드 없음"
   },
   "HRM-05": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/hrm/leave-policy.ts",
       "src/server/modules/hrm/leave.ts"
@@ -783,7 +792,8 @@
       "tests/e2e/hrm.spec.ts"
     ],
     "manual": "ADR-0007 승인 계산 예시 전건, 소멸 처리 확인",
-    "notes": "DEC-05 정책 버전 기반. 상수 하드코딩 없음"
+    "notes": "DEC-05 정책 버전 기반. 상수 하드코딩 없음",
+    "reason": "hrm.grantAnnual/grantManual/expireGrants 미도달"
   },
   "HRM-06": {
     "status": "DONE",
@@ -807,7 +817,8 @@
       "tests/integration/hrm.test.ts"
     ],
     "manual": "승인 시 사용원장·근태 반영, 취소 시 반대행 확인",
-    "notes": "결재 연동은 STEP 5에서 콜백으로 연결(E2E-03)"
+    "notes": "결재 연동은 STEP 5에서 콜백으로 연결(E2E-03)",
+    "gap": "hrm.cancelLeave 미도달 - 신청 취소 경로 없음"
   },
   "HRM-07": {
     "status": "DONE",
@@ -828,7 +839,7 @@
     "manual": "연장·야간·휴일 구분과 한도 경고 확인"
   },
   "HRM-08": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/hrm/employee.ts (scheduleContractExpiryNotice)",
       "src/server/modules/storage/attachment.ts"
@@ -848,10 +859,11 @@
       "tests/integration/storage.test.ts",
       "tests/integration/hrm.test.ts"
     ],
-    "manual": "인사서류 권한 접근통제, 계약만료 아웃박스 생성 확인"
+    "manual": "인사서류 권한 접근통제, 계약만료 아웃박스 생성 확인",
+    "reason": "/hr/documents 404, 인용 시험이 HRM-08을 다루지 않음"
   },
   "HRM-09": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/hrm/employee.ts (issueCertificate)"
     ],
@@ -865,7 +877,8 @@
       "tests/integration/hrm.test.ts"
     ],
     "manual": "발급이력 기록과 민감정보 미포함 확인",
-    "notes": "PDF 렌더는 STEP 11 출력 공통화에서 연결"
+    "notes": "PDF 렌더는 STEP 11 출력 공통화에서 연결",
+    "reason": "화면 없음, /hr/certificates 404, PDF 렌더러 없음"
   },
   "HRM-10": {
     "status": "DONE",
@@ -885,7 +898,7 @@
     "manual": "부서·고용형태·근속 분포와 입퇴사 집계 확인"
   },
   "HRM-11": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/hrm/employee.ts (resign)",
       "src/server/modules/auth/service.ts (deactivateUserForEmployee)"
@@ -901,7 +914,8 @@
     "tests": [
       "tests/integration/hrm.test.ts"
     ],
-    "manual": "퇴사 시 계정 비활성·세션 폐기 원자성, 롤백 시 둘 다 원복 확인"
+    "manual": "퇴사 시 계정 비활성·세션 폐기 원자성, 롤백 시 둘 다 원복 확인",
+    "reason": "hrm.resign 미도달 - 퇴사 처리 경로 없음"
   },
   "HRM-12": {
     "status": "DONE",
@@ -928,7 +942,7 @@
     "manual": "마스킹 기본, 사유 필수, 접근이력 기록, 감사로그 원문 없음 확인"
   },
   "HRM-13": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/hrm/employee.ts (me, requestChange, reviewChange)"
     ],
@@ -947,10 +961,11 @@
       "tests/integration/hrm.test.ts",
       "tests/e2e/hrm.spec.ts"
     ],
-    "manual": "본인 정보·근태·연차 조회와 연락처 변경신청 확인"
+    "manual": "본인 정보·근태·연차 조회와 연락처 변경신청 확인",
+    "reason": "hrm.reviewChange 미도달 - 변경신청 처리 경로 없음"
   },
   "APV-01": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/approval/form.ts",
       "src/server/modules/approval/service.ts (activeFormVersion, formSnapshot)"
@@ -971,7 +986,8 @@
       "tests/integration/approval.test.ts",
       "tests/e2e/approval.spec.ts"
     ],
-    "manual": "새 버전 발행 후 기존 문서가 상신 당시 양식으로 재현되는지 확인"
+    "manual": "새 버전 발행 후 기존 문서가 상신 당시 양식으로 재현되는지 확인",
+    "reason": "approval.publishFormVersion 미도달 - 버전 확정 불가"
   },
   "APV-02": {
     "status": "DONE",
@@ -988,7 +1004,7 @@
     "manual": "지출결의·구매요청·품의·계약검토·휴가·근태정정 6종 시드 확인"
   },
   "APV-03": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/approval/line.ts (buildLine, selectLineTemplate)"
     ],
@@ -1010,7 +1026,8 @@
       "tests/integration/approval.test.ts",
       "tests/e2e/approval.spec.ts"
     ],
-    "manual": "순차·병렬합의·참조 구분과 규칙 우선순위 확인"
+    "manual": "순차·병렬합의·참조 구분과 규칙 우선순위 확인",
+    "reason": "ApprovalLineTemplate.editable 미사용, 병렬합의/참조 시험 없음"
   },
   "APV-04": {
     "status": "DONE",
@@ -1066,7 +1083,7 @@
     "notes": "첨부 다건은 AttachmentPanel(UIX-07) 사용"
   },
   "APV-07": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/approval/service.ts (approve, reject, hold, withdraw, resubmit)"
     ],
@@ -1084,7 +1101,8 @@
     "tests": [
       "tests/integration/approval.test.ts"
     ],
-    "manual": "승인·반려·보류·회수·재상신, 순서 밖 결재 차단, 낙관적 잠금 확인"
+    "manual": "승인·반려·보류·회수·재상신, 순서 밖 결재 차단, 낙관적 잠금 확인",
+    "reason": "approval.releaseHold/resubmit 미도달"
   },
   "APV-08": {
     "status": "DONE",
@@ -1148,7 +1166,7 @@
     "manual": "기안·대기·진행·완료·반려·참조함과 미결 배지 확인"
   },
   "APV-11": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/approval/service.ts (notifyPending, longPending)",
       "src/server/modules/notification/service.ts"
@@ -1162,7 +1180,8 @@
       "tests/integration/approval.test.ts"
     ],
     "manual": "요청·승인·반려 알림 생성과 이메일 아웃박스 적재, 장기미결 탐지 확인",
-    "notes": "재시도·실패이력은 아웃박스 워커(INT-10) 공통"
+    "notes": "재시도·실패이력은 아웃박스 워커(INT-10) 공통",
+    "reason": "장기미결 알림 경로에 시험 없음"
   },
   "APV-12": {
     "status": "DONE",
@@ -1189,7 +1208,7 @@
     "notes": "ApprovalActionLog는 append-only"
   },
   "APV-13": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/approval/service.ts (listInbox 조건)",
       "src/server/modules/numbering/service.ts"
@@ -1204,10 +1223,11 @@
       "tests/integration/transaction.test.ts",
       "tests/e2e/approval.spec.ts"
     ],
-    "manual": "양식별 채번(AP-YYYYMM-nnnn)과 다조건 검색 확인"
+    "manual": "양식별 채번(AP-YYYYMM-nnnn)과 다조건 검색 확인",
+    "reason": "양식별 채번 미구현, 다조건 검색 시험 없음"
   },
   "APV-14": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "screens": [
       "src/app/(app)/approval/inbox/page.tsx",
       "src/app/(app)/approval/documents/[id]/page.tsx"
@@ -1215,7 +1235,8 @@
     "tests": [
       "tests/e2e/approval.spec.ts"
     ],
-    "manual": "390px에서 결재함·기안 화면 조작 확인"
+    "manual": "390px에서 결재함·기안 화면 조작 확인",
+    "reason": "근거 E2E가 승인/반려를 수행하지 않음"
   },
   "APV-15": {
     "status": "DONE",
@@ -1567,7 +1588,8 @@
     "tests": [
       "tests/integration/master.test.ts"
     ],
-    "manual": "분류는 3단계까지만 생성되고 품목은 최하위 분류에만 연결되는지 확인"
+    "manual": "분류는 3단계까지만 생성되고 품목은 최하위 분류에만 연결되는지 확인",
+    "gap": "master.createItemCategory 미도달 - 분류 생성은 BAS-07 화면 몫"
   },
   "BAS-03": {
     "status": "DONE",
@@ -1706,7 +1728,8 @@
       "tests/integration/master.test.ts",
       "tests/e2e/master.spec.ts"
     ],
-    "manual": "사용 이력이 있는 마스터는 삭제 버튼이 비활성화되고 사용중지만 가능한지 확인"
+    "manual": "사용 이력이 있는 마스터는 삭제 버튼이 비활성화되고 사용중지만 가능한지 확인",
+    "gap": "master.deletePartner 미도달"
   },
   "INV-01": {
     "status": "DONE",
@@ -1815,7 +1838,7 @@
     "manual": "캐시를 고의로 훼손한 뒤 대조에서 검출되고 재생성으로 복구되는지 확인"
   },
   "INV-05": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/inventory/stock-report.ts (book, bookToCsv)"
     ],
@@ -1836,7 +1859,8 @@
       "tests/e2e/inventory.spec.ts"
     ],
     "manual": "기초·기말과 원천전표 링크, 엑셀 내려받기(UTF-8 BOM)를 확인",
-    "notes": "품목 선택은 마스터 전체를 대상으로 서버 조회한다. 고정 목록은 마스터가 커지면 틀린다 (CR-22)"
+    "notes": "품목 선택은 마스터 전체를 대상으로 서버 조회한다. 고정 목록은 마스터가 커지면 틀린다 (CR-22)",
+    "reason": "inventory.bookCsv 미도달 - 엑셀 출력 없음"
   },
   "INV-06": {
     "status": "DONE",
@@ -1863,7 +1887,7 @@
     "manual": "동시 출고 경쟁시험에서 한 건만 성공하는지, 경고 모드 전환 시 SecurityEvent가 남는지 확인"
   },
   "INV-07": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/inventory/safety-stock.ts",
       "src/server/modules/notification/service.ts",
@@ -1887,7 +1911,8 @@
       "tests/integration/inventory.test.ts",
       "tests/e2e/inventory.spec.ts"
     ],
-    "manual": "미달 발생 시 앱·이메일 알림이 하루 1건으로 묶이는지, 재시도 이력이 남는지 확인"
+    "manual": "미달 발생 시 앱·이메일 알림이 하루 1건으로 묶이는지, 재시도 이력이 남는지 확인",
+    "reason": "inventory.safetyStock 미도달 - 근거 API 전부 화면 미연결"
   },
   "INV-08": {
     "status": "DONE",
@@ -2036,7 +2061,8 @@
       "tests/integration/accounting.test.ts",
       "tests/e2e/accounting.spec.ts"
     ],
-    "manual": "표준 계정과목의 명칭 변경·삭제가 거부되고, 하위 계정이 생기면 상위 계정이 전기 불가로 바뀌는지 확인"
+    "manual": "표준 계정과목의 명칭 변경·삭제가 거부되고, 하위 계정이 생기면 상위 계정이 전기 불가로 바뀌는지 확인",
+    "gap": "accounting.deleteAccount 미도달 - 요구는 사용중지이므로 유지"
   },
   "ACC-02": {
     "status": "DONE",
@@ -2065,10 +2091,11 @@
       "tests/integration/accounting.test.ts",
       "tests/e2e/accounting.spec.ts"
     ],
-    "manual": "불균형·양변 동시입력·0원 라인이 각각 다른 사유로 거부되는지, 화면에서 차액이 저장 전에 보이는지 확인"
+    "manual": "불균형·양변 동시입력·0원 라인이 각각 다른 사유로 거부되는지, 화면에서 차액이 저장 전에 보이는지 확인",
+    "gap": "accounting.updateEntry 미도달 - 작성 전표 화면 정정 불가"
   },
   "ACC-03": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/accounting/posting-rule.ts (DEFAULT_TEMPLATES, versionFor, publish, post, preview)",
       "src/server/modules/accounting/account.ts (MAPPING_SLOTS, resolveSlot)",
@@ -2096,7 +2123,8 @@
       "tests/integration/integration.test.ts"
     ],
     "manual": "규칙 새 버전을 발행해도 기존 분개가 그대로인지, 부가세 0인 매출이 빈 라인을 만들지 않는지 확인",
-    "notes": "DEC-03 수동전표 규칙이 실제로 적용된다"
+    "notes": "DEC-03 수동전표 규칙이 실제로 적용된다",
+    "reason": "accounting.publishPostingRule 미도달 - 규칙 버전 확정 불가"
   },
   "ACC-04": {
     "status": "DONE",
@@ -2219,10 +2247,11 @@
       "tests/integration/accounting.test.ts",
       "tests/e2e/accounting.spec.ts"
     ],
-    "manual": "B-01: 마감기간 전표 거부, period.reopen 권한자만 사유 입력 후 해제, 해제 사유가 감사로그에 남는지 확인. 연 마감 후 손익 계정은 이월되지 않고 재무상태 계정만 이월되는지 확인"
+    "manual": "B-01: 마감기간 전표 거부, period.reopen 권한자만 사유 입력 후 해제, 해제 사유가 감사로그에 남는지 확인. 연 마감 후 손익 계정은 이월되지 않고 재무상태 계정만 이월되는지 확인",
+    "gap": "accounting.openingBalances 미도달 - 기초잔액 입력 화면 없음"
   },
   "ACC-09": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/accounting/report.ts (trialBalanceToCsv, accountLedgerToCsv, INTERNAL_NOTICE)"
     ],
@@ -2243,10 +2272,11 @@
       "tests/integration/accounting.test.ts",
       "tests/e2e/accounting.spec.ts"
     ],
-    "manual": "모든 회계 화면과 내보내기 파일에 내부관리용 표시가 나타나는지 확인"
+    "manual": "모든 회계 화면과 내보내기 파일에 내부관리용 표시가 나타나는지 확인",
+    "reason": "accounting.accountLedgerCsv 미도달 - 원장 엑셀 없음"
   },
   "SLS-01": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/sales/quotation.ts (create, update, copy, setStatus, list, detail)",
       "src/server/modules/sales/pricing.ts (priceLines)",
@@ -2275,7 +2305,8 @@
       "tests/unit/item-match.test.ts"
     ],
     "manual": "견적서 복사 후 유효기간과 단가가 그대로 넘어오는지, 만료된 견적이 주문으로 넘어가지 않는지 확인",
-    "notes": "유효기간 경과 견적은 EXPIRED로 표시되고 전환이 거부된다"
+    "notes": "유효기간 경과 견적은 EXPIRED로 표시되고 전환이 거부된다",
+    "reason": "sales.updateQuotation 미도달 - 견적 수정 경로 없음"
   },
   "SLS-02": {
     "status": "DONE",
@@ -2323,7 +2354,8 @@
       "tests/integration/sales.test.ts",
       "tests/e2e/sales.spec.ts"
     ],
-    "manual": "이미 출고된 주문의 취소가 거부되고, 취소 시 견적 잔여수량이 되돌아오는지 확인"
+    "manual": "이미 출고된 주문의 취소가 거부되고, 취소 시 견적 잔여수량이 되돌아오는지 확인",
+    "gap": "sales.createSalesOrder 미도달 - 직접 등록 경로 없음, 전환만 가능"
   },
   "SLS-04": {
     "status": "DONE",
@@ -2349,7 +2381,7 @@
     "manual": "부분 출고 시 주문 상태가 PARTIAL, 전량 출고 시 COMPLETE로 바뀌는지 확인"
   },
   "SLS-05": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/sales/sales-document.ts (create, update, confirm, cancel)",
       "src/server/modules/sales/receivable.ts (raise, reverse)",
@@ -2371,7 +2403,7 @@
     "tables": [
       "SalesDocument",
       "SalesDocumentLine",
-      "OpenItem"
+      "Receivable / Payable"
     ],
     "tests": [
       "tests/integration/sales.test.ts",
@@ -2380,7 +2412,8 @@
       "tests/integration/integration.test.ts"
     ],
     "manual": "B-02 확정 한 번에 재고·채권·분개·감사로그가 함께 남고, 어느 하나가 실패하면 전부 남지 않는지 확인",
-    "notes": "E2E-01. 확정은 멱등키 뒤에서 한 트랜잭션으로 수행되며 여신한도와 DEC-03 결재 게이트를 통과해야 한다"
+    "notes": "E2E-01. 확정은 멱등키 뒤에서 한 트랜잭션으로 수행되며 여신한도와 DEC-03 결재 게이트를 통과해야 한다",
+    "reason": "sales.updateSalesDocument 미도달 - 전표 정정 경로 없음"
   },
   "SLS-06": {
     "status": "DONE",
@@ -2403,7 +2436,7 @@
     "tables": [
       "PurchaseDocument",
       "PurchaseDocumentLine",
-      "OpenItem"
+      "Receivable / Payable"
     ],
     "tests": [
       "tests/integration/sales.test.ts",
@@ -2414,7 +2447,7 @@
     "manual": "E2E-02 발주에서 입고까지 재고 수량과 이동평균 단가, 미지급금이 함께 반영되는지 확인"
   },
   "SLS-07": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/sales/tax-invoice.ts (build, render, issue, history)"
     ],
@@ -2434,7 +2467,8 @@
       "tests/e2e/sales.spec.ts"
     ],
     "manual": "발행 서식에 국세청 미전송 고지 문구가 항상 보이는지, 발행 이력이 남는지 확인",
-    "notes": "사내 관리용 서식이며 전자세금계산서 전송은 범위 밖이다. 이메일 발송은 아웃박스를 거쳐 중복 발송되지 않는다"
+    "notes": "사내 관리용 서식이며 전자세금계산서 전송은 범위 밖이다. 이메일 발송은 아웃박스를 거쳐 중복 발송되지 않는다",
+    "reason": "sales.taxInvoice/taxInvoiceHistory 미도달 - 화면 없음"
   },
   "SLS-08": {
     "status": "DONE",
@@ -2450,7 +2484,7 @@
       "src/app/(app)/settlement/receivables/page.tsx"
     ],
     "tables": [
-      "OpenItem"
+      "Receivable / Payable"
     ],
     "tests": [
       "tests/unit/sales-pricing.test.ts",
@@ -2472,7 +2506,7 @@
       "src/app/(app)/settlement/payables/page.tsx"
     ],
     "tables": [
-      "OpenItem"
+      "Receivable / Payable"
     ],
     "tests": [
       "tests/integration/sales.test.ts",
@@ -2502,7 +2536,7 @@
     ],
     "tables": [
       "Settlement",
-      "SettlementAllocation"
+      "SettlementMatch"
     ],
     "tests": [
       "tests/integration/sales.test.ts",
@@ -2536,7 +2570,7 @@
     "notes": "반품은 음수 매출이 아니라 별도 문서유형이며 원전표 라인에 연결된다"
   },
   "SLS-12": {
-    "status": "DONE",
+    "status": "NOT_VERIFIED",
     "services": [
       "src/server/modules/sales/sales-document.ts (create, confirm 기간검증)",
       "src/server/modules/accounting/period.ts (assertOpen)"
@@ -2557,7 +2591,8 @@
       "tests/e2e/accounting.spec.ts"
     ],
     "manual": "B-01 마감된 기간의 전표 등록과 확정이 모두 거부되는지 확인",
-    "notes": "DEC-04. 마감 검증은 확정뿐 아니라 등록 시점에도 수행한다"
+    "notes": "DEC-04. 마감 검증은 확정뿐 아니라 등록 시점에도 수행한다",
+    "reason": "근거 화면 accounting/periods 부재, E2E에 해당 시험 없음"
   },
   "SLS-13": {
     "status": "DONE",
@@ -2861,7 +2896,8 @@
     "tests": [
       "tests/integration/migration.test.ts",
       "tests/e2e/migration.spec.ts"
-    ]
+    ],
+    "gap": "migration.reconcile 미도달 - 이관 대사를 화면에서 실행할 수 없음"
   },
   "MIG-02": {
     "status": "DONE",
@@ -2888,7 +2924,8 @@
     "tests": [
       "tests/integration/migration.test.ts",
       "tests/e2e/migration.spec.ts"
-    ]
+    ],
+    "gap": "migration.reconcile 미도달 - 이관 대사를 화면에서 실행할 수 없음"
   },
   "MIG-03": {
     "status": "DONE",
@@ -2916,7 +2953,8 @@
     "tests": [
       "tests/integration/migration.test.ts",
       "tests/e2e/migration.spec.ts"
-    ]
+    ],
+    "gap": "migration.reconcile 미도달 - 이관 대사를 화면에서 실행할 수 없음"
   },
   "MIG-04": {
     "status": "DONE",
@@ -2943,7 +2981,8 @@
     "tests": [
       "tests/integration/migration.test.ts",
       "tests/e2e/migration.spec.ts"
-    ]
+    ],
+    "gap": "migration.reconcile 미도달 - 이관 대사를 화면에서 실행할 수 없음"
   },
   "MIG-05": {
     "status": "DONE",
@@ -2969,7 +3008,8 @@
     "tests": [
       "tests/integration/migration.test.ts",
       "tests/e2e/migration.spec.ts"
-    ]
+    ],
+    "gap": "migration.reconcile 미도달 - 이관 대사를 화면에서 실행할 수 없음"
   },
   "MIG-06": {
     "status": "DONE",
@@ -2997,7 +3037,8 @@
     "tests": [
       "tests/integration/migration.test.ts",
       "tests/e2e/migration.spec.ts"
-    ]
+    ],
+    "gap": "migration.reconcile 미도달 - 이관 대사를 화면에서 실행할 수 없음"
   },
   "MIG-07": {
     "status": "DONE",
@@ -3024,7 +3065,8 @@
     "tests": [
       "tests/integration/migration.test.ts",
       "tests/e2e/migration.spec.ts"
-    ]
+    ],
+    "gap": "migration.reconcile 미도달 - 이관 대사를 화면에서 실행할 수 없음"
   },
   "MIG-08": {
     "status": "DONE",
@@ -3051,7 +3093,8 @@
     "tests": [
       "tests/integration/migration.test.ts",
       "tests/e2e/migration.spec.ts"
-    ]
+    ],
+    "gap": "migration.reconcile 미도달 - 이관 대사를 화면에서 실행할 수 없음"
   },
   "MIG-09": {
     "status": "DONE",
@@ -3080,6 +3123,7 @@
     "tests": [
       "tests/integration/migration.test.ts",
       "tests/e2e/migration.spec.ts"
-    ]
+    ],
+    "gap": "migration.reconcile 미도달 - 이관 대사를 화면에서 실행할 수 없음"
   }
 }
