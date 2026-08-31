@@ -70,7 +70,7 @@ test('HRM-12 / NFR-SEC-06: 민감정보는 마스킹되고 원문 조회에 사�
   await panel.getByRole('button', { name: '저장' }).click();
 
   // masked by default, plaintext never rendered
-  await expect(panel.getByText('******-4******')).toBeVisible();
+  await expect(panel.getByText('******-1******')).toBeVisible();
   await expect(page.getByText('900101-1234567')).toBeHidden();
 
   // reveal requires a reason of at least 5 characters

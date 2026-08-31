@@ -438,6 +438,10 @@ describe('ACC-03: automatic posting from a source document', () => {
       include: { lines: { include: { account: true } } },
     });
     const beforeCodes = before.lines.map((l) => l.account.code).sort();
+    // decimal amounts as strings, never through Number()/parseFloat — this is money
+    const beforeAmounts = before.lines
+      .map((l) => ({ code: l.account.code, debit: l.debit.toString(), credit: l.credit.toString() }))
+      .sort((a, b) => a.code.localeCompare(b.code));
 
     // publish a new version that books receipts to cash instead of the bank
     await runTx(admin, (t) =>
@@ -456,6 +460,12 @@ describe('ACC-03: automatic posting from a source document', () => {
       include: { lines: { include: { account: true } } },
     });
     expect(after.lines.map((l) => l.account.code).sort()).toEqual(beforeCodes);
+    const afterAmounts = after.lines
+      .map((l) => ({ code: l.account.code, debit: l.debit.toString(), credit: l.credit.toString() }))
+      .sort((a, b) => a.code.localeCompare(b.code));
+    expect(afterAmounts).toEqual(beforeAmounts);
+    // the entry keeps pointing at the version it was actually posted under
+    expect(after.postingRuleVersionId).toBe(before.postingRuleVersionId);
 
     // a July receipt uses the new version
     await runTx(admin, (t) =>
@@ -779,6 +789,59 @@ describe('ACC-09: export carries the internal-use notice', () => {
     expect(csv).toContain('내부 관리용');
     expect(csv).toContain('기초');
     expect(csv).toContain('기말');
+  });
+
+  it('the account ledger CSV has one row per ledger line, with amounts matching the query exactly', async () => {
+    // an 18-digit amount, well past Number.MAX_SAFE_INTEGER: a float round-trip would corrupt it
+    const big = '123456789012345678';
+    await post([
+      { accountId: acc['110']!, debit: big },
+      { accountId: acc['401']!, credit: big },
+    ]);
+    await post([
+      { accountId: acc['102']!, debit: '3000' },
+      { accountId: acc['110']!, credit: '3000' },
+    ]);
+
+    const ledger = await runTx(admin, (t) =>
+      report.accountLedger(t, { accountId: acc['110']!, from: '2026-06-01', to: '2026-06-30' }),
+    );
+    expect(ledger.rows).toHaveLength(2);
+
+    const csv = report.accountLedgerToCsv(ledger);
+    const lines = csv.split('\n');
+    const headerIdx = lines.findIndex((l) => l.startsWith('일자,'));
+    expect(lines[headerIdx]!.split(',')).toEqual([
+      '일자',
+      '전표번호',
+      '적요',
+      '상대계정',
+      '거래처',
+      '부문',
+      '차변',
+      '대변',
+      '잔액',
+    ]);
+
+    // exactly the header's opening line, one row per ledger row, then the closing line
+    const dataLines = lines.slice(headerIdx + 1);
+    expect(dataLines).toHaveLength(ledger.rows.length + 2);
+
+    ledger.rows.forEach((row, i) => {
+      const cols = dataLines[i + 1]!.split(',');
+      // string equality, never Number()/parseFloat: that is exactly the bug this guards
+      expect(cols[6]).toBe(row.debit);
+      expect(cols[7]).toBe(row.credit);
+      expect(cols[8]).toBe(row.balance);
+    });
+
+    const closingCols = dataLines[dataLines.length - 1]!.split(',');
+    expect(closingCols[6]).toBe(ledger.totalDebit);
+    expect(closingCols[7]).toBe(ledger.totalCredit);
+    expect(closingCols[8]).toBe(ledger.closing);
+
+    // the large amount survives character-for-character
+    expect(csv).toContain(big);
   });
 });
 

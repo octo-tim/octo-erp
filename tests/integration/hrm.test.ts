@@ -318,7 +318,15 @@ describe('HRM-04 / HRM-07: attendance', () => {
     expect(result.applied).toBe(1);
     expect(result.errors).toHaveLength(3);
     expect(result.errors.map((x) => x.row)).toEqual([2, 3, 4]);
+    // the unknown 사번 row's message names the offending value, not just a generic failure
+    expect(result.errors[0]!.message).toContain('NOPE');
+    expect(result.errors[0]!.message).toContain('사원이 없습니다');
     expect(await prisma.attendance.count({ where: { employeeId: e.id } })).toBe(1);
+
+    // the valid row's data actually landed, not merely counted
+    const applied = await prisma.attendance.findFirstOrThrow({ where: { employeeId: e.id } });
+    expect(applied.source).toBe('UPLOAD');
+    expect(applied.checkIn).not.toBeNull();
   });
 
   it('a correction is only reflected once approved', async () => {

@@ -187,7 +187,10 @@ test('INV-07: 안전재고 미달이 재고현황에서 강조된다', async ({ 
   await page.goto('/inventory/status');
   await page.getByLabel('검색어').fill(name);
   await page.getByRole('button', { name: '조회' }).click();
-  await expect(page.locator('tbody tr', { hasText: name })).toContainText('미달');
+  // The item now appears in two tables: the 안전재고 미달 summary card added for INV-07 and
+  // the per-warehouse grid. The claim under test is that the shortfall is called out, so
+  // assert a row for this item says so rather than matching whichever table comes first.
+  await expect(page.locator('tbody tr', { hasText: name }).filter({ hasText: '미달' })).not.toHaveCount(0);
 });
 
 test('INV-08: 실사 차이를 승인하면 조정전표가 생성된다', async ({ page }) => {

@@ -446,6 +446,56 @@ describe('INV-05: the stock book', () => {
     expect(csv).toContain('기초');
     expect(csv).toContain('기말');
   });
+
+  it('the CSV has one row per movement, with amounts matching the book exactly', async () => {
+    const id = await makeItem('수불부검증품');
+    // fractional quantities exercise the 3-decimal quantity strings, not just amounts
+    await receipt(id, '7.500', '12345', { docDate: '2026-06-10' });
+    await issue(id, '2.250', { docDate: '2026-06-20' });
+
+    const book = await runTx(admin, (t) =>
+      report.book(t, { itemId: id, from: '2026-06-01', to: '2026-06-30' }),
+    );
+    expect(book.rows).toHaveLength(2);
+
+    const csv = report.bookToCsv(book);
+    const lines = csv.split('\n');
+    expect(lines[0]!.split(',')).toEqual([
+      '일자',
+      '전표번호',
+      '구분',
+      '창고',
+      '사유',
+      '입고수량',
+      '출고수량',
+      '입고금액',
+      '출고금액',
+      '재고수량',
+      '재고금액',
+    ]);
+
+    // header + opening line + one row per movement + closing line
+    expect(lines).toHaveLength(book.rows.length + 3);
+
+    book.rows.forEach((row, i) => {
+      const cols = lines[i + 2]!.split(',');
+      // string equality, never Number()/parseFloat: that is exactly the bug this guards
+      expect(cols[5]).toBe(row.inQty);
+      expect(cols[6]).toBe(row.outQty);
+      expect(cols[7]).toBe(row.inAmount);
+      expect(cols[8]).toBe(row.outAmount);
+      expect(cols[9]).toBe(row.balanceQty);
+      expect(cols[10]).toBe(row.balanceAmount);
+    });
+
+    const closingCols = lines[lines.length - 1]!.split(',');
+    expect(closingCols[5]).toBe(book.totals.inQty);
+    expect(closingCols[6]).toBe(book.totals.outQty);
+    expect(closingCols[7]).toBe(book.totals.inAmount);
+    expect(closingCols[8]).toBe(book.totals.outAmount);
+    expect(closingCols[9]).toBe(book.closing.quantity);
+    expect(closingCols[10]).toBe(book.closing.amount);
+  });
 });
 
 describe('INV-07: safety stock', () => {

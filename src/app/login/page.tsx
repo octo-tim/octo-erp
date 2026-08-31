@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -29,11 +27,18 @@ export default function LoginPage() {
       setError(data.message ?? '로그인에 실패했습니다.');
       return;
     }
-    // A temporary password must be replaced before the user goes anywhere else. The login
-    // response has always carried this flag and nothing read it, so an admin reset left the
-    // user on a password the admin knows, with no screen to change it.
-    router.push(data.mustChangePassword ? '/account?force=1' : '/home');
-    router.refresh();
+    /**
+     * A temporary password must be replaced before the user goes anywhere else. The login
+     * response has always carried this flag and nothing read it, so an admin reset left the
+     * user on a password the admin knows, with no screen to change it.
+     *
+     * A full page load rather than router.push: the client query cache still holds the
+     * previous identity, and a client-side navigation would carry it into the new session —
+     * a user who had just replaced a temporary password was bounced straight back to the
+     * password screen by their own stale `auth.me`. Who is signed in is not something to
+     * serve from cache across a login.
+     */
+    window.location.assign(data.mustChangePassword ? '/account?force=1' : '/home');
   }
 
   return (

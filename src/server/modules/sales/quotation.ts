@@ -103,10 +103,26 @@ export async function update(ctx: TransactionContext, id: string, input: Quotati
   requirePermission(ctx.actor, 'sales.write');
   const before = await ctx.tx.quotation.findUniqueOrThrow({ where: { id } });
   assertVersion('견적서', before.version, version);
-  if (before.status === 'CONVERTED' || before.status === 'CANCELED') {
+  /**
+   * INT-03: only a draft is editable.
+   *
+   * This used to name CONVERTED and CANCELED and stop there, which let a CONFIRMED quotation
+   * — one already sent to the customer — have its lines and totals rewritten in place, with
+   * no trace on the document that the figures the customer holds are no longer the figures
+   * on file. EXPIRED had the same hole. Listing what may not be edited leaves every status
+   * added later editable by default; listing what may be is the safer direction.
+   */
+  if (before.status !== 'DRAFT') {
+    const label: Record<string, string> = {
+      CONVERTED: '전환된',
+      CANCELED: '취소된',
+      CONFIRMED: '확정된',
+      EXPIRED: '만료된',
+    };
     throw new AppError(
       'IMMUTABLE',
-      `${before.status === 'CONVERTED' ? '전환된' : '취소된'} 견적서는 수정할 수 없습니다.`,
+      `${label[before.status] ?? `${before.status} 상태의`} 견적서는 수정할 수 없습니다. 복사해서 새로 작성하세요.`,
+      { status: before.status },
     );
   }
 

@@ -99,7 +99,9 @@ test('APV-01: 결재양식 화면이 항목 스키마와 버전을 보여준다'
 test('APV-04: 결재선·전결 화면에서 대결을 설정하고 해제한다', async ({ page }) => {
   await page.goto('/approval/lines');
   await expect(page.getByRole('heading', { name: '결재선·전결', level: 1 })).toBeVisible();
-  await expect(page.getByText('기본 결재선 (부서장 → 대표)')).toBeVisible();
+  // .first(): the template name now also appears in the 결재선 규칙 table added for APV-03,
+  // so this must name the template card rather than matching anywhere on the page.
+  await expect(page.getByText('기본 결재선 (부서장 → 대표)').first()).toBeVisible();
   await expect(page.getByText('기안자 부서장')).toBeVisible();
   await expect(page.getByText('3,000,000')).toBeVisible();
 

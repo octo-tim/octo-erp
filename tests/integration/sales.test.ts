@@ -889,4 +889,254 @@ describe('SLS-01: 견적서', () => {
       ),
     ).rejects.toThrow(/이미 주문으로 전환된/);
   });
+
+  it('DRAFT 견적서를 수정하면 라인과 공급가액·세액이 새로 계산된다', async () => {
+    const q = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        title: '수정 전',
+        lines: [{ itemId: itemA, quantity: '2', unitPrice: '10000', taxType: 'TAXABLE' }],
+      }),
+    );
+    expect(q.supplyAmount.toString()).toBe('20000');
+    expect(q.vatAmount.toString()).toBe('2000');
+
+    const updated = await runTx(admin, (t) =>
+      quotation.update(
+        t,
+        q.id,
+        {
+          partnerId: customerId,
+          title: '수정 후',
+          lines: [
+            { itemId: itemA, quantity: '3', unitPrice: '10000', taxType: 'TAXABLE' },
+            { itemId: itemB, quantity: '2', unitPrice: '5000', taxType: 'EXEMPT' },
+          ],
+        },
+        q.version,
+      ),
+    );
+
+    expect(updated.version).toBe(q.version + 1);
+    expect(updated.title).toBe('수정 후');
+    // 3 x 10,000 taxable (+10% vat) plus 2 x 5,000 exempt (no vat)
+    expect(updated.supplyAmount.toString()).toBe('40000');
+    expect(updated.vatAmount.toString()).toBe('3000');
+    expect(updated.totalAmount.toString()).toBe('43000');
+
+    const detail = await runTx(admin, (t) => quotation.detail(t, q.id));
+    expect(detail.lines).toHaveLength(2);
+    expect(detail.lines[0]!.quantity.toString()).toBe('3');
+    expect(detail.lines[1]!.quantity.toString()).toBe('2');
+  });
+
+  it('오래된 버전으로 견적서를 수정하면 VERSION_CONFLICT로 거부된다', async () => {
+    const q = await runTx(admin, (t) =>
+      quotation.create(t, {
+        partnerId: customerId,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+      }),
+    );
+    // someone else's edit lands first and bumps the version
+    await runTx(admin, (t) =>
+      quotation.update(
+        t,
+        q.id,
+        { partnerId: customerId, lines: [{ itemId: itemA, quantity: '2', unitPrice: '1000' }] },
+        q.version,
+      ),
+    );
+
+    await expect(
+      runTx(admin, (t) =>
+        quotation.update(
+          t,
+          q.id,
+          { partnerId: customerId, lines: [{ itemId: itemA, quantity: '5', unitPrice: '1000' }] },
+          q.version, // stale: the real version is now q.version + 1
+        ),
+      ),
+    ).rejects.toThrow(/다른 사용자에 의해 변경/);
+  });
+
+  /**
+   * INT-03. The guard used to name CONVERTED and CANCELED only, so a quotation already
+   * confirmed and sent to the customer could have its lines and totals rewritten in place —
+   * the customer's copy and the stored copy would disagree with nothing recording that they
+   * ever did. EXPIRED had the same hole.
+   */
+  it('확정·만료된 견적서는 수정할 수 없다', async () => {
+    for (const status of ['CONFIRMED', 'EXPIRED'] as const) {
+      const q = await runTx(admin, (t) =>
+        quotation.create(t, {
+          partnerId: customerId,
+          lines: [{ itemId: itemA, quantity: '1', unitPrice: '1000' }],
+        }),
+      );
+      await runTx(admin, (t) => quotation.setStatus(t, q.id, 'CONFIRMED', q.version));
+      let current = await runTx(admin, (t) => quotation.detail(t, q.id));
+      if (status === 'EXPIRED') {
+        await runTx(admin, (t) => quotation.setStatus(t, q.id, 'EXPIRED', current.version));
+        current = await runTx(admin, (t) => quotation.detail(t, q.id));
+      }
+
+      await expect(
+        runTx(admin, (t) =>
+          quotation.update(
+            t,
+            q.id,
+            { partnerId: customerId, lines: [{ itemId: itemA, quantity: '99', unitPrice: '1' }] },
+            current.version,
+          ),
+        ),
+      ).rejects.toThrow(/수정할 수 없습니다/);
+
+      // and the stored figures are untouched by the attempt
+      const after = await runTx(admin, (t) => quotation.detail(t, q.id));
+      expect(after.lines).toHaveLength(1);
+      expect(after.lines[0]!.quantity.toString()).toBe('1');
+      expect(after.totalAmount.toString()).toBe(current.totalAmount.toString());
+    }
+  });
+});
+
+describe('SLS-05: 매출전표 수정', () => {
+  it('DRAFT 전표를 수정하면 라인과 합계가 새로 계산된다', async () => {
+    await stockUp(itemA, '20', '10000');
+    const doc = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        lines: [{ itemId: itemA, quantity: '2', unitPrice: '50000', taxType: 'TAXABLE' }],
+      }),
+    );
+    expect(doc.totalAmount.toString()).toBe('110000');
+
+    const updated = await runTx(admin, (t) =>
+      salesDocument.update(
+        t,
+        doc.id,
+        {
+          partnerId: customerId,
+          warehouseId,
+          lines: [{ itemId: itemA, quantity: '3', unitPrice: '50000', taxType: 'TAXABLE' }],
+        },
+        doc.version,
+      ),
+    );
+
+    expect(updated.version).toBe(doc.version + 1);
+    expect(updated.supplyAmount.toString()).toBe('150000');
+    expect(updated.vatAmount.toString()).toBe('15000');
+    expect(updated.totalAmount.toString()).toBe('165000');
+    expect(updated.lines).toHaveLength(1);
+    expect(updated.lines[0]!.quantity.toString()).toBe('3');
+  });
+
+  it('확정된 전표는 수정할 수 없다', async () => {
+    await stockUp(itemA, '10', '10000');
+    const doc = await sale('2026-06-01', '1', '50000');
+    const confirmed = await prisma.salesDocument.findUniqueOrThrow({ where: { id: doc.id } });
+
+    await expect(
+      runTx(admin, (t) =>
+        salesDocument.update(
+          t,
+          doc.id,
+          {
+            partnerId: customerId,
+            warehouseId,
+            lines: [{ itemId: itemA, quantity: '2', unitPrice: '50000' }],
+          },
+          confirmed.version,
+        ),
+      ),
+    ).rejects.toThrow(/작성 중인 전표만/);
+  });
+
+  it('오래된 버전으로 수정하면 VERSION_CONFLICT로 거부된다', async () => {
+    await stockUp(itemA, '10', '10000');
+    const doc = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        lines: [{ itemId: itemA, quantity: '1', unitPrice: '50000' }],
+      }),
+    );
+    await runTx(admin, (t) =>
+      salesDocument.update(
+        t,
+        doc.id,
+        { partnerId: customerId, warehouseId, lines: [{ itemId: itemA, quantity: '2', unitPrice: '50000' }] },
+        doc.version,
+      ),
+    );
+
+    await expect(
+      runTx(admin, (t) =>
+        salesDocument.update(
+          t,
+          doc.id,
+          {
+            partnerId: customerId,
+            warehouseId,
+            lines: [{ itemId: itemA, quantity: '3', unitPrice: '50000' }],
+          },
+          doc.version, // stale: the real version is now doc.version + 1
+        ),
+      ),
+    ).rejects.toThrow(/다른 사용자에 의해 변경/);
+  });
+
+  it('주문에서 만든 전표를 수정해도 원천 라인의 잔여수량이 이중 반영되지 않는다', async () => {
+    await stockUp(itemA, '20', '10000');
+    const order = await runTx(admin, (t) =>
+      salesOrder.create(t, {
+        partnerId: customerId,
+        lines: [{ itemId: itemA, quantity: '10', unitPrice: '50000' }],
+      }),
+    );
+    const doc = await runTx(admin, (t) =>
+      salesDocument.create(t, {
+        partnerId: customerId,
+        warehouseId,
+        lines: [{ itemId: itemA, quantity: '6', unitPrice: '50000', sourceLineId: order.lines[0]!.id }],
+      }),
+    );
+    const afterCreate = await runTx(admin, (t) => salesOrder.detail(t, order.id));
+    expect(afterCreate.lines[0]!.remaining).toBe('4.000');
+
+    // correcting the quantity from 6 to 7 releases the old reservation before making a new one
+    const updated = await runTx(admin, (t) =>
+      salesDocument.update(
+        t,
+        doc.id,
+        {
+          partnerId: customerId,
+          warehouseId,
+          lines: [{ itemId: itemA, quantity: '7', unitPrice: '50000', sourceLineId: order.lines[0]!.id }],
+        },
+        doc.version,
+      ),
+    );
+
+    const afterUpdate = await runTx(admin, (t) => salesOrder.detail(t, order.id));
+    // 10 - 7, never 10 - 6 - 7: the first reservation must not still be counted
+    expect(afterUpdate.lines[0]!.remaining).toBe('3.000');
+    expect(afterUpdate.status).toBe('IN_PROGRESS');
+    expect(updated.lines[0]!.quantity.toString()).toBe('7');
+
+    // exactly one active reservation lives against this order line and document
+    const active = await prisma.documentConversion.count({
+      where: {
+        sourceType: 'SALES_ORDER',
+        sourceId: order.id,
+        sourceLineId: order.lines[0]!.id,
+        targetType: 'SALES',
+        targetId: doc.id,
+        canceledAt: null,
+      },
+    });
+    expect(active).toBe(1);
+  });
 });
