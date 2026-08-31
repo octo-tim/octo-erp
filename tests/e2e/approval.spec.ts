@@ -135,7 +135,9 @@ test('APV-14: 모바일에서 결재를 승인하고 반려한다', async ({ pag
 
   const suffix = Date.now().toString().slice(-8);
   const approverUsername = `mobile-appr-${suffix}`;
-  const approverDisplayName = '모바일 승인자';
+  // unique per run: the account is left behind, so a fixed name would match several options
+  // in the approver picker on the second run and the selection would be ambiguous.
+  const approverDisplayName = `모바일 승인자 ${suffix}`;
   const tempPassword = 'MobileAppr!2345';
   const newPassword = `Changed!${suffix}`;
   const approveTitle = `모바일 승인대상 ${suffix}`;
