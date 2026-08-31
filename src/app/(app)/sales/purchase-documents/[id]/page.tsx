@@ -4,6 +4,7 @@ import { use, useState } from 'react';
 import Link from 'next/link';
 import { api, newRequestId } from '@/lib/trpc';
 import { ApprovalActions } from '@/components/documents/approval-actions';
+import { AttachmentPanel } from '@/components/ui/attachment-panel';
 import { Button, Card, EmptyState, Input, Spinner, StatusBadge } from '@/components/ui/primitives';
 import { fmt } from '@/lib/format';
 
@@ -243,6 +244,8 @@ export default function PurchaseDocumentDetailPage({ params }: { params: Promise
           </dd>
         </dl>
       </Card>
+
+      <AttachmentPanel ownerType="PURCHASE_DOC" ownerId={id} readOnly={d.status === 'CANCELED'} />
     </div>
   );
 }

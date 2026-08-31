@@ -6,7 +6,14 @@ import * as notification from '@/server/modules/notification/service';
 import { has, requirePermission } from '@/server/modules/rbac/service';
 import { nextDocNo } from '@/server/modules/numbering/service';
 import { businessDate } from '@/lib/dates';
-import { buildLine, pendingStepNumbers, selectLineTemplate, type LineContext } from './line';
+import {
+  buildLine,
+  buildOverrideLine,
+  pendingStepNumbers,
+  selectLineTemplate,
+  type LineContext,
+  type StepRole,
+} from './line';
 import { resolveHandler, type ApprovalTarget } from './handlers';
 
 /**
@@ -77,8 +84,6 @@ export interface DraftInput {
   divisionId?: string;
   departmentId?: string;
   target?: ApprovalTarget;
-  /** APV-03: drafter-chosen line, allowed only when the template permits editing */
-  lineOverride?: { approverId: string; role: 'APPROVE' | 'AGREE' | 'REFERENCE' }[];
 }
 
 /** APV-01: the active form version on the given date, plus its schema snapshot. */
@@ -200,7 +205,13 @@ async function linkTarget(ctx: TransactionContext, documentId: string, target: A
 /** APV-06/07: submit for approval — resolves the line and notifies the first approver. */
 export async function submit(
   ctx: TransactionContext,
-  input: { documentId: string; version: number; lineTemplateId?: string },
+  input: {
+    documentId: string;
+    version: number;
+    lineTemplateId?: string;
+    /** APV-03: drafter-chosen line, accepted only when the resolved template's `editable` allows it */
+    lineOverride?: { approverId: string; role: StepRole }[];
+  },
 ) {
   requirePermission(ctx.actor, 'approval.use');
   const onDate = businessDate(ctx.now);
@@ -255,7 +266,28 @@ export async function submit(
       amount: lineContext.amount,
     }));
 
-  const { steps } = await buildLine(ctx, templateId, lineContext);
+  // APV-03: a drafter-edited line is only ever honoured when the resolved template says so —
+  // checked here, on the server, regardless of whether the client offered an edit control.
+  let steps;
+  if (input.lineOverride) {
+    const template = await ctx.tx.approvalLineTemplate.findUnique({ where: { id: templateId } });
+    if (!template) throw new AppError('NOT_FOUND', '결재선 서식을 찾을 수 없습니다.');
+    if (!template.isActive) throw new AppError('VALIDATION', '사용 중지된 결재선 서식입니다.');
+    if (!template.editable) {
+      throw new AppError(
+        'FORBIDDEN',
+        '이 결재선 서식은 상신 시 결재선을 변경할 수 없습니다. 기본 결재선으로 상신하세요.',
+        { templateId },
+      );
+    }
+    steps = await buildOverrideLine(ctx, {
+      drafterId: document.drafterId,
+      onDate,
+      override: input.lineOverride,
+    });
+  } else {
+    ({ steps } = await buildLine(ctx, templateId, lineContext));
+  }
 
   await ctx.tx.approvalStep.deleteMany({ where: { documentId: document.id } });
   await ctx.tx.approvalStep.createMany({
@@ -299,10 +331,88 @@ export async function submit(
     after: {
       status: 'IN_PROGRESS',
       steps: steps.map((s) => ({ stepNo: s.stepNo, role: s.role, approverId: s.approverId })),
+      lineOverridden: !!input.lineOverride,
     },
   });
 
   return updated;
+}
+
+/**
+ * APV-03: shows the drafter what `submit` would build right now, and whether the resolved
+ * template lets them change it. Read-only — it never writes steps, so calling it repeatedly
+ * (e.g. while the drafter edits amount) is free of side effects.
+ */
+export async function previewLine(
+  ctx: TransactionContext,
+  documentId: string,
+): Promise<{
+  templateId: string;
+  editable: boolean;
+  steps: { stepNo: number; role: string; approverId: string }[];
+  skipped: { stepNo: number; reason: string }[];
+}> {
+  requirePermission(ctx.actor, 'approval.use');
+  const document = await ctx.tx.approvalDocument.findUniqueOrThrow({
+    where: { id: documentId },
+    include: { formVersion: true },
+  });
+  if (document.drafterId !== ctx.actor.userId && !ctx.actor.isAdmin) {
+    throw new AppError('FORBIDDEN', '기안자만 결재선을 미리 볼 수 있습니다.');
+  }
+
+  const onDate = businessDate(ctx.now);
+  const lineContext: LineContext = {
+    drafterId: document.drafterId,
+    drafterEmployeeId: document.drafterEmployeeId,
+    departmentId: document.departmentId,
+    divisionId: document.divisionId,
+    amount: document.amount?.toString() ?? null,
+    onDate,
+  };
+
+  const templateId = await selectLineTemplate(ctx, {
+    formId: document.formVersion.formId,
+    divisionId: document.divisionId,
+    departmentId: document.departmentId,
+    amount: lineContext.amount,
+  });
+  const template = await ctx.tx.approvalLineTemplate.findUniqueOrThrow({ where: { id: templateId } });
+
+  try {
+    const { steps, skipped } = await buildLine(ctx, templateId, lineContext);
+    return {
+      templateId,
+      editable: template.editable,
+      steps: steps.map((s) => ({ stepNo: s.stepNo, role: s.role, approverId: s.approverId })),
+      skipped,
+    };
+  } catch (e) {
+    // An editable template can still fail to auto-resolve anyone (e.g. the drafter has no
+    // department head on record) — that gap is exactly what editing exists to route around,
+    // so hand back an empty, editable line instead of a dead end. Any other failure (an
+    // inactive template, for instance) is real and must still be reported as one, editable or
+    // not — editing lets the drafter pick approvers, it does not waive those checks.
+    if (
+      e instanceof AppError &&
+      e.code === 'VALIDATION' &&
+      template.editable &&
+      e.message.includes('승인 단계가 없는 결재선')
+    ) {
+      return { templateId, editable: true, steps: [], skipped: [] };
+    }
+    throw e;
+  }
+}
+
+/** APV-03: candidates for a manually edited 결재선 — active users a drafter may pick as approver. */
+export async function listApprovers(ctx: TransactionContext) {
+  requirePermission(ctx.actor, 'approval.use');
+  return ctx.tx.user.findMany({
+    where: { isActive: true },
+    select: { id: true, displayName: true, username: true },
+    orderBy: { displayName: 'asc' },
+  });
 }
 
 async function logAction(

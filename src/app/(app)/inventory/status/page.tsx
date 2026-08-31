@@ -7,6 +7,8 @@ import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
 import { Card, Field, Input, Select } from '@/components/ui/primitives';
 import { fmt } from '@/lib/format';
+import { downloadCsv, toCsv } from '@/lib/csv';
+import { businessDate } from '@/lib/dates';
 
 /**
  * INV-04 / INV-07: stock on hand by item and warehouse, with the safety-stock shortfall
@@ -56,6 +58,44 @@ export default function StockStatusPage() {
 
   const all = (list.data ?? []) as Row[];
   const rows = all.slice((page - 1) * pageSize, page * pageSize);
+
+  /**
+   * UIX-03: `onHand` returns the whole filtered result already (this screen paginates
+   * client-side, not the server), so exporting `all` — not just `rows` — reflects every
+   * row the current filters match, not merely the page on screen.
+   */
+  function exportCsv() {
+    const warehouseName = applied.warehouseId
+      ? (warehouses.data ?? []).find((w) => w.id === applied.warehouseId)?.name
+      : undefined;
+    const csv = toCsv(
+      [
+        '품목코드',
+        '품목명',
+        '규격',
+        '분류',
+        '창고',
+        '재고수량',
+        '단위',
+        '재고금액',
+        '안전재고',
+        '안전재고미달',
+      ],
+      all.map((r) => [
+        r.code,
+        r.name,
+        r.spec ?? '',
+        r.categoryName ?? '',
+        r.warehouseName,
+        r.quantity,
+        r.unitCode,
+        r.amount,
+        r.safetyStock ?? '',
+        r.belowSafety ? 'Y' : 'N',
+      ]),
+    );
+    downloadCsv(csv, `재고현황_${businessDate(new Date())}${warehouseName ? `_${warehouseName}` : ''}.csv`);
+  }
 
   const columns: Column<Row>[] = [
     { key: 'code', header: '품목코드', width: 120 },
@@ -219,6 +259,7 @@ export default function StockStatusPage() {
         onRowOpen={(r) => router.push(`/inventory/ledger?itemId=${r.itemId}`)}
         emptyTitle="재고가 없습니다."
         emptyDescription="입고 전표를 확정하면 재고가 나타납니다."
+        onExport={all.length > 0 ? exportCsv : undefined}
       />
     </StandardListPage>
   );

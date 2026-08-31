@@ -63,11 +63,44 @@ export default function ApprovalDocumentPage({ params }: { params: Promise<{ id:
   const [resubmitOpen, setResubmitOpen] = useState(false);
   const [resubmitTitle, setResubmitTitle] = useState('');
   const [resubmitContent, setResubmitContent] = useState<Record<string, string>>({});
+  const [lineRows, setLineRows] = useState<
+    { approverId: string; role: 'APPROVE' | 'AGREE' | 'REFERENCE' }[] | null
+  >(null);
+  // Tracks which document's line we've last seeded `lineRows` from, so navigating to a
+  // different document (a new `id`, possibly reusing this same mounted component) reseeds
+  // once rather than keeping the previous document's rows.
+  const [seededForDocId, setSeededForDocId] = useState<string | null>(null);
+
+  // APV-03: preview the line the drafter is about to submit, and — only when the resolved
+  // template allows it — let them adjust it. The server enforces `editable` independently on
+  // submit, so this control being absent or disabled is a convenience, not the actual rule.
+  // Hooks must run unconditionally, so this is computed from the raw query result rather than
+  // the `doc` alias, which only exists after the loading/error checks below.
+  const canEditLine = detail.data?.status === 'DRAFT' && detail.data?.isDrafter === true;
+  const preview = api.approval.previewLine.useQuery({ documentId: id }, { enabled: canEditLine });
+  const approvers = api.approval.listApprovers.useQuery(undefined, {
+    enabled: canEditLine && !!preview.data?.editable,
+  });
+
+  // Adjusting local state from a query result belongs in the render body, not an effect — it
+  // runs once per document because `seededForDocId` gates it, so it never fights the drafter's
+  // own edits to `lineRows` afterwards.
+  if (preview.data && seededForDocId !== id) {
+    setSeededForDocId(id);
+    setLineRows(
+      preview.data.steps.map((s) => ({
+        approverId: s.approverId,
+        role: s.role as 'APPROVE' | 'AGREE' | 'REFERENCE',
+      })),
+    );
+  }
 
   if (detail.isLoading) return <Spinner />;
   if (detail.error)
     return <EmptyState title="결재문서를 열 수 없습니다." description={detail.error.message} />;
   const doc = detail.data!;
+  const approverName = (userId: string) =>
+    (approvers.data ?? []).find((u) => u.id === userId)?.displayName ?? userId;
   const snapshot = doc.formSnapshot as unknown as {
     formName: string;
     version: number;
@@ -197,6 +230,131 @@ export default function ApprovalDocumentPage({ params }: { params: Promise<{ id:
         )}
       </Card>
 
+      {canEditLine ? (
+        <Card title="결재선 미리보기" className="no-print">
+          {preview.isLoading ? (
+            <Spinner />
+          ) : preview.error ? (
+            <p role="alert" className="text-sm text-red-700">
+              {preview.error.message}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-slate-500">
+                {preview.data?.editable
+                  ? '상신 시 이 결재선이 적용됩니다. 이 서식은 상신 전 결재자를 조정할 수 있습니다.'
+                  : '상신 시 이 결재선이 적용됩니다. 이 서식은 상신 시 결재선을 변경할 수 없습니다.'}
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-max text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th scope="col" className="px-3 py-2 text-left font-semibold">
+                        단계
+                      </th>
+                      <th scope="col" className="px-3 py-2 text-left font-semibold">
+                        구분
+                      </th>
+                      <th scope="col" className="px-3 py-2 text-left font-semibold">
+                        결재자
+                      </th>
+                      {preview.data?.editable ? <th scope="col" className="px-3 py-2" /> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(lineRows ?? []).map((row, idx) => (
+                      <tr key={idx} className="border-b border-slate-100 last:border-0">
+                        <td className="px-3 py-1.5 tabular">{idx + 1}</td>
+                        <td className="px-3 py-1.5">
+                          {preview.data?.editable ? (
+                            <Select
+                              aria-label={`${idx + 1}단계 구분`}
+                              value={row.role}
+                              onChange={(e) => {
+                                const role = e.target.value as 'APPROVE' | 'AGREE' | 'REFERENCE';
+                                setLineRows((rows) =>
+                                  (rows ?? []).map((r, i) => (i === idx ? { ...r, role } : r)),
+                                );
+                              }}
+                            >
+                              <option value="APPROVE">결재</option>
+                              <option value="AGREE">합의</option>
+                              <option value="REFERENCE">참조</option>
+                            </Select>
+                          ) : (
+                            (STEP_ROLE_LABEL[row.role] ?? row.role)
+                          )}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          {preview.data?.editable ? (
+                            <Select
+                              aria-label={`${idx + 1}단계 결재자`}
+                              value={row.approverId}
+                              onChange={(e) => {
+                                const approverId = e.target.value;
+                                setLineRows((rows) =>
+                                  (rows ?? []).map((r, i) => (i === idx ? { ...r, approverId } : r)),
+                                );
+                              }}
+                            >
+                              <option value="">선택</option>
+                              {(approvers.data ?? []).map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.displayName} ({u.username})
+                                </option>
+                              ))}
+                            </Select>
+                          ) : (
+                            approverName(row.approverId)
+                          )}
+                        </td>
+                        {preview.data?.editable ? (
+                          <td className="px-3 py-1.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={(lineRows ?? []).length <= 1}
+                              onClick={() => setLineRows((rows) => (rows ?? []).filter((_, i) => i !== idx))}
+                            >
+                              삭제
+                            </Button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {preview.data?.editable ? (
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      setLineRows((rows) => [...(rows ?? []), { approverId: '', role: 'APPROVE' }])
+                    }
+                  >
+                    단계 추가
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      setLineRows(
+                        (preview.data?.steps ?? []).map((s) => ({
+                          approverId: s.approverId,
+                          role: s.role as 'APPROVE' | 'AGREE' | 'REFERENCE',
+                        })),
+                      )
+                    }
+                  >
+                    기본 결재선으로 되돌리기
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </Card>
+      ) : null}
+
       {doc.status === 'ON_HOLD' && heldStepForMe ? (
         <Card title="보류 해제" className="no-print">
           <p className="mb-3 text-sm text-slate-600">
@@ -297,10 +455,23 @@ export default function ApprovalDocumentPage({ params }: { params: Promise<{ id:
               <Button
                 variant="primary"
                 size="sm"
+                disabled={
+                  preview.data?.editable === true &&
+                  ((lineRows ?? []).length === 0 || (lineRows ?? []).some((r) => !r.approverId))
+                }
                 onClick={() =>
                   act(
                     () =>
-                      submit.mutateAsync({ documentId: id, version: doc.version, requestId: newRequestId() }),
+                      submit.mutateAsync({
+                        documentId: id,
+                        version: doc.version,
+                        // The server re-checks the template's `editable` flag independently —
+                        // sending an override when it isn't allowed is rejected, not ignored.
+                        ...(preview.data?.editable === true && lineRows && lineRows.length > 0
+                          ? { lineOverride: lineRows }
+                          : {}),
+                        requestId: newRequestId(),
+                      }),
                     '상신했습니다.',
                   )
                 }

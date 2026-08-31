@@ -18,6 +18,8 @@ import {
   StatusBadge,
 } from '@/components/ui/primitives';
 import { floorTo, mul } from '@/lib/money';
+import { downloadCsv, toCsv } from '@/lib/csv';
+import { businessDate } from '@/lib/dates';
 
 /**
  * Component gallery (STEP 3 quality gate): every shared component rendered with real
@@ -252,7 +254,17 @@ export default function ComponentGalleryPage() {
             selectable
             selected={selected}
             onSelectedChange={setSelected}
-            onExport={() => window.alert('엑셀 내보내기는 각 업무 화면에서 서버 데이터셋으로 생성됩니다.')}
+            onExport={() => {
+              // gallery demo only: `sorted` is the whole filtered+sorted set, not just the
+              // page on screen — real business screens export the same way (see
+              // src/app/(app)/inventory/status/page.tsx) or, when server-paged, through a
+              // server export procedure rather than the rows already fetched to the page.
+              const csv = toCsv(
+                ['전표번호', '전표일', '거래처', '상태', '수량', '금액'],
+                sorted.map((r) => [r.docNo, r.docDate, r.partner, r.status, r.quantity, r.amount]),
+              );
+              downloadCsv(csv, `컴포넌트_갤러리_예시_${businessDate(new Date())}.csv`);
+            }}
           />
         </StandardListPage>
       </section>

@@ -4,6 +4,7 @@ import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api, newRequestId } from '@/lib/trpc';
 import { ApprovalActions } from '@/components/documents/approval-actions';
+import { AttachmentPanel } from '@/components/ui/attachment-panel';
 import {
   Button,
   Card,
@@ -504,6 +505,8 @@ export default function JournalDetailPage({ params }: { params: Promise<{ id: st
           </p>
         ) : null}
       </Card>
+
+      <AttachmentPanel ownerType="JOURNAL" ownerId={id} readOnly={e.status === 'CANCELED'} />
     </div>
   );
 }

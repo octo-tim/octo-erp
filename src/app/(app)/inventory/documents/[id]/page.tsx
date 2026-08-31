@@ -4,6 +4,7 @@ import { use, useState } from 'react';
 import Link from 'next/link';
 import { api, newRequestId } from '@/lib/trpc';
 import { ApprovalActions } from '@/components/documents/approval-actions';
+import { AttachmentPanel } from '@/components/ui/attachment-panel';
 import {
   Button,
   Card,
@@ -597,6 +598,8 @@ export default function StockDocumentDetailPage({ params }: { params: Promise<{ 
           원장 행은 수정·삭제되지 않습니다. 취소 시 반대 부호의 행이 추가됩니다.
         </p>
       </Card>
+
+      <AttachmentPanel ownerType="STOCK_DOC" ownerId={id} readOnly={d.status === 'CANCELED'} />
 
       <ChangeHistory entityType="StockDocument" entityId={id} />
 

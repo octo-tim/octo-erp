@@ -6,6 +6,7 @@ import { withTransaction } from '@/server/core/context';
 import * as approval from '@/server/modules/approval/service';
 import * as form from '@/server/modules/approval/form';
 import * as employee from '@/server/modules/hrm/employee';
+import * as organization from '@/server/modules/hrm/organization';
 import * as leave from '@/server/modules/hrm/leave';
 import * as attendance from '@/server/modules/hrm/attendance';
 import { registerHandler, __resetHandlers } from '@/server/modules/approval/handlers';
@@ -179,6 +180,329 @@ describe('APV-03/APV-05: line resolution and amount branching', () => {
     await expect(
       runTx(drafter, (t) => approval.submit(t, { documentId: doc.id, version: doc.version })),
     ).rejects.toThrow(/승인 단계가 없는 결재선/);
+  });
+});
+
+describe('APV-03: 상신 시 결재선 변경 (ApprovalLineTemplate.editable)', () => {
+  it('editable 서식은 기안자가 결재선을 바꿔 상신할 수 있다', async () => {
+    // STANDARD (seeded) is editable: true
+    const doc = await draftExpense('1000000');
+    await runTx(drafter, (t) =>
+      approval.submit(t, {
+        documentId: doc.id,
+        version: doc.version,
+        lineOverride: [{ approverId: deputy.userId, role: 'APPROVE' }],
+      }),
+    );
+
+    const steps = await prisma.approvalStep.findMany({
+      where: { documentId: doc.id },
+      orderBy: { stepNo: 'asc' },
+    });
+    // the drafter's override is honoured — not the department head this template would
+    // otherwise resolve to
+    expect(steps).toHaveLength(1);
+    expect(steps[0]!.approverId).toBe(deputy.userId);
+  });
+
+  it('editable=false 서식은 서버가 결재선 변경을 거부한다 (컨트롤을 숨기는 것만으로는 강제되지 않음)', async () => {
+    const proposalForm = await prisma.approvalForm.findUniqueOrThrow({ where: { code: 'PROPOSAL' } });
+    const locked = await prisma.approvalLineTemplate.create({
+      data: {
+        code: `LOCKED-${randomUUID().slice(0, 8)}`,
+        name: '고정 결재선',
+        editable: false,
+        steps: { create: [{ stepNo: 1, role: 'APPROVE', resolveBy: 'DRAFTER_MANAGER', canFinalize: true }] },
+      },
+    });
+    const rule = await prisma.approvalRule.create({
+      data: {
+        code: `LOCKED-RULE-${randomUUID().slice(0, 8)}`,
+        name: '고정 결재선 규칙',
+        formId: proposalForm.id,
+        lineTemplateId: locked.id,
+        priority: 100,
+      },
+    });
+
+    try {
+      const doc = await runTx(drafter, (t) =>
+        approval.draft(t, {
+          docNo: `AP-${randomUUID().slice(0, 8)}`,
+          formCode: 'PROPOSAL',
+          title: '품의 테스트',
+          content: { subject: '품의 테스트', background: '테스트 배경' },
+          departmentId: deptId,
+        }),
+      );
+
+      // a hidden control would stop here; the server must refuse the override on its own
+      await expect(
+        runTx(drafter, (t) =>
+          approval.submit(t, {
+            documentId: doc.id,
+            version: doc.version,
+            lineOverride: [{ approverId: deputy.userId, role: 'APPROVE' }],
+          }),
+        ),
+      ).rejects.toThrow(/결재선을 변경할 수 없습니다/);
+
+      // and nothing was written by the rejected attempt — submitting for real still works
+      const refreshed = await prisma.approvalDocument.findUniqueOrThrow({ where: { id: doc.id } });
+      expect(refreshed.status).toBe('DRAFT');
+      await runTx(drafter, (t) => approval.submit(t, { documentId: doc.id, version: refreshed.version }));
+      const steps = await prisma.approvalStep.findMany({ where: { documentId: doc.id } });
+      expect(steps).toHaveLength(1);
+      expect(steps[0]!.approverId).toBe(manager.userId);
+    } finally {
+      await prisma.approvalRule.delete({ where: { id: rule.id } });
+      await prisma.approvalLineTemplate.delete({ where: { id: locked.id } });
+    }
+  });
+});
+
+describe('APV-03: 병렬합의(AGREE)와 참조·열람(REFERENCE)', () => {
+  it('AGREE: 병렬 단계는 모두 승인해야 다음 단계로 넘어가고, 뒤 단계는 그 사이에 진행될 수 없다', async () => {
+    const doc = await draftExpense('1000000');
+    await runTx(drafter, (t) =>
+      approval.submit(t, {
+        documentId: doc.id,
+        version: doc.version,
+        lineOverride: [
+          { approverId: manager.userId, role: 'AGREE' },
+          { approverId: ceo.userId, role: 'AGREE' },
+          { approverId: deputy.userId, role: 'APPROVE' },
+        ],
+      }),
+    );
+
+    // both AGREE approvers are asked to act at once
+    expect(
+      await prisma.notification.count({
+        where: { userId: manager.userId, title: { contains: '결재 요청' } },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.notification.count({ where: { userId: ceo.userId, title: { contains: '결재 요청' } } }),
+    ).toBe(1);
+    // the APPROVE step behind the AGREE block is not — it is not anyone's turn yet
+    expect(await prisma.notification.count({ where: { userId: deputy.userId } })).toBe(0);
+
+    const afterSubmit = await runTx(manager, (t) => approval.detail(t, doc.id));
+    expect(afterSubmit.pendingStepNos.sort()).toEqual([1, 2]);
+    expect((await runTx(ceo, (t) => approval.detail(t, doc.id))).canAct).toBe(true);
+    expect((await runTx(deputy, (t) => approval.detail(t, doc.id))).canAct).toBe(false);
+
+    let current = await prisma.approvalDocument.findUniqueOrThrow({ where: { id: doc.id } });
+    // the step behind an open AGREE block can never jump the queue
+    await expect(
+      runTx(deputy, (t) => approval.approve(t, { documentId: doc.id, version: current.version })),
+    ).rejects.toThrow(/결재 차례가 아니/);
+
+    // one AGREE approver acting alone does not clear the block
+    await runTx(manager, (t) => approval.approve(t, { documentId: doc.id, version: current.version }));
+    current = await prisma.approvalDocument.findUniqueOrThrow({ where: { id: doc.id } });
+    expect(current.status).toBe('IN_PROGRESS');
+    expect((await runTx(ceo, (t) => approval.detail(t, doc.id))).canAct).toBe(true);
+    await expect(
+      runTx(deputy, (t) => approval.approve(t, { documentId: doc.id, version: current.version })),
+    ).rejects.toThrow(/결재 차례가 아니/);
+
+    // the second AGREE approver clears the block, unblocking the step behind it
+    await runTx(ceo, (t) => approval.approve(t, { documentId: doc.id, version: current.version }));
+    current = await prisma.approvalDocument.findUniqueOrThrow({ where: { id: doc.id } });
+    expect(current.status).toBe('IN_PROGRESS');
+    const afterBlock = await runTx(deputy, (t) => approval.detail(t, doc.id));
+    expect(afterBlock.canAct).toBe(true);
+    expect(afterBlock.pendingStepNos).toEqual([3]);
+
+    await runTx(deputy, (t) => approval.approve(t, { documentId: doc.id, version: current.version }));
+    expect((await prisma.approvalDocument.findUniqueOrThrow({ where: { id: doc.id } })).status).toBe(
+      'APPROVED',
+    );
+  });
+
+  it('REFERENCE: 참조 단계는 결재 진행을 막지 않고, 참조자는 열람만 하고 승인할 수 없다', async () => {
+    const doc = await draftExpense('1000000');
+    await runTx(drafter, (t) =>
+      approval.submit(t, {
+        documentId: doc.id,
+        version: doc.version,
+        lineOverride: [
+          { approverId: manager.userId, role: 'APPROVE' },
+          { approverId: ceo.userId, role: 'REFERENCE' },
+        ],
+      }),
+    );
+
+    // a REFERENCE step is skipped immediately, not queued as work
+    const referenceStep = await prisma.approvalStep.findFirstOrThrow({
+      where: { documentId: doc.id, role: 'REFERENCE' },
+    });
+    expect(referenceStep.status).toBe('SKIPPED');
+    expect(
+      await prisma.approvalParticipant.count({
+        where: { documentId: doc.id, userId: ceo.userId, role: 'REFERENCE' },
+      }),
+    ).toBe(1);
+    expect(
+      (await runTx(ceo, (t) => approval.listInbox(t, { inbox: 'REFERENCE', skip: 0, take: 20 }))).total,
+    ).toBe(1);
+    // never on the reference viewer's action queue
+    expect(
+      (await runTx(ceo, (t) => approval.listInbox(t, { inbox: 'PENDING', skip: 0, take: 20 }))).total,
+    ).toBe(0);
+    expect((await runTx(ceo, (t) => approval.detail(t, doc.id))).canAct).toBe(false);
+
+    const current = await prisma.approvalDocument.findUniqueOrThrow({ where: { id: doc.id } });
+    // a reference viewer is never given a turn to act
+    await expect(
+      runTx(ceo, (t) => approval.approve(t, { documentId: doc.id, version: current.version })),
+    ).rejects.toThrow(/결재 차례가 아니/);
+
+    // the single APPROVE step alone completes the document — REFERENCE never blocks it
+    await runTx(manager, (t) => approval.approve(t, { documentId: doc.id, version: current.version }));
+    expect((await prisma.approvalDocument.findUniqueOrThrow({ where: { id: doc.id } })).status).toBe(
+      'APPROVED',
+    );
+  });
+});
+
+describe('APV-13: 다조건 검색 (listInbox의 q/from/to)', () => {
+  async function draftAndSubmit(actor: Actor, amount: string, title: string, departmentIdOverride?: string) {
+    const doc = await runTx(actor, (t) =>
+      approval.draft(t, {
+        docNo: `AP-${randomUUID().slice(0, 8)}`,
+        formCode: 'EXPENSE',
+        title,
+        content: { purpose: title, amount, paymentDate: '2026-09-10', payee: '거래처' },
+        amount,
+        departmentId: departmentIdOverride ?? deptId,
+      }),
+    );
+    await runTx(actor, (t) => approval.submit(t, { documentId: doc.id, version: doc.version }));
+    return doc;
+  }
+
+  it('키워드로 제목·문서번호를 검색한다', async () => {
+    const target = await draftAndSubmit(drafter, '1000000', '출장비 정산');
+    await draftAndSubmit(drafter, '1000000', '사무용품 구매');
+
+    const byTitle = await runTx(drafter, (t) =>
+      approval.listInbox(t, { inbox: 'DRAFTED', q: '출장비', skip: 0, take: 20 }),
+    );
+    expect(byTitle.total).toBe(1);
+    expect(byTitle.rows.map((r) => r.id)).toEqual([target.id]);
+
+    const byDocNo = await runTx(drafter, (t) =>
+      approval.listInbox(t, { inbox: 'DRAFTED', q: target.docNo, skip: 0, take: 20 }),
+    );
+    expect(byDocNo.rows.map((r) => r.id)).toEqual([target.id]);
+
+    const noMatch = await runTx(drafter, (t) =>
+      approval.listInbox(t, { inbox: 'DRAFTED', q: '존재하지않는키워드', skip: 0, take: 20 }),
+    );
+    expect(noMatch.total).toBe(0);
+  });
+
+  it('작성일 범위로 검색하면 범위 밖 문서는 제외된다', async () => {
+    const inRange = await draftAndSubmit(drafter, '1000000', '범위내 문서');
+    const outOfRange = await draftAndSubmit(drafter, '1000000', '범위밖 문서');
+    await prisma.$executeRawUnsafe(
+      `UPDATE "ApprovalDocument" SET "createdAt" = '2026-01-15T00:00:00Z' WHERE id = '${inRange.id}'`,
+    );
+    await prisma.$executeRawUnsafe(
+      `UPDATE "ApprovalDocument" SET "createdAt" = '2026-05-01T00:00:00Z' WHERE id = '${outOfRange.id}'`,
+    );
+
+    const result = await runTx(drafter, (t) =>
+      approval.listInbox(t, { inbox: 'DRAFTED', from: '2026-01-01', to: '2026-01-31', skip: 0, take: 20 }),
+    );
+    expect(result.total).toBe(1);
+    expect(result.rows.map((r) => r.id)).toEqual([inRange.id]);
+  });
+
+  it('키워드와 날짜 범위를 함께 사용할 수 있다', async () => {
+    const a = await draftAndSubmit(drafter, '1000000', '분기 보고서');
+    const b = await draftAndSubmit(drafter, '1000000', '분기 정산');
+    await prisma.$executeRawUnsafe(
+      `UPDATE "ApprovalDocument" SET "createdAt" = '2026-02-10T00:00:00Z' WHERE id = '${a.id}'`,
+    );
+    await prisma.$executeRawUnsafe(
+      `UPDATE "ApprovalDocument" SET "createdAt" = '2026-06-10T00:00:00Z' WHERE id = '${b.id}'`,
+    );
+
+    // matches the keyword for both, but the date range keeps only one
+    const result = await runTx(drafter, (t) =>
+      approval.listInbox(t, {
+        inbox: 'DRAFTED',
+        q: '분기',
+        from: '2026-02-01',
+        to: '2026-02-28',
+        skip: 0,
+        take: 20,
+      }),
+    );
+    expect(result.total).toBe(1);
+    expect(result.rows.map((r) => r.id)).toEqual([a.id]);
+  });
+
+  it('검색은 호출자의 권한 범위를 벗어난 문서를 노출하지 않는다', async () => {
+    // a second department whose head is the CEO, so a document drafted there routes to a
+    // different approver than `manager` — the scope leak this test guards against would be
+    // a keyword match returning someone else's document regardless of who is really on it
+    const dept2 = await runTx(admin, (t) =>
+      organization.createDepartment(t, { code: 'APV-DEPT-2', name: '결재시험팀2', validFrom: '2020-01-01' }),
+    );
+    const ceoEmployee = await prisma.employee.findFirstOrThrow({ where: { name: '대표이사' } });
+    await prisma.department.update({ where: { id: dept2.id }, data: { headEmployeeId: ceoEmployee.id } });
+    const otherDrafterEmployee = await runTx(admin, (t) =>
+      employee.create(t, { name: '타부서 기안자', hireDate: '2022-01-01', departmentId: dept2.id }),
+    );
+    await prisma.user.upsert({
+      where: { username: 'drafter2' },
+      create: {
+        username: 'drafter2',
+        displayName: '타부서 기안자',
+        passwordHash: await hashPassword('Approve!123456'),
+        employeeId: otherDrafterEmployee.id,
+        roles: {
+          create: [{ roleId: (await prisma.role.findUniqueOrThrow({ where: { code: 'sales' } })).id }],
+        },
+      },
+      update: { employeeId: otherDrafterEmployee.id, isActive: true },
+    });
+    const drafter2 = await actorFor('drafter2');
+
+    const mine = await draftAndSubmit(drafter, '1000000', '결재대상 문서');
+    const theirs = await draftAndSubmit(drafter2, '1000000', '결재대상 문서', dept2.id);
+
+    // `theirs` is pending on ceo (dept2's head), never on manager — a keyword search must not
+    // hand manager a document they have no role on just because the title matches
+    const managerPending = await runTx(manager, (t) =>
+      approval.listInbox(t, { inbox: 'PENDING', q: '결재대상', skip: 0, take: 20 }),
+    );
+    expect(managerPending.total).toBe(1);
+    expect(managerPending.rows.map((r) => r.id)).toEqual([mine.id]);
+
+    // manager's own DRAFTED search never returns a document manager didn't draft
+    const managerDrafted = await runTx(manager, (t) =>
+      approval.listInbox(t, { inbox: 'DRAFTED', q: '결재대상', skip: 0, take: 20 }),
+    );
+    expect(managerDrafted.total).toBe(0);
+
+    // and `drafter` cannot find the other drafter's document by number either
+    const drafterOnOthers = await runTx(drafter, (t) =>
+      approval.listInbox(t, { inbox: 'DRAFTED', q: theirs.docNo, skip: 0, take: 20 }),
+    );
+    expect(drafterOnOthers.total).toBe(0);
+
+    // ceo, who really is pending on `theirs`, does find it
+    const ceoPending = await runTx(ceo, (t) =>
+      approval.listInbox(t, { inbox: 'PENDING', q: '결재대상', skip: 0, take: 20 }),
+    );
+    expect(ceoPending.total).toBe(1);
+    expect(ceoPending.rows.map((r) => r.id)).toEqual([theirs.id]);
   });
 });
 

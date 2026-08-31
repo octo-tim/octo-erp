@@ -73,7 +73,18 @@ export const approvalRouter = router({
 
   submit: permissionProcedure('approval.use')
     .input(
-      z.object({ documentId: cuid, version: z.number().int(), lineTemplateId: cuid.optional(), requestId }),
+      z.object({
+        documentId: cuid,
+        version: z.number().int(),
+        lineTemplateId: cuid.optional(),
+        // APV-03: only honoured server-side when the resolved template's `editable` allows it
+        lineOverride: z
+          .array(z.object({ approverId: cuid, role: z.enum(['APPROVE', 'AGREE', 'REFERENCE']) }))
+          .min(1)
+          .max(20)
+          .optional(),
+        requestId,
+      }),
     )
     .mutation(({ ctx, input }) =>
       tx(
@@ -83,10 +94,20 @@ export const approvalRouter = router({
             documentId: input.documentId,
             version: input.version,
             ...(input.lineTemplateId ? { lineTemplateId: input.lineTemplateId } : {}),
+            ...(input.lineOverride ? { lineOverride: input.lineOverride } : {}),
           }),
         input.requestId,
       ),
     ),
+
+  // APV-03: preview + candidate approvers for editing the line before submitting
+  previewLine: permissionProcedure('approval.use')
+    .input(z.object({ documentId: cuid }))
+    .query(({ ctx, input }) => readTx(ctx, (t) => approval.previewLine(t, input.documentId))),
+
+  listApprovers: permissionProcedure('approval.use').query(({ ctx }) =>
+    readTx(ctx, (t) => approval.listApprovers(t)),
+  ),
 
   // ── APV-07 processing ──
   approve: permissionProcedure('approval.use')

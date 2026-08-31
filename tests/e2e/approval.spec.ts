@@ -119,13 +119,110 @@ test('APV-04: 결재선·전결 화면에서 대결을 설정하고 해제한다
   );
 });
 
-test('APV-14: 모바일에서도 결재함과 문서를 처리할 수 있다', async ({ page, isMobile }) => {
+/**
+ * APV-14: the requirement is mobile lookup *and* approve *and* reject — a screen that only
+ * loads is not evidence any of the three work. The seeded admin has no employee record, so
+ * it can never resolve an approver for its own documents (see the APV-07 test above); it also
+ * cannot approve its own document even if it could (a drafter is never its own approver). So
+ * this test has admin register a second, disposable account through the normal 사용자 등록
+ * screen, uses the APV-03 결재선 override to hand that account the APPROVE step on two
+ * documents (STANDARD is an editable template), then logs in as that account on the mobile
+ * viewport to actually approve one and actually reject the other — asserting each one lands
+ * in the status the action implies.
+ */
+test('APV-14: 모바일에서 결재를 승인하고 반려한다', async ({ page, context, isMobile }) => {
   test.skip(!isMobile, '모바일 결재 요구사항(APV-14) 전용 검증');
+
+  const suffix = Date.now().toString().slice(-8);
+  const approverUsername = `mobile-appr-${suffix}`;
+  const approverDisplayName = '모바일 승인자';
+  const tempPassword = 'MobileAppr!2345';
+  const newPassword = `Changed!${suffix}`;
+  const approveTitle = `모바일 승인대상 ${suffix}`;
+  const rejectTitle = `모바일 반려대상 ${suffix}`;
+
+  // 1) admin registers a fresh, disposable approver account for this run only
+  await page.goto('/system/users');
+  await page.getByLabel('아이디').fill(approverUsername);
+  await page.getByLabel('이름').fill(approverDisplayName);
+  await page.getByLabel('임시 비밀번호').fill(tempPassword);
+  await page.getByLabel('영업 (sales)').check();
+  await page.getByRole('button', { name: '등록', exact: true }).click();
+  await expect(page.getByText(/계정을 등록했습니다/)).toBeVisible();
+
+  // 2) admin drafts a document, overrides its 결재선 to the new account, and submits — twice
+  async function draftAssignedTo(title: string) {
+    await page.goto('/approval/draft');
+    await page.getByLabel('결재양식').selectOption('EXPENSE');
+    await page.getByLabel('제목', { exact: true }).fill(title);
+    await page.getByLabel('지출목적').fill(title);
+    await page.getByLabel('지출금액').fill('120000');
+    await page.getByLabel('지급예정일').fill('2026-09-30');
+    await page.getByLabel('지급처').fill('오피스넥스');
+    await page.getByRole('button', { name: '임시저장' }).click();
+    await expect(page).toHaveURL(/\/approval\/documents\//);
+
+    // the seeded admin has no resolvable department head, so the generated line starts
+    // empty here — that is exactly what an editable template's override is for
+    await expect(page.getByRole('heading', { name: '결재선 미리보기' })).toBeVisible();
+    await page.getByRole('button', { name: '단계 추가' }).click();
+    const approverSelect = page.getByLabel('1단계 결재자');
+    // the candidate list loads asynchronously — wait for the option to actually exist before
+    // selecting it, rather than racing the query
+    await expect(approverSelect.locator('option', { hasText: approverDisplayName })).toHaveCount(1);
+    await approverSelect.selectOption({ label: `${approverDisplayName} (${approverUsername})` });
+    await page.getByRole('button', { name: '상신' }).click();
+    await expect(page.getByRole('status')).toContainText('상신했습니다');
+  }
+
+  await draftAssignedTo(approveTitle);
+  await draftAssignedTo(rejectTitle);
+
+  // 3) switch identities: log out of admin, into the freshly created account (forced
+  // password change first, exactly like any other temporary-password account)
+  await page.request.post('/api/auth/logout');
+  await context.clearCookies();
+  await page.goto('/login');
+  await page.getByLabel('아이디').fill(approverUsername);
+  await page.getByLabel('비밀번호').fill(tempPassword);
+  await page.getByRole('button', { name: '로그인' }).click();
+  await expect(page).toHaveURL(/\/account/);
+  await page.getByLabel('현재 비밀번호').fill(tempPassword);
+  await page.getByLabel('새 비밀번호', { exact: true }).fill(newPassword);
+  await page.getByLabel('새 비밀번호 확인').fill(newPassword);
+  await page.getByRole('button', { name: '비밀번호 변경' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel('아이디').fill(approverUsername);
+  await page.getByLabel('비밀번호').fill(newPassword);
+  await page.getByRole('button', { name: '로그인' }).click();
+  await expect(page).toHaveURL(/\/home$/);
+
+  // 4) mobile: open the pending inbox and actually approve one document
   await page.goto('/approval/inbox');
   await expect(page.getByRole('heading', { name: '결재함', level: 1 })).toBeVisible();
-  await expect(page.getByRole('tab', { name: /대기/ })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /대기/ })).toHaveAttribute('aria-selected', 'true');
+  await page.locator('tbody tr', { hasText: approveTitle }).getByRole('button').first().click();
 
-  await page.goto('/approval/draft');
-  await page.getByLabel('결재양식').selectOption('EXPENSE');
-  await expect(page.getByLabel('지출목적')).toBeVisible();
+  await expect(page).toHaveURL(/\/approval\/documents\//);
+  await expect(page.getByRole('heading', { name: '결재 처리' })).toBeVisible();
+  await page.getByRole('button', { name: '승인' }).click();
+  await expect(page.getByRole('status')).toContainText('승인했습니다');
+  // approved and complete: nothing left for this actor to act on
+  await expect(page.getByRole('heading', { name: '결재 처리' })).toHaveCount(0);
+
+  // 5) mobile: back to the inbox, and actually reject the other one
+  await page.goto('/approval/inbox');
+  await page.locator('tbody tr', { hasText: rejectTitle }).getByRole('button').first().click();
+  await expect(page.getByRole('heading', { name: '결재 처리' })).toBeVisible();
+  await page.getByLabel('의견').fill('모바일 반려 시험');
+  await page.getByRole('button', { name: '반려' }).click();
+  await expect(page.getByRole('status')).toContainText('반려했습니다');
+  await expect(page.getByRole('heading', { name: '결재 처리' })).toHaveCount(0);
+
+  // 6) the inbox reflects both outcomes: neither document is pending any more
+  await page.goto('/approval/inbox');
+  await expect(page.getByText(approveTitle)).toHaveCount(0);
+  await expect(page.getByText(rejectTitle)).toHaveCount(0);
+  await page.getByRole('tab', { name: /반려·회수/ }).click();
+  await expect(page.locator('tbody tr', { hasText: rejectTitle })).toBeVisible();
 });

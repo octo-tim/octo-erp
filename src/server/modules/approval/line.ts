@@ -163,6 +163,59 @@ export async function buildLine(
   return { steps, skipped };
 }
 
+/**
+ * APV-03: builds the line from a drafter-supplied override instead of the template.
+ * Only called when the caller has already checked `ApprovalLineTemplate.editable` — this
+ * function itself does not know or care which template the drafter started from, it only
+ * validates the shape of a hand-picked line the same way a generated one is validated:
+ * at least one APPROVE/AGREE step, no self-approval, and a real, active approver per step.
+ * Delegation (APV-04) still applies so a manually chosen approver who is currently away is
+ * still redirected to their deputy, same as a generated line.
+ */
+export async function buildOverrideLine(
+  ctx: TransactionContext,
+  input: {
+    drafterId: string;
+    onDate: string;
+    override: { approverId: string; role: StepRole }[];
+  },
+): Promise<ResolvedStep[]> {
+  if (input.override.length === 0) {
+    throw new AppError('VALIDATION', '결재선에는 최소 1명 이상의 결재자가 필요합니다.');
+  }
+  if (!input.override.some((s) => s.role === 'APPROVE' || s.role === 'AGREE')) {
+    throw new AppError(
+      'VALIDATION',
+      '승인 단계가 없는 결재선입니다. 결재 또는 합의 단계를 하나 이상 넣으세요.',
+    );
+  }
+
+  const steps: ResolvedStep[] = [];
+  let stepNo = 0;
+  for (const s of input.override) {
+    if (s.approverId === input.drafterId && s.role !== 'REFERENCE') {
+      throw new AppError('VALIDATION', '기안자 본인을 결재자로 지정할 수 없습니다.');
+    }
+    const approver = await ctx.tx.user.findUnique({ where: { id: s.approverId } });
+    if (!approver?.isActive) {
+      throw new AppError('VALIDATION', `사용할 수 없는 결재자입니다: ${s.approverId}`);
+    }
+
+    const delegate = await resolveDelegate(ctx, s.approverId, input.onDate);
+    stepNo += 1;
+    steps.push({
+      stepNo,
+      role: s.role,
+      approverId: s.approverId,
+      ...(delegate ? { actedByUserId: delegate } : {}),
+      // a manually edited line does not carry 전결 — it always runs to its last step
+      canFinalize: false,
+    });
+  }
+
+  return steps;
+}
+
 /** APV-03/05: picks the highest-priority rule whose conditions all match. */
 export async function selectLineTemplate(
   ctx: TransactionContext,

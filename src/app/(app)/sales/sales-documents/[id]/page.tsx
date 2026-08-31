@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, newRequestId } from '@/lib/trpc';
 import { ApprovalActions } from '@/components/documents/approval-actions';
+import { AttachmentPanel } from '@/components/ui/attachment-panel';
 import {
   Button,
   Card,
@@ -582,6 +583,8 @@ export default function SalesDocumentDetailPage({ params }: { params: Promise<{ 
           )}
         </Card>
       ) : null}
+
+      <AttachmentPanel ownerType="SALES_DOC" ownerId={id} readOnly={d.status === 'CANCELED'} />
     </div>
   );
 }
