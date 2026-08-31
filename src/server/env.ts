@@ -29,6 +29,48 @@ export type Env = z.infer<typeof schema>;
 
 let cached: Env | null = null;
 
+/**
+ * NFR-SEC-03/06 — refuse to run production on the example values.
+ *
+ * The schema above checks shape, not substance: a key of 64 zeros is valid hex and the
+ * literal `change-me-...` is longer than 32 characters, so `cp .env.example .env` on a
+ * production host used to boot cleanly with an encryption key anyone who has read the
+ * repository already knows, and a session secret that also signs attachment download links.
+ * Shape checks cannot catch that; only naming the known-bad values can.
+ *
+ * This runs for staging and production only. Development and test keep the example values
+ * on purpose, so the checks are aimed at deployment rather than at the developer's machine.
+ */
+export function assertDeploymentSecrets(env: Env): void {
+  if (env.APP_ENV !== 'production' && env.APP_ENV !== 'staging') return;
+
+  const problems: string[] = [];
+
+  if (/^0+$/.test(env.DATA_ENCRYPTION_KEY) || /^(.)\1+$/.test(env.DATA_ENCRYPTION_KEY)) {
+    problems.push('DATA_ENCRYPTION_KEY is the placeholder value from .env.example');
+  }
+  if (env.SESSION_SECRET.includes('change-me')) {
+    problems.push('SESSION_SECRET is the placeholder value from .env.example');
+  }
+  if (new Set(env.SESSION_SECRET).size < 8) {
+    problems.push('SESSION_SECRET has too little variety to be a real secret');
+  }
+  if (!env.APP_ORIGIN.startsWith('https://')) {
+    problems.push('APP_ORIGIN must be https in staging and production');
+  }
+  if (env.STORAGE_DRIVER === 's3' && !env.S3_BUCKET) {
+    problems.push('STORAGE_DRIVER=s3 requires S3_BUCKET');
+  }
+
+  if (problems.length > 0) {
+    throw new Error(
+      `Refusing to start ${env.APP_ENV} with unsafe configuration:\n` +
+        problems.map((p) => `  - ${p}`).join('\n') +
+        '\nGenerate real values before deploying. See docs/operations.md.',
+    );
+  }
+}
+
 export function getEnv(): Env {
   if (cached) return cached;
   const parsed = schema.safeParse(process.env);
@@ -36,6 +78,7 @@ export function getEnv(): Env {
     const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid environment configuration:\n${issues}`);
   }
+  assertDeploymentSecrets(parsed.data);
   cached = parsed.data;
   return cached;
 }

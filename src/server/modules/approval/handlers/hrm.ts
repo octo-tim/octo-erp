@@ -13,6 +13,8 @@ export const leaveRequestHandler: ApprovalTargetHandler = {
   label: '휴가신청',
 
   async validateBeforeSubmit(ctx: TransactionContext, target) {
+    // locked before read, like every other target: no submit over a concurrent state change
+    await ctx.tx.$queryRawUnsafe('SELECT id FROM "LeaveRequest" WHERE id = $1 FOR UPDATE', target.targetId);
     const request = await ctx.tx.leaveRequest.findUnique({ where: { id: target.targetId } });
     if (!request) throw new AppError('NOT_FOUND', '휴가신청을 찾을 수 없습니다.');
     if (request.version !== target.targetVersion) {
@@ -91,6 +93,10 @@ export const attendanceCorrectionHandler: ApprovalTargetHandler = {
   label: '근태정정',
 
   async validateBeforeSubmit(ctx, target) {
+    await ctx.tx.$queryRawUnsafe(
+      'SELECT id FROM "AttendanceCorrectionRequest" WHERE id = $1 FOR UPDATE',
+      target.targetId,
+    );
     const request = await ctx.tx.attendanceCorrectionRequest.findUnique({ where: { id: target.targetId } });
     if (!request) throw new AppError('NOT_FOUND', '근태정정 신청을 찾을 수 없습니다.');
     if (request.version !== target.targetVersion) {

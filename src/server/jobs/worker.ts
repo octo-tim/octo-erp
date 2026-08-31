@@ -5,11 +5,15 @@ import { logger } from '@/server/core/logger';
 import { MAX_ATTEMPTS, nextBackoff } from '@/server/modules/outbox/service';
 import { sendEmail } from './handlers/email';
 import { runScheduledJob } from './handlers/scheduled';
+import { registerScheduledJobs } from './register';
 
 /**
  * INT-10: the transactional-outbox worker. Claims with FOR UPDATE SKIP LOCKED so
  * multiple instances can run, retries with backoff, and never blocks business writes.
  */
+// every scheduled job has a handler before a single event is claimed
+registerScheduledJobs();
+
 const WORKER_ID = `${process.env['RAILWAY_REPLICA_ID'] ?? 'local'}:${process.pid}:${randomUUID().slice(0, 8)}`;
 const BATCH = Number(process.env['OUTBOX_BATCH'] ?? 20);
 const POLL_MS = Number(process.env['OUTBOX_POLL_MS'] ?? 2000);

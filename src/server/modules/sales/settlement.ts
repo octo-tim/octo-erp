@@ -91,6 +91,7 @@ export async function autoAllocate(ctx: TransactionContext, settlementId: string
   requirePermission(ctx.actor, 'settlement.write');
 
   const settlement = await lockSettlement(ctx, settlementId);
+  assertAllocatable(settlement);
   const remaining = D(settlement.amount).minus(D(settlement.allocatedAmount));
   if (remaining.lte(0)) {
     throw new AppError('VALIDATION', '미배분 잔액이 없습니다.');
@@ -130,6 +131,7 @@ export async function reallocate(
   if (reason.trim().length < 2) throw new AppError('VALIDATION', '재배분 사유를 입력하세요.');
 
   const settlement = await lockSettlement(ctx, settlementId);
+  assertAllocatable(settlement);
   const existing = await ctx.tx.settlementMatch.findMany({ where: { settlementId } });
 
   // reverse what is there now
@@ -138,7 +140,14 @@ export async function reallocate(
     const key = (m.receivableId ?? m.payableId)!;
     net.set(key, (net.get(key) ?? ZERO).plus(D(m.amount)));
   }
-  for (const [targetId, total] of net) {
+
+  /**
+   * Sorted, like the allocation phase below it. The reversal used to walk the map in
+   * insertion order, so two reallocations touching the same pair of open items could take
+   * the row locks in opposite orders and deadlock — the exact thing `applyAllocations`
+   * already sorts to avoid.
+   */
+  for (const [targetId, total] of [...net.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     if (total.isZero()) continue;
     await ctx.tx.settlementMatch.create({
       data: {
@@ -343,7 +352,8 @@ export async function cancel(ctx: TransactionContext, id: string, reason: string
       const key = (m.receivableId ?? m.payableId)!;
       net.set(key, (net.get(key) ?? ZERO).plus(D(m.amount)));
     }
-    for (const [targetId, total] of net) {
+    // same deterministic order as everywhere else that locks open items
+    for (const [targetId, total] of [...net.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
       if (total.isZero()) continue;
       await ctx.tx.settlementMatch.create({
         data: {
@@ -389,6 +399,31 @@ export async function cancel(ctx: TransactionContext, id: string, reason: string
 async function lockSettlement(ctx: TransactionContext, id: string) {
   await ctx.tx.$queryRawUnsafe('SELECT id FROM "Settlement" WHERE id = $1 FOR UPDATE', id);
   return ctx.tx.settlement.findUniqueOrThrow({ where: { id } });
+}
+
+/**
+ * SLS-10 / INT-02: allocation only makes sense while the settlement is still a draft.
+ *
+ * Neither allocation path checked the status. Allocating a CANCELED receipt marked invoices
+ * as settled against money that had been cancelled — the cancellation's reversing journal
+ * entry still stood, so the receivables sub-ledger and the general ledger disagreed with
+ * nothing to show why. Allocating a CONFIRMED one changed which invoices the receipt paid
+ * after its journal entry had already been posted from the earlier allocation.
+ */
+function assertAllocatable(settlement: { status: string; docNo: string }): void {
+  if (settlement.status === 'DRAFT') return;
+  if (settlement.status === 'CANCELED') {
+    throw new AppError(
+      'INVALID_TRANSITION',
+      `취소된 ${settlement.docNo}에는 배분할 수 없습니다. 새 수금·지급을 등록하세요.`,
+      { status: settlement.status },
+    );
+  }
+  throw new AppError(
+    'INVALID_TRANSITION',
+    `확정된 ${settlement.docNo}의 배분은 바꿀 수 없습니다. 취소한 뒤 다시 등록하세요.`,
+    { status: settlement.status },
+  );
 }
 
 async function openItemsFor(ctx: TransactionContext, partnerId: string, isReceipt: boolean) {

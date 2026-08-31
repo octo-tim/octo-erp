@@ -130,9 +130,19 @@ export async function periodStatus(ctx: TransactionContext, period: string): Pro
   return row?.status === 'CLOSED' ? 'CLOSED' : 'OPEN';
 }
 
-/** A movement may not be posted into a month whose valuation is already closed. */
+/**
+ * A movement may not be posted into a month whose valuation is already closed.
+ *
+ * Locked FOR SHARE for the same reason as the accounting calendar: an unlocked read lets a
+ * month close underneath a confirm that is still running, and the movement lands in a month
+ * whose average cost has already been fixed and reported.
+ */
 export async function assertPeriodOpen(ctx: TransactionContext, docDate: string): Promise<void> {
   const period = periodKey(docDate);
+  await ctx.tx.$queryRawUnsafe(
+    'SELECT period FROM "InventoryValuationPeriod" WHERE "period" = $1 FOR SHARE',
+    period,
+  );
   if ((await periodStatus(ctx, period)) === 'CLOSED') {
     throw new AppError(
       'PERIOD_CLOSED',
@@ -237,6 +247,21 @@ async function compute(ctx: TransactionContext, period: string): Promise<CloseRe
  */
 export async function close(ctx: TransactionContext, period: string): Promise<CloseResult> {
   requirePermission(ctx.actor, 'inventory.valuation');
+
+  /**
+   * The exclusive counterpart to the FOR SHARE in `assertPeriodOpen`. A close waits for
+   * every movement already dated in this month, then no further movement can enter it.
+   * The row is created first because a month with no movements yet has no row to lock.
+   */
+  await ctx.tx.inventoryValuationPeriod.upsert({
+    where: { period },
+    create: { period, status: 'OPEN' },
+    update: {},
+  });
+  await ctx.tx.$queryRawUnsafe(
+    'SELECT period FROM "InventoryValuationPeriod" WHERE "period" = $1 FOR UPDATE',
+    period,
+  );
 
   const config = await policy.resolve<ValuationConfig>(ctx, 'inventory.valuation');
   if (config.config.method !== 'MONTHLY_AVERAGE') {

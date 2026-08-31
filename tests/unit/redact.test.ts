@@ -40,8 +40,20 @@ describe('redaction (INT-09)', () => {
   });
 
   it('produces display masks', () => {
-    expect(maskResidentNo('4567')).toBe('******-4******');
+    expect(maskResidentNo('4')).toBe('******-4******');
     expect(maskBankAccount('6789')).toBe('****-****-6789');
     expect(redact({ password: 'x' })).toEqual({ password: REDACTED });
+  });
+
+  /**
+   * The stored column holds one digit and four digits respectively. A caller that hands over
+   * more than that is a bug somewhere else, but the mask must still not print it.
+   */
+  it('masks never widen for an over-long input', () => {
+    expect(maskResidentNo('4567')).toBe('******-4******');
+    expect(maskBankAccount('123456789')).toBe('****-****-6789');
+    expect(maskResidentNo(null)).toBe('******-*******');
+    expect(maskResidentNo('')).toBe('******-*******');
+    expect(maskBankAccount(undefined)).toBe('****-****-****');
   });
 });

@@ -27,9 +27,17 @@ export async function statusOf(ctx: TransactionContext, key: string): Promise<'O
  * The guard every business module calls before it writes anything dated. Callers pass the
  * business date (전표일), not the wall clock — backdating into a closed month is exactly
  * what this prevents.
+ *
+ * The period row is locked FOR SHARE, not merely read. Reading it without a lock left a
+ * race that silently invalidated a financial close: a confirm reads the month as OPEN, a
+ * close runs and commits while the confirm is still working, and the confirm then commits a
+ * journal entry into a month that has been closed and signed off. The trial balance for
+ * that month changes afterwards and nothing says why. FOR SHARE lets any number of confirms
+ * run together — they only conflict with `close`, which takes the exclusive lock.
  */
 export async function assertOpen(ctx: TransactionContext, businessDate: string): Promise<void> {
   const key = periodOf(businessDate);
+  await ctx.tx.$queryRawUnsafe('SELECT id FROM "AccountingPeriod" WHERE "periodKey" = $1 FOR SHARE', key);
   if ((await statusOf(ctx, key)) === 'CLOSED') {
     throw new AppError(
       'PERIOD_CLOSED',
@@ -84,6 +92,12 @@ export async function list(ctx: TransactionContext, take = 36) {
 }
 
 export async function close(ctx: TransactionContext, key: string) {
+  /**
+   * The exclusive counterpart to the FOR SHARE in `assertOpen`: a close waits for every
+   * confirm already dated in this month to finish, and every confirm that starts afterwards
+   * sees CLOSED. Without it a close and a confirm could each believe they went first.
+   */
+  await ctx.tx.$queryRawUnsafe('SELECT id FROM "AccountingPeriod" WHERE "periodKey" = $1 FOR UPDATE', key);
   requirePermission(ctx.actor, 'accounting.close');
 
   const period = await ensure(ctx, key);

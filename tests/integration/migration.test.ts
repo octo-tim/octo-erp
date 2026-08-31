@@ -396,7 +396,7 @@ describe('MIG-06 / MIG-07: 인사·조직·연차 이관', () => {
       where: { employeeId: employee.id },
     });
     expect(sensitive.residentNoEnc).not.toContain('900101');
-    expect(sensitive.residentNoLast4).toBe('4567');
+    expect(sensitive.residentNoMaskDigit).toBe('1');
 
     // and nothing carried the plain value into the batch, the audit log or the outbox
     const batches = await prisma.migrationBatch.findMany();

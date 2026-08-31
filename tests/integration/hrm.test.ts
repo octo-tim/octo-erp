@@ -94,10 +94,12 @@ describe('HRM-12 / NFR-SEC-06: sensitive data', () => {
     const raw = await prisma.employeeSensitive.findUniqueOrThrow({ where: { employeeId: e.id } });
     expect(raw.residentNoEnc).not.toContain('900101');
     expect(raw.bankAccountEnc).not.toContain('456789');
-    expect(raw.residentNoLast4).toBe('4567');
+    // only the gender digit survives in the clear, not four digits (NFR-SEC-06)
+    expect(raw.residentNoMaskDigit).toBe('1');
+    expect(JSON.stringify(raw)).not.toContain('4567');
 
     const detail = await runTx(admin, (t) => employee.detail(t, e.id));
-    expect(detail.sensitive?.residentNoMasked).toBe('******-4******');
+    expect(detail.sensitive?.residentNoMasked).toBe('******-1******');
     expect(detail.sensitive?.bankAccountMasked).toBe('****-****-6789');
     expect(JSON.stringify(detail)).not.toContain('900101-1234567');
   });
@@ -159,7 +161,7 @@ describe('HRM-12 / NFR-SEC-06: sensitive data', () => {
 
     const mine = await runTx(self, (t) => employee.me(t));
     expect(mine.name).toBe('홍길동');
-    expect(mine.sensitive?.residentNoMasked).toBe('******-4******');
+    expect(mine.sensitive?.residentNoMasked).toBe('******-1******');
     await expect(
       runTx(self, (t) =>
         employee.revealSensitive(t, { employeeId: e.id, field: 'residentNo', reason: '본인 확인용입니다' }),

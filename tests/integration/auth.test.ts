@@ -134,11 +134,25 @@ describe('login and sessions', () => {
 
   it('revokeAllSessions kills every live session', async () => {
     const user = await prisma.user.findUniqueOrThrow({ where: { username: 'admin' } });
-    const s1 = await login(prisma, { username: 'admin', password: PASSWORD });
-    const s2 = await login(prisma, { username: 'admin', password: PASSWORD });
-    expect(await revokeAllSessions(prisma, user.id)).toBeGreaterThanOrEqual(2);
-    expect(await resolveSession(prisma, s1.token)).toBeNull();
-    expect(await resolveSession(prisma, s2.token)).toBeNull();
+    const session = await login(prisma, { username: 'admin', password: PASSWORD });
+    expect(await revokeAllSessions(prisma, user.id)).toBeGreaterThanOrEqual(1);
+    expect(await resolveSession(prisma, session.token)).toBeNull();
+  });
+
+  /**
+   * NFR-SEC-03. The rotation used to revoke only already-expired sessions, so it revoked
+   * nothing: a user who logged in again because they suspected a compromise did not evict
+   * whoever was holding their old cookie. Deleting the rotation code broke no test, which
+   * is why this one exists.
+   */
+  it('로그인하면 기존 세션이 끊긴다: 재로그인이 탈취된 세션을 밀어낸다', async () => {
+    const first = await login(prisma, { username: 'admin', password: PASSWORD });
+    expect(await resolveSession(prisma, first.token)).not.toBeNull();
+
+    const second = await login(prisma, { username: 'admin', password: PASSWORD });
+
+    expect(await resolveSession(prisma, first.token)).toBeNull();
+    expect(await resolveSession(prisma, second.token)).not.toBeNull();
   });
 });
 

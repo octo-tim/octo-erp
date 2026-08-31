@@ -184,7 +184,7 @@ export async function detail(ctx: TransactionContext, id: string) {
       department: true,
       user: { select: { id: true, username: true, isActive: true, lastLoginAt: true } },
       sensitive: {
-        select: { residentNoLast4: true, bankName: true, bankAccountLast4: true, updatedAt: true },
+        select: { residentNoMaskDigit: true, bankName: true, bankAccountLast4: true, updatedAt: true },
       },
     },
   });
@@ -195,7 +195,7 @@ export async function detail(ctx: TransactionContext, id: string) {
     ...employee,
     sensitive: employee.sensitive
       ? {
-          residentNoMasked: maskResidentNo(employee.sensitive.residentNoLast4),
+          residentNoMasked: maskResidentNo(employee.sensitive.residentNoMaskDigit),
           bankName: employee.sensitive.bankName,
           bankAccountMasked: maskBankAccount(employee.sensitive.bankAccountLast4),
           updatedAt: employee.sensitive.updatedAt,
@@ -216,7 +216,8 @@ export async function setSensitive(
     const normalized = input.residentNo.replace(/\D/g, '');
     if (normalized.length !== 13) throw new AppError('VALIDATION', '주민등록번호는 13자리 숫자여야 합니다.');
     data['residentNoEnc'] = encryptSensitive(normalized).ciphertext;
-    data['residentNoLast4'] = last4(normalized);
+    // only the digit the mask shows is kept in the clear; see the schema comment
+    data['residentNoMaskDigit'] = normalized[6] ?? null;
   }
   if (input.bankAccount !== undefined) {
     data['bankAccountEnc'] = encryptSensitive(input.bankAccount).ciphertext;

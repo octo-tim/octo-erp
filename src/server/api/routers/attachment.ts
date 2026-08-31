@@ -32,23 +32,32 @@ export const attachmentRouter = router({
         requestId,
       }),
     )
-    .mutation(({ ctx, input }) =>
-      tx(
-        ctx,
-        async (t) => {
-          const body = Buffer.from(input.contentBase64, 'base64');
-          const created = await attachment.upload(t, {
-            ownerType: input.ownerType,
-            ownerId: input.ownerId,
-            originalName: input.originalName,
-            mimeType: input.mimeType,
-            body,
-          });
-          return { id: created.id, originalName: created.originalName, size: created.size };
-        },
-        input.requestId,
-      ),
-    ),
+    .mutation(async ({ ctx, input }) => {
+      const body = Buffer.from(input.contentBase64, 'base64');
+      const file = {
+        ownerType: input.ownerType,
+        ownerId: input.ownerId,
+        originalName: input.originalName,
+        mimeType: input.mimeType,
+        body,
+      };
+
+      /**
+       * The bytes are written before the transaction opens, so a slow upload does not hold
+       * a database connection, and the row lands inside the transaction with everything
+       * else the request wrote. If the transaction fails the staged object is removed —
+       * without that, a rolled-back upload left a file nothing referenced and nothing
+       * collected.
+       */
+      const staged = await attachment.stageUpload({ actor: ctx.actor!, now: ctx.now }, file);
+      try {
+        const created = await tx(ctx, (t) => attachment.upload(t, file, staged), input.requestId);
+        return { id: created.id, originalName: created.originalName, size: created.size };
+      } catch (e) {
+        await attachment.discardStaged(staged);
+        throw e;
+      }
+    }),
 
   downloadUrl: authedProcedure
     .input(z.object({ attachmentId: cuid }))

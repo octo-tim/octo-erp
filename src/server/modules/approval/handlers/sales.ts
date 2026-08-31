@@ -14,6 +14,15 @@ export const salesDocumentHandler: ApprovalTargetHandler = {
   label: '매출전표',
 
   async validateBeforeSubmit(ctx, target) {
+    /**
+     * Locked before it is read. Reading first and updating after left a race that could
+     * strand a document permanently: a confirm running at the same time posts the stock,
+     * the receivable and the journal and sets CONFIRMED, then this update — still holding
+     * the stale DRAFT it read — writes PENDING_APPROVAL over it. The ledgers say the sale
+     * happened, the document says it is waiting for approval, and approving it then fails
+     * on the duplicate-effect constraint forever.
+     */
+    await ctx.tx.$queryRawUnsafe('SELECT id FROM "SalesDocument" WHERE id = $1 FOR UPDATE', target.targetId);
     const doc = await ctx.tx.salesDocument.findUnique({ where: { id: target.targetId } });
     if (!doc) throw new AppError('NOT_FOUND', '매출전표를 찾을 수 없습니다.');
     if (doc.version !== target.targetVersion) {
@@ -74,6 +83,11 @@ export const purchaseDocumentHandler: ApprovalTargetHandler = {
   label: '매입전표',
 
   async validateBeforeSubmit(ctx, target) {
+    // locked before read, for the same reason as the sales handler above
+    await ctx.tx.$queryRawUnsafe(
+      'SELECT id FROM "PurchaseDocument" WHERE id = $1 FOR UPDATE',
+      target.targetId,
+    );
     const doc = await ctx.tx.purchaseDocument.findUnique({ where: { id: target.targetId } });
     if (!doc) throw new AppError('NOT_FOUND', '매입전표를 찾을 수 없습니다.');
     if (doc.version !== target.targetVersion) {
@@ -140,6 +154,10 @@ export const purchaseRequestHandler: ApprovalTargetHandler = {
   label: '구매요청',
 
   async validateBeforeSubmit(ctx, target) {
+    await ctx.tx.$queryRawUnsafe(
+      'SELECT id FROM "PurchaseRequest" WHERE id = $1 FOR UPDATE',
+      target.targetId,
+    );
     const request = await ctx.tx.purchaseRequest.findUnique({ where: { id: target.targetId } });
     if (!request) throw new AppError('NOT_FOUND', '구매요청을 찾을 수 없습니다.');
     if (request.version !== target.targetVersion) {

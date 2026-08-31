@@ -24,25 +24,38 @@ export async function notify(ctx: TransactionContext, input: NotifyInput): Promi
   });
 
   for (const user of users) {
-    // UIX-08: a dedupKey means "one row per user per key". Without this the in-app centre
-    // fills with identical alerts while only the email side is deduplicated.
-    if (input.dedupKey) {
-      const existing = await ctx.tx.notification.findUnique({
-        where: { userId_dedupKey: { userId: user.id, dedupKey: input.dedupKey } },
-      });
-      if (existing) continue;
-    }
+    const data = {
+      userId: user.id,
+      category: input.category,
+      title: input.title,
+      body: input.body ?? null,
+      linkUrl: input.linkUrl ?? null,
+      dedupKey: input.dedupKey ?? null,
+    };
 
-    const notification = await ctx.tx.notification.create({
-      data: {
-        userId: user.id,
-        category: input.category,
-        title: input.title,
-        body: input.body ?? null,
-        linkUrl: input.linkUrl ?? null,
-        dedupKey: input.dedupKey ?? null,
-      },
-    });
+    /**
+     * UIX-08: a dedupKey means "one row per user per key". Without it the in-app centre
+     * fills with identical alerts while only the email side is deduplicated.
+     *
+     * The insert has to be conflict-free rather than checked-then-written. Two confirms
+     * that drop the same item below safety stock at the same moment both used to pass the
+     * read and both attempt the insert; the loser hit the unique index, and a unique
+     * violation aborts the entire Postgres transaction — so a *notification collision*
+     * rolled back a stock movement, its receivable and its journal entry. `skipDuplicates`
+     * issues ON CONFLICT DO NOTHING, which returns a count instead of poisoning the
+     * transaction, and a count of zero simply means somebody else raised this alert first.
+     */
+    let notification: { id: string };
+    if (input.dedupKey) {
+      const inserted = await ctx.tx.notification.createMany({ data: [data], skipDuplicates: true });
+      if (inserted.count === 0) continue;
+      notification = await ctx.tx.notification.findUniqueOrThrow({
+        where: { userId_dedupKey: { userId: user.id, dedupKey: input.dedupKey } },
+        select: { id: true },
+      });
+    } else {
+      notification = await ctx.tx.notification.create({ data, select: { id: true } });
+    }
 
     if (input.email && user.email) {
       await ctx.tx.notificationDelivery.create({

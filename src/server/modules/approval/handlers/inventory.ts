@@ -14,6 +14,8 @@ export const stockDocumentHandler: ApprovalTargetHandler = {
   label: '재고전표',
 
   async validateBeforeSubmit(ctx: TransactionContext, target) {
+    // locked before read: a concurrent confirm must not be overwritten by this submit
+    await ctx.tx.$queryRawUnsafe('SELECT id FROM "StockDocument" WHERE id = $1 FOR UPDATE', target.targetId);
     const doc = await ctx.tx.stockDocument.findUnique({ where: { id: target.targetId } });
     if (!doc) throw new AppError('NOT_FOUND', '재고 전표를 찾을 수 없습니다.');
     if (doc.version !== target.targetVersion) {

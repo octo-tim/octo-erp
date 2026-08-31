@@ -19,6 +19,8 @@ export const journalEntryHandler: ApprovalTargetHandler = {
   label: '수동전표',
 
   async validateBeforeSubmit(ctx, target) {
+    // locked before read: a concurrent confirm must not be overwritten by this submit
+    await ctx.tx.$queryRawUnsafe('SELECT id FROM "JournalEntry" WHERE id = $1 FOR UPDATE', target.targetId);
     const entry = await ctx.tx.journalEntry.findUnique({ where: { id: target.targetId } });
     if (!entry) throw new AppError('NOT_FOUND', '회계전표를 찾을 수 없습니다.');
     if (entry.sourceType) {

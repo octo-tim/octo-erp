@@ -67,10 +67,21 @@ export function redact<T>(input: T, depth = 0): T {
 }
 
 /** Display masks (screens, exports) — HRM-12 / NFR-SEC-06. */
-export function maskResidentNo(last4?: string | null): string {
-  return last4 ? `******-${last4[0] ?? '*'}******` : '******-*******';
+/**
+ * The conventional Korean masking: the birth-date half hidden, then the gender/century
+ * digit, then the rest hidden. The digit shown is the seventh — the one that position in
+ * the mask actually means. It previously showed the tenth digit there, which reads as a
+ * gender marker to anyone who knows the format and is not one.
+ */
+export function maskResidentNo(maskDigit?: string | null): string {
+  // Only ever one character reaches the screen. The stored column holds a single digit, but a
+  // mask that interpolates whatever it is handed turns one bad caller into a disclosure, and
+  // this function exists precisely so that cannot happen.
+  const digit = maskDigit?.trim().slice(0, 1);
+  return digit ? `******-${digit}******` : '******-*******';
 }
 
 export function maskBankAccount(last4?: string | null): string {
-  return last4 ? `****-****-${last4}` : '****-****-****';
+  const tail = last4?.trim().slice(-4);
+  return tail ? `****-****-${tail}` : '****-****-****';
 }

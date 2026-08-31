@@ -73,6 +73,8 @@ model Employee {
   jobTitle       String?
   employmentType String   @default("REGULAR") // REGULAR | CONTRACT | PARTTIME | INTERN
   status         String   @default("ACTIVE")  // ACTIVE | ON_LEAVE | RESIGNED
+  /** NFR-SEC-08: set when the retention job has stripped the identifying fields */
+  anonymizedAt   DateTime?
   contractEndDate DateTime? @db.Date
   version        Int      @default(1)
   createdAt      DateTime @default(now())
@@ -320,9 +322,12 @@ model Attachment {
   uploadedById String?
   sha256       String?
   deletedAt    DateTime?
+  /** NFR-SEC-08: set when the stored object itself was removed, not merely hidden */
+  purgedAt     DateTime?
   createdAt    DateTime @default(now())
 
   @@index([ownerType, ownerId])
+  @@index([ownerType, deletedAt])
 }
 
 model SystemSetting {
@@ -409,7 +414,18 @@ model EmployeeSensitive {
   employeeId     String   @id
   employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   residentNoEnc  String?
-  residentNoLast4 String?
+  /**
+   * NFR-SEC-06: the single digit the masked display shows, and nothing more.
+   *
+   * This used to hold the last four digits in plaintext. A Korean resident registration
+   * number is birth date + one gender/century digit + four more + a checksum, and the birth
+   * date is already stored in plaintext on Employee — so keeping four more plaintext digits
+   * beside the ciphertext left only three unknown, checksum-verifiable offline. That is a
+   * hundred or so candidates from a database dump alone, which is the exact attack the
+   * encryption exists to stop. Only the gender digit is kept now, because that is the only
+   * digit any screen displays.
+   */
+  residentNoMaskDigit String?
   bankName       String?
   bankAccountEnc String?
   bankAccountLast4 String?

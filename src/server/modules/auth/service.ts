@@ -22,7 +22,7 @@ export interface LoginResult {
   actor: Actor;
 }
 
-async function securityEvent(
+export async function securityEvent(
   prisma: PrismaClient,
   type: string,
   data: {
@@ -125,15 +125,25 @@ export async function login(
   });
 
   if (!ok) {
-    const failed = user.failedLoginCount + 1;
-    const lock = failed >= MAX_FAILED_LOGINS;
-    await prisma.user.update({
+    /**
+     * The count is incremented by the database, not computed here from a value read
+     * earlier. Reading and writing it in the application lets N simultaneous attempts all
+     * read the same number and all write the same number, so a parallel attacker walks
+     * past the lockout while the counter reads 1.
+     */
+    const updated = await prisma.user.update({
       where: { id: user.id },
-      data: {
-        failedLoginCount: failed,
-        lockedUntil: lock ? new Date(now.getTime() + LOCK_DURATION_MS) : user.lockedUntil,
-      },
+      data: { failedLoginCount: { increment: 1 } },
+      select: { failedLoginCount: true },
     });
+    const failed = updated.failedLoginCount;
+    const lock = failed >= MAX_FAILED_LOGINS;
+    if (lock) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lockedUntil: new Date(now.getTime() + LOCK_DURATION_MS) },
+      });
+    }
     await securityEvent(prisma, lock ? 'ACCOUNT_LOCKED' : 'LOGIN_FAILED', {
       userId: user.id,
       ip: input.ip,
@@ -148,8 +158,14 @@ export async function login(
   }
 
   // NFR-SEC-03: rotate — every login issues a new session id and drops the caller's previous ones.
+  /**
+   * The predicate used to be `expiresAt: { lt: now }`, which matches only sessions that
+   * had already expired — sessions `resolveSession` rejects anyway. So rotation revoked
+   * nothing, and a user who logged in again because they suspected a compromise did not
+   * evict the attacker. Live sessions are what has to go.
+   */
   await prisma.session.updateMany({
-    where: { userId: user.id, revokedAt: null, expiresAt: { lt: now } },
+    where: { userId: user.id, revokedAt: null },
     data: { revokedAt: now },
   });
 
@@ -232,12 +248,39 @@ export async function changePassword(
   const policyError = validatePasswordPolicy(input.newPassword);
   if (policyError) throw new AppError('VALIDATION', policyError);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash: await hashPassword(input.newPassword), mustChangePassword: false },
+  /**
+   * All three writes in one transaction. They used to be three independent statements, so
+   * a crash or a dropped connection after the first one left the password changed and
+   * every stolen session still live, with nothing in the security log to say the password
+   * had moved. The whole point of revoking on a password change is that the two happen
+   * together.
+   *
+   * The hash is computed before the transaction opens: scrypt at N=32768 takes long enough
+   * that hashing inside would hold a database connection for no reason.
+   */
+  const passwordHash = await hashPassword(input.newPassword);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: user.id },
+      data: { passwordHash, mustChangePassword: false },
+    });
+    const revoked = await tx.session.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: now },
+    });
+    await tx.securityEvent.createMany({
+      data: [
+        { type: 'SESSION_REVOKED', userId: user.id, meta: { count: revoked.count } as never },
+        {
+          type: 'PASSWORD_RESET',
+          userId: user.id,
+          actorId: user.id,
+          meta: { self: true } as never,
+        },
+      ],
+    });
   });
-  await revokeAllSessions(prisma, user.id, now);
-  await securityEvent(prisma, 'PASSWORD_RESET', { userId: user.id, actorId: user.id, meta: { self: true } });
 }
 
 /** Admin unlock (NFR-SEC-04) — runs inside a business transaction so it is audited. */
