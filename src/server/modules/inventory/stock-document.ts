@@ -129,13 +129,24 @@ async function validateLines(ctx: TransactionContext, docType: StockDocType, lin
   if (errors.length) throw new AppError('VALIDATION', errors.join('\n'), { errors });
 }
 
-/** INT-12: a user may only move stock in warehouses within their data scope. */
-function assertWarehouseScope(ctx: TransactionContext, ids: (string | null)[]): void {
+/**
+ * INT-12: a user may only move stock in warehouses within their data scope.
+ *
+ * This checks several warehouses at once — a transfer has both a source and a destination —
+ * which is why it exists alongside rbac's single-warehouse `assertWarehouseScope`. It used
+ * to raise FORBIDDEN, so the same violation reported one code through the inventory screens
+ * and OUT_OF_SCOPE through the reports, and a client branching on `appCode` was right only
+ * half the time. The security model names OUT_OF_SCOPE for a scope violation; a missing
+ * permission is the other thing.
+ */
+function assertWarehousesInScope(ctx: TransactionContext, ids: (string | null)[]): void {
   if (ctx.actor.isAdmin) return;
   const allowed = new Set(ctx.actor.warehouseIds);
   const denied = ids.filter((id): id is string => !!id && !allowed.has(id));
   if (denied.length) {
-    throw new AppError('FORBIDDEN', '권한 범위 밖의 창고입니다.', { warehouseIds: denied });
+    throw new AppError('OUT_OF_SCOPE', '해당 창고의 자료에 접근할 수 없습니다.', {
+      warehouseIds: denied,
+    });
   }
 }
 
@@ -144,7 +155,7 @@ function assertWarehouseScope(ctx: TransactionContext, ids: (string | null)[]): 
 export async function create(ctx: TransactionContext, input: DocumentInput) {
   requirePermission(ctx.actor, 'inventory.write');
   const { from, to } = warehousesFor(input);
-  assertWarehouseScope(ctx, [from, to]);
+  assertWarehousesInScope(ctx, [from, to]);
   await validateLines(ctx, input.docType, input.lines);
 
   const docDate = input.docDate ?? businessDate(ctx.now);
@@ -207,7 +218,7 @@ export async function update(ctx: TransactionContext, id: string, input: Documen
   }
 
   const { from, to } = warehousesFor({ ...input, docType: before.docType as StockDocType });
-  assertWarehouseScope(ctx, [from, to]);
+  assertWarehousesInScope(ctx, [from, to]);
   await validateLines(ctx, before.docType as StockDocType, input.lines);
 
   const docDate = input.docDate ?? businessDate(ctx.now);
