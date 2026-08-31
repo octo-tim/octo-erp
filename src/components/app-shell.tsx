@@ -108,13 +108,14 @@ export const NAV: NavGroup[] = [
   {
     label: '보고서',
     items: [
-      { href: '/reports/sales', label: '매출', permission: 'report.read' },
-      { href: '/reports/items', label: '품목', permission: 'report.read' },
-      { href: '/reports/partners', label: '거래처', permission: 'report.read' },
-      { href: '/reports/inventory', label: '재고', permission: 'report.read' },
-      { href: '/reports/receivables', label: '채권채무', permission: 'report.read' },
-      { href: '/reports/approval', label: '결재', permission: 'report.read' },
-      { href: '/reports/hr', label: '근태·인원', permission: 'report.read' },
+      // UIX-06: reports are 조회 screens, which is exactly what phones are scoped to
+      { href: '/reports/sales', label: '매출', permission: 'report.read', mobile: true },
+      { href: '/reports/items', label: '품목', permission: 'report.read', mobile: true },
+      { href: '/reports/partners', label: '거래처', permission: 'report.read', mobile: true },
+      { href: '/reports/inventory', label: '재고', permission: 'report.read', mobile: true },
+      { href: '/reports/receivables', label: '채권채무', permission: 'report.read', mobile: true },
+      { href: '/reports/approval', label: '결재', permission: 'report.read', mobile: true },
+      { href: '/reports/hr', label: '근태·인원', permission: 'report.read', mobile: true },
     ],
   },
   {

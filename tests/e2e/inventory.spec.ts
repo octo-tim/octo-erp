@@ -156,8 +156,11 @@ test('INV-05: 수불부가 기초·이동·기말과 원천전표를 보여준�
   await expect(page.getByText('재고 원장에 반영되었습니다.')).toBeVisible();
 
   await page.goto('/inventory/ledger');
-  const option = page.getByLabel('품목').locator('option', { hasText: name });
-  await page.getByLabel('품목').selectOption(await option.getAttribute('value'));
+  // CR-22: the item filter is a search box, not a dropdown of the whole master, so it keeps
+  // working when the item master outgrows any fixed list
+  await page.getByLabel('품목').fill(name);
+  // the picker resolves once the server answers, so the search button waits for that
+  await expect(page.getByRole('button', { name: '조회' })).toBeEnabled();
   await page.getByRole('button', { name: '조회' }).click();
 
   const table = page.getByRole('main').getByRole('table');

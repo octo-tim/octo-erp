@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/trpc';
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from '@/components/ui/primitives';
+import { ItemPicker } from '@/components/ui/item-picker';
 import { fmt } from '@/lib/format';
 import { businessDate } from '@/lib/dates';
 
@@ -28,7 +29,6 @@ function LedgerBook() {
   });
   const [applied, setApplied] = useState(form);
 
-  const items = api.master.searchItems.useQuery({ q: '', take: 300 });
   const warehouses = api.master.warehouses.useQuery({ activeOnly: true });
   const book = api.inventory.book.useQuery(
     {
@@ -115,18 +115,12 @@ function LedgerBook() {
           }}
         >
           <Field label="품목" htmlFor="lb-item" required>
-            <Select
+            {/* CR-22: a dropdown of the whole master stops working once the master grows */}
+            <ItemPicker
               id="lb-item"
               value={form.itemId}
-              onChange={(e) => setForm({ ...form, itemId: e.target.value })}
-            >
-              <option value="">선택</option>
-              {(items.data ?? []).map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} ({i.code})
-                </option>
-              ))}
-            </Select>
+              onChange={(itemId) => setForm({ ...form, itemId })}
+            />
           </Field>
           <Field label="창고" htmlFor="lb-wh">
             <Select

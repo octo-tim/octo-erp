@@ -2,7 +2,7 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-30T22:45:05.021Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-31T00:24:35.168Z
 
 ## 집계
 
@@ -14,13 +14,13 @@
 | ACC 회계 | 9 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
 | APV 전자결재 | 15 | 1 | 16 | 15 | 0 | 0 | 0 | 0 | 1 |
 | HRM 인사 | 13 | 1 | 14 | 13 | 0 | 0 | 0 | 0 | 1 |
-| RPT 보고서 | 10 | 1 | 11 | 0 | 0 | 0 | 0 | 10 | 1 |
-| UIX 공통 UI | 8 | 1 | 9 | 7 | 1 | 0 | 0 | 0 | 1 |
+| RPT 보고서 | 10 | 1 | 11 | 10 | 0 | 0 | 0 | 0 | 1 |
+| UIX 공통 UI | 8 | 1 | 9 | 8 | 0 | 0 | 0 | 0 | 1 |
 | INT 공통 데이터 정합성 | 12 | 0 | 12 | 11 | 1 | 0 | 0 | 0 | 0 |
-| NFR 비기능 | 22 | 0 | 22 | 8 | 6 | 0 | 0 | 8 | 0 |
+| NFR 비기능 | 22 | 0 | 22 | 11 | 6 | 0 | 0 | 5 | 0 |
 | MIG 데이터 이관 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
 | DEC 착수 시 확정 정책 | 0 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| **합계** | **128** | **6** | **143** | 102 | 8 | 0 | 0 | 27 | 6 |
+| **합계** | **128** | **6** | **143** | 116 | 7 | 0 | 0 | 14 | 6 |
 
 기능 요구사항(BAS·SLS·INV·ACC·APV·HRM·RPT·UIX): M 85개, O 6개 (RFP 5장 선언: 필수 85 / 선택 6).
 
@@ -64,7 +64,7 @@
 | INV-02 | M | **출고** — 매출 연동 및 샘플·폐기 등 사유가 있는 수동 출고 | `src/app/(app)/inventory/stock-out/page.tsx`<br>`src/app/(app)/inventory/documents/[id]/page.tsx` | `inventory.createDocument`<br>`inventory.confirmDocument` | `src/server/modules/inventory/stock-document.ts (ISSUE 분기)`<br>`src/server/modules/inventory/valuation.ts (provisionalCosts)` | `StockDocument`<br>`StockDocumentLine`<br>`InventoryLedger` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts`<br>`tests/unit/item-match.test.ts` | 샘플·폐기 사유 선택이 필수인지, 출고 단가가 입력값이 아니라 월 총평균가로 산정되는지 확인 | DONE | — |
 | INV-03 | M | **창고 이동** — 출발·도착 창고, 요청·이동중·완료·취소 상태 | `src/app/(app)/inventory/moves/page.tsx`<br>`src/app/(app)/inventory/documents/[id]/page.tsx` | `inventory.shipTransfer`<br>`inventory.confirmDocument`<br>`inventory.cancelDocument` | `src/server/modules/inventory/stock-document.ts (ship, movementTransitions, TRANSFER 원장 2행)` | `StockDocument`<br>`InventoryLedger` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts`<br>`tests/unit/item-match.test.ts` | 요청 상태에서는 재고가 움직이지 않고, 도착 처리 시 양쪽 창고가 동시에 바뀌는지 확인 | DONE | — |
 | INV-04 | M | **현재고** — 확정 시 원장 반영, 취소 시 반대 원장, 원장 합계가 진실 | `src/app/(app)/inventory/status/page.tsx`<br>`src/app/(app)/inventory/valuation/page.tsx` | `inventory.onHand`<br>`inventory.reconcile`<br>`inventory.rebuildSnapshot` | `src/server/modules/inventory/ledger.ts (post, reverse, reconcile, rebuild)`<br>`src/server/modules/inventory/stock-report.ts (onHand)` | `InventoryLedger`<br>`StockSnapshot` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 캐시를 고의로 훼손한 뒤 대조에서 검출되고 재생성으로 복구되는지 확인 | DONE | — |
-| INV-05 | M | **수불부** — 기간별 기초·입고·출고·기말과 원천전표, 엑셀 출력 | `src/app/(app)/inventory/ledger/page.tsx` | `inventory.book`<br>`inventory.bookCsv` | `src/server/modules/inventory/stock-report.ts (book, bookToCsv)` | `InventoryLedger`<br>`StockDocument` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 기초·기말과 원천전표 링크, 엑셀 내려받기(UTF-8 BOM)를 확인 | DONE | — |
+| INV-05 | M | **수불부** — 기간별 기초·입고·출고·기말과 원천전표, 엑셀 출력 | `src/app/(app)/inventory/ledger/page.tsx`<br>`src/components/ui/item-picker.tsx` | `inventory.book`<br>`inventory.bookCsv` | `src/server/modules/inventory/stock-report.ts (book, bookToCsv)` | `InventoryLedger`<br>`StockDocument` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 기초·기말과 원천전표 링크, 엑셀 내려받기(UTF-8 BOM)를 확인 | DONE | 품목 선택은 마스터 전체를 대상으로 서버 조회한다. 고정 목록은 마스터가 커지면 틀린다 (CR-22) |
 | INV-06 | M | **마이너스 재고** — 설정에 따라 경고 또는 확정 차단, 동시 출고에서도 보장 | `src/app/(app)/inventory/documents/[id]/page.tsx` | `inventory.confirmDocument` | `src/server/modules/inventory/ledger.ts (lockAndRead, checkNegative, negativeStockMode)`<br>`src/server/modules/inventory/stock-document.ts (postWithChecks)` | `InventoryLedger`<br>`StockSnapshot`<br>`SystemSetting (inventory.allowNegative)`<br>`SecurityEvent` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 동시 출고 경쟁시험에서 한 건만 성공하는지, 경고 모드 전환 시 SecurityEvent가 남는지 확인 | DONE | — |
 | INV-07 | M | **안전재고** — 앱·이메일·확정 메신저 채널 알림과 재시도 이력 | `src/app/(app)/inventory/status/page.tsx`<br>`src/components/ui/notification-center.tsx` | `inventory.safetyStock`<br>`inventory.onHand (belowSafetyOnly)` | `src/server/modules/inventory/safety-stock.ts`<br>`src/server/modules/notification/service.ts`<br>`src/server/modules/outbox/service.ts` | `Item.safetyStock`<br>`Notification`<br>`NotificationDelivery`<br>`OutboxEvent` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 미달 발생 시 앱·이메일 알림이 하루 1건으로 묶이는지, 재시도 이력이 남는지 확인 | DONE | — |
 | INV-08 | M | **재고 실사** — 실사·차이·승인·조정전표 생성 | `src/app/(app)/inventory/counts/page.tsx`<br>`src/app/(app)/inventory/counts/[id]/page.tsx` | `inventory.createCount`<br>`inventory.startCount`<br>`inventory.recordCount`<br>`inventory.approveCount`<br>`inventory.cancelCount`<br>`inventory.counts`<br>`inventory.count` | `src/server/modules/inventory/stock-count.ts` | `StockCount`<br>`StockCountLine`<br>`StockDocument (ADJUST)` | `tests/integration/inventory.test.ts`<br>`tests/e2e/inventory.spec.ts` | 실사 시작 후 발생한 이동이 차이에 영향을 주지 않는지, 미입력 품목이 승인을 막는지 확인 | DONE | — |
@@ -129,28 +129,28 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| RPT-01 | M | **매출현황** — 일·주·월·분기 매출·원가·이익 추이 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-02 | M | **품목순위** — 수량·금액 상위 N개와 기여도 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-03 | M | **거래처실적** — 매출·매입과 전년동기 비교 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-04 | M | **재고현황** — 창고·분류별 수량·금액, 안전재고 강조 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-05 | M | **채권채무** — 미수·미지급과 연령분석 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-06 | M | **대시보드** — 매출·이익률·미수·재고금액·안전재고·내 결재 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-07 | M | **공통기능** — 조회조건 저장, 엑셀·PDF, 인쇄 최적화 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-08 | M | **드릴다운** — 집계에서 권한 범위 내 원천전표로 이동 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-09 | M | **결재현황** — 처리건수·평균시간·장기미결 | — | — | — | — | — | — | NOT_STARTED | — |
-| RPT-10 | M | **근태·인원** — 근태·연장근로·연차사용률·인원증감 | — | — | — | — | — | — | NOT_STARTED | — |
+| RPT-01 | M | **매출현황** — 일·주·월·분기 매출·원가·이익 추이 | `src/app/(app)/reports/sales/page.tsx` | `report.salesTrend` | `src/server/modules/report/sales-report.ts (salesTrend)`<br>`src/server/modules/report/filter.ts (resolveFilter, 데이터범위 검증)` | `SalesDocument`<br>`JournalEntry`<br>`JournalLine` | `tests/integration/report.test.ts`<br>`tests/e2e/reports.spec.ts`<br>`tests/unit/report-filter.test.ts` | 일·주·월·분기 단위를 바꿔가며 합계가 같은지, 확정 전표만 집계되는지 확인 | DONE | 매출원가는 확정 시 기록된 분개에서 읽는다. 품목 마스터에서 다시 계산하면 DEC-01 월마감 조정과 어긋난다 |
+| RPT-02 | M | **품목순위** — 수량·금액 상위 N개와 기여도 | `src/app/(app)/reports/items/page.tsx` | `report.itemRanking` | `src/server/modules/report/sales-report.ts (itemRanking)` | — | `tests/integration/report.test.ts`<br>`tests/e2e/reports.spec.ts` | 금액·수량 기준을 바꾸면 순위가 바뀌는지, 기여도 분모가 표시된 상위 합계임이 화면에 설명되는지 확인 | DONE | — |
+| RPT-03 | M | **거래처실적** — 매출·매입과 전년동기 비교 | `src/app/(app)/reports/partners/page.tsx` | `report.partnerPerformance` | `src/server/modules/report/sales-report.ts (partnerPerformance)` | — | `tests/integration/report.test.ts`<br>`tests/e2e/reports.spec.ts` | 전년 실적이 없는 거래처에 증감률이 0퍼센트로 표시되지 않고 하이픈으로 남는지 확인 | DONE | — |
+| RPT-04 | M | **재고현황** — 창고·분류별 수량·금액, 안전재고 강조 | `src/app/(app)/reports/inventory/page.tsx` | `report.stockStatus` | `src/server/modules/report/operations-report.ts (stockStatus)` | `InventoryLedger`<br>`Item.safetyStock` | `tests/integration/report.test.ts`<br>`tests/e2e/reports.spec.ts` | 캐시가 아니라 원장에서 집계되는지, 안전재고 미달만 걸러보기가 동작하는지 확인 | DONE | — |
+| RPT-05 | M | **채권채무** — 미수·미지급과 연령분석 | `src/app/(app)/reports/receivables/page.tsx` | `report.openItems` | `src/server/modules/report/operations-report.ts (openItems)`<br>`src/server/modules/sales/pricing.ts (agingBucket)` | `Receivable`<br>`Payable` | `tests/integration/report.test.ts`<br>`tests/e2e/reports.spec.ts` | 연령 기준일이 지급기일 우선인지, 경계일이 아래 구간에 포함되는지 확인 | DONE | — |
+| RPT-06 | M | **대시보드** — 매출·이익률·미수·재고금액·안전재고·내 결재 | `src/app/(app)/home/page.tsx`<br>`src/components/ui/dashboard-grid.tsx` | `report.dashboard` | `src/server/modules/report/operations-report.ts (dashboard)` | — | `tests/integration/report.test.ts`<br>`tests/e2e/reports.spec.ts` | 위젯 숫자가 한 시점에서 나오는지, 각 위젯에서 원천 화면으로 이동되는지 확인 | DONE | 여섯 위젯이 한 번의 서버 호출로 채워진다. 위젯마다 따로 조회하면 서로 다른 시점이 섞인다 |
+| RPT-07 | M | **공통기능** — 조회조건 저장, 엑셀·PDF, 인쇄 최적화 | `src/components/report/report-filter-bar.tsx`<br>`src/components/report/report-table.tsx` | `preference.get`<br>`preference.set` | `src/lib/report-export.ts (toCsv, INTERNAL_NOTICE)`<br>`src/server/modules/report/filter.ts (resolveFilter, 데이터범위 검증)` | `UserPreference(kind=REPORT_FILTER)` | `tests/unit/report-export.test.ts`<br>`tests/e2e/reports.spec.ts` | 화면 합계와 내보낸 파일 합계가 같은지, 인쇄 시 제목·기간·고지문구가 나오는지, 조회조건이 다음 방문에 남아 있는지 확인 | DONE | 내보내기는 화면이 이미 가진 행을 그대로 쓴다. 다시 조회하면 그 사이 바뀐 자료가 섞인다 |
+| RPT-08 | M | **드릴다운** — 집계에서 권한 범위 내 원천전표로 이동 | `src/app/(app)/reports/drilldown/page.tsx` | `report.drillDown` | `src/server/modules/report/drilldown.ts` | — | `tests/integration/report.test.ts`<br>`tests/e2e/reports.spec.ts` | 집계에 잡힌 건수와 드릴다운 건수가 맞는지, 권한 범위 밖 전표가 나오지 않는지 확인 | DONE | 집계와 같은 범위 규칙을 그대로 적용한다. 조건이 URL에 있어 링크로 공유해도 각자의 범위로 보인다 |
+| RPT-09 | M | **결재현황** — 처리건수·평균시간·장기미결 | `src/app/(app)/reports/approval/page.tsx` | `report.approvalStats` | `src/server/modules/report/operations-report.ts (approvalStats)` | `ApprovalDocument` | `tests/integration/report.test.ts`<br>`tests/e2e/reports.spec.ts` | 평균 처리시간이 완료 문서만으로 계산되는지, 장기 미결이 오래된 순으로 나오는지 확인 | DONE | — |
+| RPT-10 | M | **근태·인원** — 근태·연장근로·연차사용률·인원증감 | `src/app/(app)/reports/hr/page.tsx` | `report.workforce` | `src/server/modules/report/operations-report.ts (workforceStats)` | `Attendance`<br>`LeaveGrant`<br>`LeaveUsage`<br>`Employee` | `tests/integration/report.test.ts`<br>`tests/e2e/reports.spec.ts` | 인사 권한이 없는 사용자에게 빈 보고서가 아니라 권한 안내가 보이는지 확인 | DONE | NFR-SEC-02에 따라 report.read만으로는 볼 수 없고 hr.read가 필요하다 |
 | RPT-11 | O | **예약발송** — 주기·수신자별 이메일 자동발송 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항 |
 
 ## UIX — 공통 UI
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| UIX-01 | M | **홈** — 위젯 배치·표시 저장과 주요 기능 진입 | `src/app/(app)/home/page.tsx`<br>`src/components/ui/dashboard-grid.tsx` | `src/server/api/routers/preference.ts` | — | `UserPreference` | `tests/e2e/components.spec.ts` | 위젯 숨김·순서 변경 후 새로고침 유지 확인 | DONE | 레이아웃·저장 완료. 업무 위젯 데이터 연결은 STEP 11 |
+| UIX-01 | M | **홈** — 위젯 배치·표시 저장과 주요 기능 진입 | `src/app/(app)/home/page.tsx`<br>`src/components/ui/dashboard-grid.tsx` | `src/server/api/routers/preference.ts` | — | `UserPreference` | `tests/e2e/components.spec.ts`<br>`tests/e2e/reports.spec.ts` | 위젯 숨김·순서 변경 후 새로고침 유지 확인 | DONE | STEP 11에서 위젯이 실제 수치와 원천 화면 링크로 채워졌다 |
 | UIX-02 | M | **표준 조회** — 조건·그리드 구조, 컬럼 표시·순서·너비 저장 | `src/components/ui/standard-list-page.tsx` | `src/server/api/routers/preference.ts` | — | — | `tests/e2e/components.spec.ts` | 조회조건·컬럼 표시 저장 후 새로고침 복원 확인 | DONE | 모든 목록 화면이 StandardListPage + useSavedFilters 사용 |
 | UIX-03 | M | **그리드** — 정렬·필터·페이징/가상스크롤·다중선택·합계·엑셀 | `src/components/ui/data-grid.tsx` | — | — | — | `tests/e2e/components.spec.ts` | 정렬·다중선택·합계·페이징·컬럼설정·엑셀 버튼 확인 | DONE | 서버 페이징 전제(페이지당 최대 200). 1만건 전체 전송 없음 |
 | UIX-04 | M | **전표 입력** — 라인 추가·복사·삭제, Tab/Enter, 자동완성 | `src/components/ui/voucher-line-editor.tsx` | — | — | — | `tests/e2e/components.spec.ts` | Tab/Enter 이동, Ctrl+D 복사, Ctrl+Delete 삭제, 자동완성 확인 | DONE | 표시용 재계산만 클라이언트에서 수행하고 서버가 최종 검증(DEC-02) |
 | UIX-05 | M | **입력검증** — 오류 위치 표시, 저장 실패 시 입력값 보존 | `src/components/ui/form-error-summary.tsx` | — | — | — | `tests/e2e/components.spec.ts` | 저장 실패 시 오류 요약·필드 포커스·입력값 보존 확인 | DONE | — |
-| UIX-06 | M | **반응형** — PC 우선, 태블릿·모바일 조회·대시보드·결재 | `src/components/app-shell.tsx`<br>`src/app/globals.css` | — | — | — | `tests/e2e/components.spec.ts`<br>`tests/e2e/auth.spec.ts` | 1440·1024·390px 확인, 모바일 메뉴 토글 | IN_PROGRESS | 앱 셸 반응형 완료. 업무 화면 전수 확인은 STEP 11 |
+| UIX-06 | M | **반응형** — PC 우선, 태블릿·모바일 조회·대시보드·결재 | `src/components/app-shell.tsx`<br>`src/app/globals.css` | — | — | — | `tests/e2e/components.spec.ts`<br>`tests/e2e/auth.spec.ts`<br>`tests/e2e/reports.spec.ts` | 1440·1024·390px 확인, 모바일 메뉴 토글 | DONE | 보고서까지 포함해 PC·태블릿·모바일 조회 흐름 확인 완료 |
 | UIX-07 | M | **첨부파일** — 전표·거래처·결재·인사파일의 권한 기반 업로드·미리보기 | `src/components/ui/attachment-panel.tsx` | `src/server/api/routers/attachment.ts` | `src/server/modules/storage/attachment.ts` | `Attachment` | `tests/integration/storage.test.ts`<br>`tests/e2e/components.spec.ts` | 권한 없는 첨부 접근 차단, 만료 URL 거부 확인 | DONE | — |
 | UIX-08 | M | **알림센터** — 재고·여신·결재·인사 알림 통합 | `src/components/ui/notification-center.tsx` | `src/server/api/routers/notification.ts` | `src/server/modules/notification/service.ts` | `Notification`<br>`NotificationDelivery` | `tests/integration/transaction.test.ts`<br>`tests/e2e/components.spec.ts` | 알림 목록·읽음·모두 읽음 확인 | DONE | 재고·여신·결재·인사 알림이 같은 센터로 모임 |
 | UIX-09 | O | **즐겨찾기** — 즐겨찾기와 최근메뉴 | — | — | — | — | — | — | OPTION_NOT_APPROVED | 선택 요구사항. 승인 시 구현 |
@@ -176,9 +176,9 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| NFR-PERF-01 | M | **목록 성능** — 1만 건 목록 일반 조회 서버 2초 이내 | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-PERF-02 | M | **저장 성능** — 일반 전표 저장 1초 이내(외부 알림 제외) | — | — | — | — | — | — | NOT_STARTED | — |
-| NFR-PERF-03 | M | **보고서 성능** — 1년 보고서 집계 5초 이내 | — | — | — | — | — | — | NOT_STARTED | — |
+| NFR-PERF-01 | M | **목록 성능** — 1만 건 목록 일반 조회 서버 2초 이내 | — | — | `tools/seed-perf.mjs (1년치 실분포 시드)` | — | `tests/integration/performance.test.ts` | node tools/seed-perf.mjs 로 1년치를 넣고 통합시험에서 측정값 확인 | DONE | 1년치 12,000여 건 분포에서 목록 조회 70ms, 조건 조회 28ms, 깊은 페이지 39ms. 목표 2초 |
+| NFR-PERF-02 | M | **저장 성능** — 일반 전표 저장 1초 이내(외부 알림 제외) | — | — | `tools/seed-perf.mjs (1년치 실분포 시드)` | — | `tests/integration/performance.test.ts` | node tools/seed-perf.mjs 로 1년치를 넣고 통합시험에서 측정값 확인 | DONE | 전표 저장 12ms, 확정 42ms. 목표 1초 |
+| NFR-PERF-03 | M | **보고서 성능** — 1년 보고서 집계 5초 이내 | — | — | `tools/seed-perf.mjs (1년치 실분포 시드)` | — | `tests/integration/performance.test.ts` | node tools/seed-perf.mjs 로 1년치를 넣고 통합시험에서 측정값 확인 | DONE | 매출현황 월별 75ms 일별 97ms, 품목순위 72ms, 거래처실적 22ms, 재고현황 118ms, 대시보드 59ms. 목표 5초 |
 | NFR-PERF-04 | M | **동시 사용자** — 확정된 동시 사용자 수에서 오류율·응답시간 충족 | — | — | — | — | — | — | NOT_STARTED | — |
 | NFR-SEC-01 | M | **RBAC·데이터 범위** — 조회·등록·수정·삭제·승인 권한과 부문·창고 범위를 서버에서 강제 | — | `src/server/api/trpc.ts`<br>`src/server/api/routers/admin.ts` | `src/server/modules/rbac/permissions.ts`<br>`src/server/modules/rbac/service.ts` | `Role`<br>`Permission`<br>`RolePermission`<br>`UserRole` | `tests/integration/rbac.test.ts` | 역할별 허용·차단 라우터 호출 확인 | DONE | 8개 역할 시드, 권한 문자열 module.action |
 | NFR-SEC-02 | M | **인사 권한 분리** — 인사 권한 분리, 본인 외 조회는 인사담당·경영진 | — | — | `src/server/modules/rbac/service.ts (assertHrScope)`<br>`src/server/modules/storage/attachment.ts` | — | `tests/integration/rbac.test.ts`<br>`tests/integration/storage.test.ts` | hr.self 사용자가 타인 인사서류 접근 시 403 확인 | DONE | hr.read 없으면 본인만. 첨부도 SELF_OWNED_TYPES로 동일 규칙 적용 |
@@ -250,3 +250,7 @@
 | CR-17 | STEP 10 | 결재 대상으로 지정된 매출·매입·재고 전표를 결재로 올릴 방법이 아예 없었다. 해당 targetType을 가진 결재양식이 없었고 화면에도 상신 경로가 없어서, 기준금액을 넘는 전표는 확정도 상신도 못 하고 멈춘다. 사용자가 스스로 빠져나올 수 없는 상태다. 양식 4종을 추가하고, 전표 화면에서 한 번에 기안·상신하는 경로와 취소 상신 경로를 만들었다. | APV-08, APV-12, DEC-03, SLS-05, SLS-06, INV-01 | FIXED |
 | CR-18 | STEP 10 | 승인 콜백이 업무 부작용을 결재자의 권한으로 수행하고 있어, 매출전표를 결재하려면 결재자가 sales.confirm 권한을 따로 가져야 했다. 결재선에 올라간 부서장이나 재무 담당이 정작 승인을 못 하는 상황이 된다. 확정·취소의 권한 검사를 직접 호출일 때만 수행하도록 바꿨다. 결재선이 이미 그 문서에 대한 승인 권한을 판정했고, 감사로그에는 여전히 결재자가 행위자로 남는다. | APV-08, NFR-SEC-01, INT-06 | FIXED |
 | CR-19 | STEP 10 | 취소 역분개 일자 규칙이 모듈마다 달랐다. 매출·매입은 회계 달력만 보고, 재고는 재고평가 달력만 본 뒤 원전표 일자가 아니라 오늘 날짜를 썼다. 확정 매출 취소는 두 원장을 모두 건드리므로 어느 쪽 규칙이든 상대 달력이 마감된 달에 행을 넣을 수 있었다. 두 달력이 모두 여는 첫 달로 결정하는 하나의 규칙으로 통일했다. 재고전표 등록·확정에도 빠져 있던 회계기간 검증을 추가했다. | INT-07, DEC-04, INV-01, SLS-05 | FIXED |
+| CR-20 | STEP 11 | 보고서 조회조건을 저장·복원하면서, 서버에서 돌아온 저장값을 무조건 화면에 덮어쓰고 있었다. 저장값은 네트워크로 오기 때문에 느린 회선에서는 사용자가 이미 날짜를 입력한 뒤에 도착할 수 있고, 그러면 방금 친 조건이 지워지고 엉뚱한 기간으로 조회된다. E2E에서 실제로 재현됐다. 사용자가 폼을 건드리기 전에만 복원하도록 바꿨다. | RPT-07, UIX-02, UIX-05 | FIXED |
+| CR-21 | STEP 11 | 성능 측정용 시드가 재고원장 행을 지우려다 추가전용 트리거에 막혔다. 트리거가 옳고 시드가 틀린 경우다. 애플리케이션 코드는 그대로 두고, 시드에서만 한 트랜잭션 동안 replica 모드로 전환해 정리하도록 했으며 시험 데이터베이스가 아니면 거부한다. 운영 코드에서는 이 방식을 쓰지 않는다. | INT-04, NFR-PERF-01 | IMPLEMENTED_AS_TOOLING |
+| CR-22 | STEP 11 | CR-14와 같은 결함이 고치지 않고 남겨둔 자리에서 그대로 재발했다. 수불부의 품목 선택이 상한 300건짜리 드롭다운이어서, 활성 품목이 329건이 되자 방금 등록한 품목이 목록에 없어 수불부를 조회할 수 없었다. 마스터가 커지면 고정 목록은 어떤 상한을 두든 언젠가 틀린다. 입력한 글자로 서버를 조회하는 품목 선택 컴포넌트를 만들어 교체했고, 서버 응답이 도착하는 시점에 다시 해석하도록 해서 이름을 다 치고 곧바로 조회를 눌러도 품목이 비지 않는다. | INV-05, UIX-02, BAS-01 | FIXED |
+| CR-23 | STEP 11 | 대시보드 위젯 배치의 '배치 저장 완료' 버튼이 실제로는 편집모드를 끄기만 하고 저장을 기다리지 않았다. 배치 변경은 바뀔 때마다 즉시 저장되지만 응답을 기다리지 않으므로, 완료를 누르고 곧바로 새로고침하면 저장이 요청보다 먼저 끝나지 않아 배치가 되돌아간다. 홈 화면에 대시보드 집계 조회가 붙으면서 실제로 재현됐다. 저장을 뜻하는 버튼이라면 저장을 보장해야 하므로, 편집 종료 시 저장 완료를 기다리고 그동안 '저장 중'을 표시하도록 했다. | UIX-01, RPT-06 | FIXED |

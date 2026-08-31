@@ -44,6 +44,17 @@ export function DashboardGrid({ dashboardKey, widgets }: { dashboardKey: string;
     [dashboardKey, setPref],
   );
 
+  /**
+   * Each change saves as it is made, which is what makes the arrangement feel immediate.
+   * But the button that ends editing says 배치 저장 완료, and a button that says that has to
+   * mean it: leaving edit mode therefore waits for the layout to be stored, so a reload or
+   * a navigation straight afterwards cannot outrun the write and lose the arrangement.
+   */
+  async function finishEditing() {
+    await setPref.mutateAsync({ kind: 'DASHBOARD', key: dashboardKey, value: layout });
+    setEditing(false);
+  }
+
   function move(id: string, delta: number) {
     const order = [...layout.order];
     const i = order.indexOf(id);
@@ -65,8 +76,13 @@ export function DashboardGrid({ dashboardKey, widgets }: { dashboardKey: string;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => setEditing((v) => !v)} aria-pressed={editing}>
-          {editing ? '배치 저장 완료' : '위젯 배치'}
+        <Button
+          size="sm"
+          onClick={() => (editing ? void finishEditing() : setEditing(true))}
+          aria-pressed={editing}
+          disabled={editing && setPref.isPending}
+        >
+          {editing ? (setPref.isPending ? '저장 중' : '배치 저장 완료') : '위젯 배치'}
         </Button>
       </div>
 

@@ -409,10 +409,11 @@
       "UserPreference"
     ],
     "tests": [
-      "tests/e2e/components.spec.ts"
+      "tests/e2e/components.spec.ts",
+      "tests/e2e/reports.spec.ts"
     ],
     "manual": "위젯 숨김·순서 변경 후 새로고침 유지 확인",
-    "notes": "레이아웃·저장 완료. 업무 위젯 데이터 연결은 STEP 11"
+    "notes": "STEP 11에서 위젯이 실제 수치와 원천 화면 링크로 채워졌다"
   },
   "UIX-02": {
     "status": "DONE",
@@ -614,17 +615,18 @@
     "manual": "저장 실패 시 오류 요약·필드 포커스·입력값 보존 확인"
   },
   "UIX-06": {
-    "status": "IN_PROGRESS",
+    "status": "DONE",
     "screens": [
       "src/components/app-shell.tsx",
       "src/app/globals.css"
     ],
     "tests": [
       "tests/e2e/components.spec.ts",
-      "tests/e2e/auth.spec.ts"
+      "tests/e2e/auth.spec.ts",
+      "tests/e2e/reports.spec.ts"
     ],
     "manual": "1440·1024·390px 확인, 모바일 메뉴 토글",
-    "notes": "앱 셸 반응형 완료. 업무 화면 전수 확인은 STEP 11"
+    "notes": "보고서까지 포함해 PC·태블릿·모바일 조회 흐름 확인 완료"
   },
   "UIX-09": {
     "status": "OPTION_NOT_APPROVED",
@@ -1439,6 +1441,48 @@
         "SLS-05"
       ],
       "status": "FIXED"
+    },
+    {
+      "id": "CR-20",
+      "step": "STEP 11",
+      "text": "보고서 조회조건을 저장·복원하면서, 서버에서 돌아온 저장값을 무조건 화면에 덮어쓰고 있었다. 저장값은 네트워크로 오기 때문에 느린 회선에서는 사용자가 이미 날짜를 입력한 뒤에 도착할 수 있고, 그러면 방금 친 조건이 지워지고 엉뚱한 기간으로 조회된다. E2E에서 실제로 재현됐다. 사용자가 폼을 건드리기 전에만 복원하도록 바꿨다.",
+      "related": [
+        "RPT-07",
+        "UIX-02",
+        "UIX-05"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-21",
+      "step": "STEP 11",
+      "text": "성능 측정용 시드가 재고원장 행을 지우려다 추가전용 트리거에 막혔다. 트리거가 옳고 시드가 틀린 경우다. 애플리케이션 코드는 그대로 두고, 시드에서만 한 트랜잭션 동안 replica 모드로 전환해 정리하도록 했으며 시험 데이터베이스가 아니면 거부한다. 운영 코드에서는 이 방식을 쓰지 않는다.",
+      "related": [
+        "INT-04",
+        "NFR-PERF-01"
+      ],
+      "status": "IMPLEMENTED_AS_TOOLING"
+    },
+    {
+      "id": "CR-22",
+      "step": "STEP 11",
+      "text": "CR-14와 같은 결함이 고치지 않고 남겨둔 자리에서 그대로 재발했다. 수불부의 품목 선택이 상한 300건짜리 드롭다운이어서, 활성 품목이 329건이 되자 방금 등록한 품목이 목록에 없어 수불부를 조회할 수 없었다. 마스터가 커지면 고정 목록은 어떤 상한을 두든 언젠가 틀린다. 입력한 글자로 서버를 조회하는 품목 선택 컴포넌트를 만들어 교체했고, 서버 응답이 도착하는 시점에 다시 해석하도록 해서 이름을 다 치고 곧바로 조회를 눌러도 품목이 비지 않는다.",
+      "related": [
+        "INV-05",
+        "UIX-02",
+        "BAS-01"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-23",
+      "step": "STEP 11",
+      "text": "대시보드 위젯 배치의 '배치 저장 완료' 버튼이 실제로는 편집모드를 끄기만 하고 저장을 기다리지 않았다. 배치 변경은 바뀔 때마다 즉시 저장되지만 응답을 기다리지 않으므로, 완료를 누르고 곧바로 새로고침하면 저장이 요청보다 먼저 끝나지 않아 배치가 되돌아간다. 홈 화면에 대시보드 집계 조회가 붙으면서 실제로 재현됐다. 저장을 뜻하는 버튼이라면 저장을 보장해야 하므로, 편집 종료 시 저장 완료를 기다리고 그동안 '저장 중'을 표시하도록 했다.",
+      "related": [
+        "UIX-01",
+        "RPT-06"
+      ],
+      "status": "FIXED"
     }
   ],
   "BAS-01": {
@@ -1748,7 +1792,8 @@
       "inventory.bookCsv"
     ],
     "screens": [
-      "src/app/(app)/inventory/ledger/page.tsx"
+      "src/app/(app)/inventory/ledger/page.tsx",
+      "src/components/ui/item-picker.tsx"
     ],
     "tables": [
       "InventoryLedger",
@@ -1758,7 +1803,8 @@
       "tests/integration/inventory.test.ts",
       "tests/e2e/inventory.spec.ts"
     ],
-    "manual": "기초·기말과 원천전표 링크, 엑셀 내려받기(UTF-8 BOM)를 확인"
+    "manual": "기초·기말과 원천전표 링크, 엑셀 내려받기(UTF-8 BOM)를 확인",
+    "notes": "품목 선택은 마스터 전체를 대상으로 서버 조회한다. 고정 목록은 마스터가 커지면 틀린다 (CR-22)"
   },
   "INV-06": {
     "status": "DONE",
@@ -2516,5 +2562,245 @@
     ],
     "manual": "결재 완료 전 구매요청이 발주로 전환되지 않는지, 공급처별로 발주가 나뉘는지 확인",
     "notes": "결재 대상 핸들러로 등록되어 승인 시점에 요청 상태가 바뀐다"
+  },
+  "RPT-01": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/report/sales-report.ts (salesTrend)",
+      "src/server/modules/report/filter.ts (resolveFilter, 데이터범위 검증)"
+    ],
+    "api": [
+      "report.salesTrend"
+    ],
+    "screens": [
+      "src/app/(app)/reports/sales/page.tsx"
+    ],
+    "tables": [
+      "SalesDocument",
+      "JournalEntry",
+      "JournalLine"
+    ],
+    "tests": [
+      "tests/integration/report.test.ts",
+      "tests/e2e/reports.spec.ts",
+      "tests/unit/report-filter.test.ts"
+    ],
+    "manual": "일·주·월·분기 단위를 바꿔가며 합계가 같은지, 확정 전표만 집계되는지 확인",
+    "notes": "매출원가는 확정 시 기록된 분개에서 읽는다. 품목 마스터에서 다시 계산하면 DEC-01 월마감 조정과 어긋난다"
+  },
+  "RPT-02": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/report/sales-report.ts (itemRanking)"
+    ],
+    "api": [
+      "report.itemRanking"
+    ],
+    "screens": [
+      "src/app/(app)/reports/items/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/report.test.ts",
+      "tests/e2e/reports.spec.ts"
+    ],
+    "manual": "금액·수량 기준을 바꾸면 순위가 바뀌는지, 기여도 분모가 표시된 상위 합계임이 화면에 설명되는지 확인"
+  },
+  "RPT-03": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/report/sales-report.ts (partnerPerformance)"
+    ],
+    "api": [
+      "report.partnerPerformance"
+    ],
+    "screens": [
+      "src/app/(app)/reports/partners/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/report.test.ts",
+      "tests/e2e/reports.spec.ts"
+    ],
+    "manual": "전년 실적이 없는 거래처에 증감률이 0퍼센트로 표시되지 않고 하이픈으로 남는지 확인"
+  },
+  "RPT-04": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/report/operations-report.ts (stockStatus)"
+    ],
+    "api": [
+      "report.stockStatus"
+    ],
+    "screens": [
+      "src/app/(app)/reports/inventory/page.tsx"
+    ],
+    "tables": [
+      "InventoryLedger",
+      "Item.safetyStock"
+    ],
+    "tests": [
+      "tests/integration/report.test.ts",
+      "tests/e2e/reports.spec.ts"
+    ],
+    "manual": "캐시가 아니라 원장에서 집계되는지, 안전재고 미달만 걸러보기가 동작하는지 확인"
+  },
+  "RPT-05": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/report/operations-report.ts (openItems)",
+      "src/server/modules/sales/pricing.ts (agingBucket)"
+    ],
+    "api": [
+      "report.openItems"
+    ],
+    "screens": [
+      "src/app/(app)/reports/receivables/page.tsx"
+    ],
+    "tables": [
+      "Receivable",
+      "Payable"
+    ],
+    "tests": [
+      "tests/integration/report.test.ts",
+      "tests/e2e/reports.spec.ts"
+    ],
+    "manual": "연령 기준일이 지급기일 우선인지, 경계일이 아래 구간에 포함되는지 확인"
+  },
+  "RPT-06": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/report/operations-report.ts (dashboard)"
+    ],
+    "api": [
+      "report.dashboard"
+    ],
+    "screens": [
+      "src/app/(app)/home/page.tsx",
+      "src/components/ui/dashboard-grid.tsx"
+    ],
+    "tests": [
+      "tests/integration/report.test.ts",
+      "tests/e2e/reports.spec.ts"
+    ],
+    "manual": "위젯 숫자가 한 시점에서 나오는지, 각 위젯에서 원천 화면으로 이동되는지 확인",
+    "notes": "여섯 위젯이 한 번의 서버 호출로 채워진다. 위젯마다 따로 조회하면 서로 다른 시점이 섞인다"
+  },
+  "RPT-07": {
+    "status": "DONE",
+    "services": [
+      "src/lib/report-export.ts (toCsv, INTERNAL_NOTICE)",
+      "src/server/modules/report/filter.ts (resolveFilter, 데이터범위 검증)"
+    ],
+    "api": [
+      "preference.get",
+      "preference.set"
+    ],
+    "screens": [
+      "src/components/report/report-filter-bar.tsx",
+      "src/components/report/report-table.tsx"
+    ],
+    "tables": [
+      "UserPreference(kind=REPORT_FILTER)"
+    ],
+    "tests": [
+      "tests/unit/report-export.test.ts",
+      "tests/e2e/reports.spec.ts"
+    ],
+    "manual": "화면 합계와 내보낸 파일 합계가 같은지, 인쇄 시 제목·기간·고지문구가 나오는지, 조회조건이 다음 방문에 남아 있는지 확인",
+    "notes": "내보내기는 화면이 이미 가진 행을 그대로 쓴다. 다시 조회하면 그 사이 바뀐 자료가 섞인다"
+  },
+  "RPT-08": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/report/drilldown.ts"
+    ],
+    "api": [
+      "report.drillDown"
+    ],
+    "screens": [
+      "src/app/(app)/reports/drilldown/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/report.test.ts",
+      "tests/e2e/reports.spec.ts"
+    ],
+    "manual": "집계에 잡힌 건수와 드릴다운 건수가 맞는지, 권한 범위 밖 전표가 나오지 않는지 확인",
+    "notes": "집계와 같은 범위 규칙을 그대로 적용한다. 조건이 URL에 있어 링크로 공유해도 각자의 범위로 보인다"
+  },
+  "RPT-09": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/report/operations-report.ts (approvalStats)"
+    ],
+    "api": [
+      "report.approvalStats"
+    ],
+    "screens": [
+      "src/app/(app)/reports/approval/page.tsx"
+    ],
+    "tables": [
+      "ApprovalDocument"
+    ],
+    "tests": [
+      "tests/integration/report.test.ts",
+      "tests/e2e/reports.spec.ts"
+    ],
+    "manual": "평균 처리시간이 완료 문서만으로 계산되는지, 장기 미결이 오래된 순으로 나오는지 확인"
+  },
+  "RPT-10": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/report/operations-report.ts (workforceStats)"
+    ],
+    "api": [
+      "report.workforce"
+    ],
+    "screens": [
+      "src/app/(app)/reports/hr/page.tsx"
+    ],
+    "tables": [
+      "Attendance",
+      "LeaveGrant",
+      "LeaveUsage",
+      "Employee"
+    ],
+    "tests": [
+      "tests/integration/report.test.ts",
+      "tests/e2e/reports.spec.ts"
+    ],
+    "manual": "인사 권한이 없는 사용자에게 빈 보고서가 아니라 권한 안내가 보이는지 확인",
+    "notes": "NFR-SEC-02에 따라 report.read만으로는 볼 수 없고 hr.read가 필요하다"
+  },
+  "NFR-PERF-01": {
+    "status": "DONE",
+    "services": [
+      "tools/seed-perf.mjs (1년치 실분포 시드)"
+    ],
+    "tests": [
+      "tests/integration/performance.test.ts"
+    ],
+    "manual": "node tools/seed-perf.mjs 로 1년치를 넣고 통합시험에서 측정값 확인",
+    "notes": "1년치 12,000여 건 분포에서 목록 조회 70ms, 조건 조회 28ms, 깊은 페이지 39ms. 목표 2초"
+  },
+  "NFR-PERF-02": {
+    "status": "DONE",
+    "services": [
+      "tools/seed-perf.mjs (1년치 실분포 시드)"
+    ],
+    "tests": [
+      "tests/integration/performance.test.ts"
+    ],
+    "manual": "node tools/seed-perf.mjs 로 1년치를 넣고 통합시험에서 측정값 확인",
+    "notes": "전표 저장 12ms, 확정 42ms. 목표 1초"
+  },
+  "NFR-PERF-03": {
+    "status": "DONE",
+    "services": [
+      "tools/seed-perf.mjs (1년치 실분포 시드)"
+    ],
+    "tests": [
+      "tests/integration/performance.test.ts"
+    ],
+    "manual": "node tools/seed-perf.mjs 로 1년치를 넣고 통합시험에서 측정값 확인",
+    "notes": "매출현황 월별 75ms 일별 97ms, 품목순위 72ms, 거래처실적 22ms, 재고현황 118ms, 대시보드 59ms. 목표 5초"
   }
 }

@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { authedProcedure, router } from '@/server/api/trpc';
 import { prisma } from '@/server/db';
 
-/** UIX-01/UIX-02: per-user grid columns, saved search filters, dashboard layout. */
-const kind = z.enum(['GRID_COLUMNS', 'SEARCH_FILTER', 'DASHBOARD']);
+/** UIX-01/UIX-02/RPT-07: per-user grid columns, saved search and report filters, dashboard layout. */
+const kind = z.enum(['GRID_COLUMNS', 'SEARCH_FILTER', 'DASHBOARD', 'REPORT_FILTER']);
 
 export const preferenceRouter = router({
   get: authedProcedure
