@@ -6,6 +6,7 @@ import { MAX_ATTEMPTS, nextBackoff } from '@/server/modules/outbox/service';
 import { sendEmail } from './handlers/email';
 import { runScheduledJob } from './handlers/scheduled';
 import { registerScheduledJobs } from './register';
+import { enqueueDueJobs } from './scheduler';
 
 /**
  * INT-10: the transactional-outbox worker. Claims with FOR UPDATE SKIP LOCKED so
@@ -128,6 +129,13 @@ async function notifyAdminsOfFailure(eventId: string, topic: string, error: stri
 
 export async function tick(): Promise<number> {
   await reclaimStale();
+  // The periodic jobs have no external scheduler; this is where their day's run is created.
+  // A failure here must not stop the worker from draining the events already queued.
+  try {
+    await enqueueDueJobs();
+  } catch (e) {
+    logger.warn({ err: (e as Error).message }, 'could not enqueue due scheduled jobs');
+  }
   const events = await claim();
   for (const event of events) await processOne(event);
   return events.length;

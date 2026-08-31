@@ -7,6 +7,7 @@ import { hashPassword, validatePasswordPolicy } from '@/server/core/crypto';
 import { AppError } from '@/server/core/errors';
 import { cuid, dateString, paging, requestId, skipTake } from '@/server/api/schemas/common';
 import { nextBackoff } from '@/server/modules/outbox/service';
+import * as retention from '@/server/jobs/retention';
 
 export const adminRouter = router({
   // ── users & roles (NFR-SEC-01) ──
@@ -379,4 +380,29 @@ export const adminRouter = router({
       };
     }),
   ),
+  // ── NFR-SEC-05 / DEC-06: personal-data retention ──
+  /**
+   * Two phases with a person in between, deliberately. `plan` only counts and records what
+   * would be destroyed; `execute` destroys it and cannot be undone. Wiring them to one
+   * button would make an irreversible action one click away from a mis-read number, so the
+   * approval is a separate call by a named user and is written to the audit log.
+   *
+   * These existed as library code from STEP 12 with no router and no screen, so the whole
+   * retention obligation was unreachable from the running system.
+   */
+  retentionRuns: permissionProcedure('admin.settings')
+    .input(z.object({ take: z.number().int().min(1).max(100).default(20) }))
+    .query(({ input }) => prisma.retentionRun.findMany({ orderBy: { createdAt: 'desc' }, take: input.take })),
+
+  planRetention: permissionProcedure('admin.settings')
+    .input(z.object({ requestId }))
+    .mutation(({ ctx, input }) => tx(ctx, (t) => retention.plan(t), input.requestId)),
+
+  approveRetention: permissionProcedure('admin.settings')
+    .input(z.object({ runId: cuid, requestId }))
+    .mutation(({ ctx, input }) => tx(ctx, (t) => retention.approve(t, input.runId), input.requestId)),
+
+  executeRetention: permissionProcedure('admin.settings')
+    .input(z.object({ runId: cuid, requestId }))
+    .mutation(({ ctx, input }) => tx(ctx, (t) => retention.execute(t, input.runId), input.requestId)),
 });

@@ -2,7 +2,7 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-31T02:06:00.574Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-31T05:09:56.218Z
 
 ## 집계
 

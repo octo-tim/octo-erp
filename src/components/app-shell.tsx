@@ -127,6 +127,7 @@ export const NAV: NavGroup[] = [
       { href: '/system/jobs', label: '실패작업', permission: 'admin.jobs' },
       { href: '/system/audit', label: '감사로그', permission: 'admin.audit' },
       { href: '/system/migration', label: '데이터 이관', permission: 'admin.migration' },
+      { href: '/system/retention', label: '개인정보 파기', permission: 'admin.settings' },
     ],
   },
   {

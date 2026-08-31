@@ -9,6 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { actorFor, prepareDatabase, prisma, runTx, truncateBusinessData } from '../helpers/db';
 import { registerScheduledJobs } from '@/server/jobs/register';
 import { runScheduledJob } from '@/server/jobs/handlers/scheduled';
+import { enqueueDueJobs } from '@/server/jobs/scheduler';
+import { businessDate } from '@/lib/dates';
 import * as approval from '@/server/modules/approval/service';
 import * as organization from '@/server/modules/hrm/organization';
 import * as employee from '@/server/modules/hrm/employee';
@@ -494,5 +496,83 @@ describe('NFR-SEC-03: 인증·세션', () => {
     // pre-fix predicate would have left it live.
     expect(await resolveSession(prisma, first.token)).toBeNull();
     expect(await resolveSession(prisma, second.token)).not.toBeNull();
+  });
+});
+
+// ── 9. INT-10 / APV-11 / NFR-SEC-08: daily scheduled-job enqueueing ──
+//
+// `registerScheduledJobs` gave every `job.*` topic a handler, which fixed events being
+// silently discarded (see test group 1 above). It did not fix a second, quieter half of the
+// same problem: nothing ever emitted `job.long_pending_approval` or `job.retention`, so those
+// two handlers sat wired up but unreachable. `enqueueDueJobs` (src/server/jobs/scheduler.ts)
+// is the fix: it enqueues one OutboxEvent per topic per KST business day, gated on "the job's
+// KST hour has passed", and deduplicated on OutboxEvent's (topic, dedupKey) unique index so
+// several worker replicas ticking at once still produce one run.
+describe('스케줄 작업 발생 (src/server/jobs/scheduler.ts)', () => {
+  /** Builds the UTC instant whose Asia/Seoul wall-clock time is the given KST hour/minute —
+   *  never the real wall clock, so the test does not pass or fail by time of day. */
+  function kst(y: number, m: number, d: number, hour: number, minute = 0): Date {
+    return new Date(Date.UTC(y, m - 1, d, hour - 9, minute));
+  }
+
+  // DAILY_JOBS today: job.retention at KST 02:00, job.long_pending_approval at KST 09:00.
+  const RETENTION_TOPIC = 'job.retention';
+  const LONG_PENDING_TOPIC = 'job.long_pending_approval';
+
+  it('KST 시각이 지난 작업만 발생하고, 아직 지나지 않은 작업은 발생하지 않는다', async () => {
+    // 05:00 KST: retention's 02:00 has passed, long_pending_approval's 09:00 has not.
+    const now = kst(2026, 8, 31, 5);
+    const day = businessDate(now);
+
+    const enqueued = await enqueueDueJobs(now);
+    expect(enqueued).toBe(1);
+
+    expect(await prisma.outboxEvent.count({ where: { topic: RETENTION_TOPIC, dedupKey: day } })).toBe(1);
+    expect(await prisma.outboxEvent.count({ where: { topic: LONG_PENDING_TOPIC, dedupKey: day } })).toBe(0);
+  });
+
+  it('같은 날 두 번 호출해도 하루에 한 번만 발생한다', async () => {
+    const now = kst(2026, 8, 31, 10); // past both jobs' hours
+    const day = businessDate(now);
+
+    expect(await enqueueDueJobs(now)).toBe(2);
+    // Second call the same day: both topics already have a row for `day`, so nothing new.
+    expect(await enqueueDueJobs(now)).toBe(0);
+
+    expect(await prisma.outboxEvent.count({ where: { topic: RETENTION_TOPIC, dedupKey: day } })).toBe(1);
+    expect(await prisma.outboxEvent.count({ where: { topic: LONG_PENDING_TOPIC, dedupKey: day } })).toBe(1);
+  });
+
+  it('여러 워커가 동시에 호출해도 하루에 한 행만 남는다', async () => {
+    const now = kst(2026, 8, 31, 10);
+    const day = businessDate(now);
+
+    // Before the (topic, dedupKey) unique index + ON CONFLICT DO NOTHING, replicas racing
+    // this read-then-insert would each pass the "not enqueued yet" read and each insert,
+    // producing duplicate runs for the same day.
+    const results = await Promise.allSettled([
+      enqueueDueJobs(now),
+      enqueueDueJobs(now),
+      enqueueDueJobs(now),
+      enqueueDueJobs(now),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(4);
+
+    expect(await prisma.outboxEvent.count({ where: { topic: RETENTION_TOPIC, dedupKey: day } })).toBe(1);
+    expect(await prisma.outboxEvent.count({ where: { topic: LONG_PENDING_TOPIC, dedupKey: day } })).toBe(1);
+  });
+
+  it('하루의 첫 호출이 늦게(23시) 일어나도 그날의 이른 시각 작업을 건너뛰지 않는다', async () => {
+    // Simulates a worker that only starts ticking at 23:00 KST: this is the FIRST call of
+    // the day, made long after both jobs' hours have passed. The condition is "hour has
+    // passed and today has not run" rather than "it is currently that hour", so both the
+    // 02:00 and 09:00 jobs still get enqueued for today instead of being skipped to
+    // tomorrow.
+    const now = kst(2026, 8, 31, 23);
+    const day = businessDate(now);
+
+    expect(await enqueueDueJobs(now)).toBe(2);
+    expect(await prisma.outboxEvent.count({ where: { topic: RETENTION_TOPIC, dedupKey: day } })).toBe(1);
+    expect(await prisma.outboxEvent.count({ where: { topic: LONG_PENDING_TOPIC, dedupKey: day } })).toBe(1);
   });
 });
