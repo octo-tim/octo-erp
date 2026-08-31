@@ -59,6 +59,7 @@ const SCREENS: { path: string; open?: string }[] = [
   { path: '/reports/receivables' },
   { path: '/reports/approval' },
   { path: '/reports/hr' },
+  { path: '/system/migration' },
 ];
 
 test.beforeEach(async ({ page }) => {

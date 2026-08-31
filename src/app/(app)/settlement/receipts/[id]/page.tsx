@@ -261,9 +261,7 @@ export default function SettlementDetailPage({ params }: { params: Promise<{ id:
                 {s.matches.map((m) => (
                   <tr key={m.id} className="border-b border-slate-100">
                     <td className="px-2 py-1.5">{fmt.dateTime(m.createdAt as unknown as string)}</td>
-                    <td className="px-2 py-1.5">
-                      {m.receivable?.document.docNo ?? m.payable?.document.docNo ?? '-'}
-                    </td>
+                    <td className="px-2 py-1.5">{docNoOf(m.receivable) ?? docNoOf(m.payable) ?? '-'}</td>
                     <td className="px-2 py-1.5">{ORIGIN_LABEL[m.origin] ?? m.origin}</td>
                     <td className="px-2 py-1.5">{m.note ?? '-'}</td>
                     <td className="tabular px-2 py-1.5 text-right">
@@ -278,4 +276,15 @@ export default function SettlementDetailPage({ params }: { params: Promise<{ id:
       </Card>
     </div>
   );
+}
+
+/**
+ * MIG-04: a migrated open item has no document in this system, so it shows the source
+ * system's number instead of an empty cell.
+ */
+function docNoOf(
+  row: { document?: { docNo: string } | null; migrationDocNo?: string | null } | null | undefined,
+): string | null {
+  if (!row) return null;
+  return row.document?.docNo ?? (row.migrationDocNo ? `${row.migrationDocNo} (이관)` : null);
 }

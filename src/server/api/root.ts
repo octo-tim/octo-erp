@@ -11,6 +11,7 @@ import { inventoryRouter } from './routers/inventory';
 import { accountingRouter } from './routers/accounting';
 import { salesRouter } from './routers/sales';
 import { reportRouter } from './routers/report';
+import { migrationRouter } from './routers/migration';
 import { registerApprovalHandlers } from '@/server/modules/approval/register';
 
 // APV-08/09: handlers must be registered before any request can approve a document.
@@ -29,6 +30,7 @@ export const appRouter = router({
   accounting: accountingRouter,
   sales: salesRouter,
   report: reportRouter,
+  migration: migrationRouter,
 });
 
 export type AppRouter = typeof appRouter;

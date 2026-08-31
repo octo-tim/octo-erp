@@ -6,6 +6,7 @@ import * as accountingPeriod from '@/server/modules/accounting/period';
 import * as postingRule from '@/server/modules/accounting/posting-rule';
 import * as journal from '@/server/modules/accounting/journal';
 import { nextDocNo, DOC_TYPES } from '@/server/modules/numbering/service';
+import { openItemDocNo } from './receivable';
 import { idempotent } from '@/server/core/idempotency';
 import { assertVersion } from '@/server/core/state-machine';
 import { amount, D, ZERO } from '@/lib/money';
@@ -205,7 +206,7 @@ async function applyAllocations(
     if (value.gt(balance)) {
       throw new AppError(
         'OVER_ALLOCATION',
-        `${target.document.docNo}: 잔액 ${amount(balance)}원을 초과해 배분할 수 없습니다. 요청 ${amount(value)}원.`,
+        `${openItemDocNo(target)}: 잔액 ${amount(balance)}원을 초과해 배분할 수 없습니다. 요청 ${amount(value)}원.`,
         { targetId: a.targetId, balance: amount(balance), requested: amount(value) },
       );
     }
@@ -229,7 +230,7 @@ async function applyAllocations(
       },
     });
     await refreshTarget(ctx, a.targetId, isReceipt);
-    applied.push({ targetId: a.targetId, amount: amount(value), docNo: target.document.docNo });
+    applied.push({ targetId: a.targetId, amount: amount(value), docNo: openItemDocNo(target) });
   }
 
   await ctx.tx.settlement.update({

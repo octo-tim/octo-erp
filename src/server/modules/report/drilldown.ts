@@ -142,18 +142,21 @@ function openItemRow(
     amount: unknown;
     settledAmount: unknown;
     partner: { name: string };
-    document: { id: string; docNo: string };
+    document: { id: string; docNo: string } | null;
+    migrationDocNo?: string | null;
   },
   base: string,
 ): DrillRow {
   return {
     id: r.id,
-    docNo: r.document.docNo,
+    // MIG-04: a migrated open item has no document here, so it shows its source number and
+    // has nowhere to drill to; the row is still counted, because the money is still owed
+    docNo: r.document?.docNo ?? (r.migrationDocNo ? `${r.migrationDocNo} (이관)` : '-'),
     docDate: r.docDate.toISOString().slice(0, 10),
     partnerName: r.partner.name,
     // what is still owed, which is the figure the aging report added up
     amount: amount(D(String(r.amount)).minus(D(String(r.settledAmount)))),
     status: r.status,
-    href: `${base}/${r.document.id}`,
+    href: r.document ? `${base}/${r.document.id}` : '',
   };
 }

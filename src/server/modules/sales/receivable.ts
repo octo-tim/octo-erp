@@ -242,6 +242,20 @@ export interface AgingRow {
 }
 
 /** SLS-08: balances by partner, split into aging buckets. */
+/**
+ * The document number an open item shows.
+ *
+ * A migrated open item has no document in this system — the source system holds it — so it
+ * carries the source number instead (MIG-04). Every screen that lists open items goes
+ * through here so a migrated one is never blank and never a crash.
+ */
+export function openItemDocNo(row: {
+  document?: { docNo: string } | null;
+  migrationDocNo?: string | null;
+}): string {
+  return row.document?.docNo ?? (row.migrationDocNo ? `${row.migrationDocNo} (이관)` : '-');
+}
+
 export async function aging(
   ctx: TransactionContext,
   input: { asOf?: string; partnerId?: string } = {},
@@ -316,7 +330,7 @@ export async function payableSummary(ctx: TransactionContext, input: { partnerId
       id: p.id,
       partnerId: p.partnerId,
       partnerName: p.partner.name,
-      docNo: p.document.docNo,
+      docNo: openItemDocNo(p),
       docDate: p.docDate.toISOString().slice(0, 10),
       dueDate: p.dueDate ? p.dueDate.toISOString().slice(0, 10) : null,
       amount: amount(p.amount),
@@ -340,7 +354,7 @@ export async function openItems(ctx: TransactionContext, partnerId: string, kind
     return rows
       .map((r) => ({
         id: r.id,
-        docNo: r.document.docNo,
+        docNo: openItemDocNo(r),
         docDate: r.docDate.toISOString().slice(0, 10),
         amount: amount(r.amount),
         settledAmount: amount(r.settledAmount),
@@ -357,7 +371,7 @@ export async function openItems(ctx: TransactionContext, partnerId: string, kind
   return rows
     .map((r) => ({
       id: r.id,
-      docNo: r.document.docNo,
+      docNo: openItemDocNo(r),
       docDate: r.docDate.toISOString().slice(0, 10),
       amount: amount(r.amount),
       settledAmount: amount(r.settledAmount),

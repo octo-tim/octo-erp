@@ -2,7 +2,7 @@
 
 > 생성: `node tools/traceability.mjs` — 원본은 `docs/requirements.json`(기준선)과 `docs/traceability-state.json`(증적). 이 파일을 직접 편집하지 않는다.
 
-기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-31T00:24:35.168Z
+기준 문서: docs/source/ERP_RFP_v0.3.md · 생성 시각: 2026-08-31T00:56:56.376Z
 
 ## 집계
 
@@ -18,9 +18,9 @@
 | UIX 공통 UI | 8 | 1 | 9 | 8 | 0 | 0 | 0 | 0 | 1 |
 | INT 공통 데이터 정합성 | 12 | 0 | 12 | 11 | 1 | 0 | 0 | 0 | 0 |
 | NFR 비기능 | 22 | 0 | 22 | 11 | 6 | 0 | 0 | 5 | 0 |
-| MIG 데이터 이관 | 9 | 0 | 9 | 0 | 0 | 0 | 0 | 9 | 0 |
+| MIG 데이터 이관 | 9 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
 | DEC 착수 시 확정 정책 | 0 | 0 | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
-| **합계** | **128** | **6** | **143** | 116 | 7 | 0 | 0 | 14 | 6 |
+| **합계** | **128** | **6** | **143** | 125 | 7 | 0 | 0 | 5 | 6 |
 
 기능 요구사항(BAS·SLS·INV·ACC·APV·HRM·RPT·UIX): M 85개, O 6개 (RFP 5장 선언: 필수 85 / 선택 6).
 
@@ -203,15 +203,15 @@
 
 | ID | 중요도 | 요구사항 | 구현 화면 | API/라우터 | 서비스 | 테이블 | 자동시험 | 수동검수 | 상태 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| MIG-01 | M | **품목 이관** — 전건, 분류·단가·과세·안전재고 포함 | — | — | — | — | — | — | NOT_STARTED | — |
-| MIG-02 | M | **거래처 이관** — 전건, 담당자·결제조건·여신한도 포함 | — | — | — | — | — | — | NOT_STARTED | — |
-| MIG-03 | M | **기초재고 이관** — 기준일 창고·품목별 수량·금액, 개시 원장 반영 | — | — | — | — | — | — | NOT_STARTED | — |
-| MIG-04 | M | **미수·미지급 이관** — 거래처별 잔액과 합의된 전표 상세 | — | — | — | — | — | — | NOT_STARTED | — |
-| MIG-05 | M | **회계 이관** — 계정과목과 기준일 기초잔액 | — | — | — | — | — | — | NOT_STARTED | — |
-| MIG-06 | M | **인사·조직 이관** — 재직자, 합의된 퇴사자, 부서·직위·입사일·조직도 | — | — | — | — | — | — | NOT_STARTED | — |
-| MIG-07 | M | **연차 이관** — 산정 기준일과 부여·사용·잔여 합계 | — | — | — | — | — | — | NOT_STARTED | — |
-| MIG-08 | M | **과거 전표 이관** — 최근 기간과 참조 방식 확정 후 이관 | — | — | — | — | — | — | NOT_STARTED | — |
-| MIG-09 | M | **이관 검증** — 건수·수량·금액·차대변·재고 평가금액 대사 결과서 | — | — | — | — | — | — | NOT_STARTED | — |
+| MIG-01 | M | **품목 이관** — 전건, 분류·단가·과세·안전재고 포함 | `src/app/(app)/system/migration/page.tsx` | `migration.template`<br>`migration.validate`<br>`migration.applyBatch`<br>`migration.reconcile`<br>`migration.batches` | `src/server/modules/migration/targets.ts (itemHandler)`<br>`src/server/modules/migration/templates.ts`<br>`src/server/modules/migration/service.ts` | `Item`<br>`MigrationBatch`<br>`MigrationRow` | `tests/integration/migration.test.ts`<br>`tests/e2e/migration.spec.ts` | 양식을 내려받아 원천을 매핑하고, 오류 행이 행 번호와 함께 표시되는지 확인 | DONE | — |
+| MIG-02 | M | **거래처 이관** — 전건, 담당자·결제조건·여신한도 포함 | `src/app/(app)/system/migration/page.tsx` | `migration.template`<br>`migration.validate`<br>`migration.applyBatch`<br>`migration.reconcile`<br>`migration.batches` | `src/server/modules/migration/targets.ts (partnerHandler)`<br>`src/server/modules/migration/templates.ts`<br>`src/server/modules/migration/service.ts` | `Partner`<br>`PartnerContact` | `tests/integration/migration.test.ts`<br>`tests/e2e/migration.spec.ts` | 사업자번호 체크섬 오류가 검증 단계에서 잡히는지 확인 | DONE | — |
+| MIG-03 | M | **기초재고 이관** — 기준일 창고·품목별 수량·금액, 개시 원장 반영 | `src/app/(app)/system/migration/page.tsx` | `migration.template`<br>`migration.validate`<br>`migration.applyBatch`<br>`migration.reconcile`<br>`migration.batches` | `src/server/modules/migration/targets.ts (openingStockHandler)`<br>`src/server/modules/migration/service.ts` | `InventoryLedger(sourceType=OPENING)`<br>`StockSnapshot`<br>`SystemSetting(migration.baselineDate)` | `tests/integration/migration.test.ts`<br>`tests/e2e/migration.spec.ts` | 기초재고가 기준일자 개시 원장으로 들어가고 원장·캐시 대조에 불일치가 없는지, 같은 파일을 다시 올려도 두 배가 되지 않는지 확인 | DONE | INT-04에 따라 캐시가 아니라 원장에 기록한다. 기준일이 없으면 반영을 거부한다 |
+| MIG-04 | M | **미수·미지급 이관** — 거래처별 잔액과 합의된 전표 상세 | `src/app/(app)/system/migration/page.tsx` | `migration.template`<br>`migration.validate`<br>`migration.applyBatch`<br>`migration.reconcile`<br>`migration.batches` | `src/server/modules/migration/targets.ts (openItemHandler)`<br>`src/server/modules/migration/service.ts` | `Receivable.migrationDocNo`<br>`Payable.migrationDocNo` | `tests/integration/migration.test.ts`<br>`tests/e2e/migration.spec.ts` | 이관 미수가 연령분석·미수목록에 잡히고 원천 전표번호가 표시되는지 확인 | DONE | 이관 미결은 이 시스템에 원천 전표가 없으므로 documentId가 비고 migrationDocNo를 갖는다 |
+| MIG-05 | M | **회계 이관** — 계정과목과 기준일 기초잔액 | `src/app/(app)/system/migration/page.tsx` | `migration.template`<br>`migration.validate`<br>`migration.applyBatch`<br>`migration.reconcile`<br>`migration.batches` | `src/server/modules/migration/targets.ts (accountHandler, openingBalanceHandler)`<br>`src/server/modules/migration/service.ts` | `Account`<br>`OpeningBalance(origin=MIGRATION)` | `tests/integration/migration.test.ts`<br>`tests/e2e/migration.spec.ts` | 기초잔액 차대 차액이 반영 전 합계에 먼저 보이는지 확인 | DONE | — |
+| MIG-06 | M | **인사·조직 이관** — 재직자, 합의된 퇴사자, 부서·직위·입사일·조직도 | `src/app/(app)/system/migration/page.tsx` | `migration.template`<br>`migration.validate`<br>`migration.applyBatch`<br>`migration.reconcile`<br>`migration.batches` | `src/server/modules/migration/targets.ts (departmentHandler, employeeHandler)`<br>`src/server/modules/migration/service.ts` | `Department`<br>`Employee`<br>`EmployeeSensitive` | `tests/integration/migration.test.ts`<br>`tests/e2e/migration.spec.ts` | 같은 파일 안의 상위 부서가 연결되는지, 퇴사자가 RESIGNED로 들어가는지, 주민번호가 암호화되고 오류파일·감사로그에 원문이 없는지 확인 | DONE | NFR-SEC-06과 같은 경로로 암호화한다. 민감 항목 오류는 값을 표시하지 않는다 |
+| MIG-07 | M | **연차 이관** — 산정 기준일과 부여·사용·잔여 합계 | `src/app/(app)/system/migration/page.tsx` | `migration.template`<br>`migration.validate`<br>`migration.applyBatch`<br>`migration.reconcile`<br>`migration.batches` | `src/server/modules/migration/targets.ts (leaveHandler)`<br>`src/server/modules/migration/service.ts` | `LeaveGrant(sourceType=MIGRATION)`<br>`LeaveUsage(sourceType=MIGRATION)` | `tests/integration/migration.test.ts`<br>`tests/e2e/migration.spec.ts` | 부여·사용·잔여 합계가 원천과 일치하는지 확인 | DONE | 사용일수는 개별 날짜를 만들어내지 않고 부여일자에 한 건으로 이관한다 |
+| MIG-08 | M | **과거 전표 이관** — 최근 기간과 참조 방식 확정 후 이관 | `src/app/(app)/system/migration/page.tsx` | `migration.template`<br>`migration.validate`<br>`migration.applyBatch`<br>`migration.reconcile`<br>`migration.batches` | `src/server/modules/migration/targets.ts (historicalSalesHandler)`<br>`src/server/modules/migration/service.ts` | `SalesDocument(status=MIGRATED)`<br>`SalesDocumentLine` | `tests/integration/migration.test.ts`<br>`tests/e2e/migration.spec.ts` | 과거전표가 재고·채권·분개를 만들지 않고 매출 보고서 집계에도 들어가지 않는지 확인 | DONE | DEC-08 참조용 이관. 기초재고·기초잔액이 이미 그 결과를 담고 있어 다시 반영하면 이중계상이 된다 |
+| MIG-09 | M | **이관 검증** — 건수·수량·금액·차대변·재고 평가금액 대사 결과서 | `src/app/(app)/system/migration/page.tsx` | `migration.template`<br>`migration.validate`<br>`migration.applyBatch`<br>`migration.reconcile`<br>`migration.batches` | `src/server/modules/migration/service.ts (validate, apply, reconcile)` | `MigrationBatch`<br>`MigrationRow(targetType,sourceKey) UNIQUE` | `tests/integration/migration.test.ts`<br>`tests/e2e/migration.spec.ts` | 대상별 대사 결과의 차이가 모두 0인지, 건수가 원천=정상+오류로 맞는지 확인 후 승인자 서명 | DONE | 차이가 1건이라도 있으면 완료로 보지 않는다. 운영 전환 계획은 docs/cutover-plan.md |
 
 ## DEC — 착수 시 확정 정책
 
@@ -254,3 +254,6 @@
 | CR-21 | STEP 11 | 성능 측정용 시드가 재고원장 행을 지우려다 추가전용 트리거에 막혔다. 트리거가 옳고 시드가 틀린 경우다. 애플리케이션 코드는 그대로 두고, 시드에서만 한 트랜잭션 동안 replica 모드로 전환해 정리하도록 했으며 시험 데이터베이스가 아니면 거부한다. 운영 코드에서는 이 방식을 쓰지 않는다. | INT-04, NFR-PERF-01 | IMPLEMENTED_AS_TOOLING |
 | CR-22 | STEP 11 | CR-14와 같은 결함이 고치지 않고 남겨둔 자리에서 그대로 재발했다. 수불부의 품목 선택이 상한 300건짜리 드롭다운이어서, 활성 품목이 329건이 되자 방금 등록한 품목이 목록에 없어 수불부를 조회할 수 없었다. 마스터가 커지면 고정 목록은 어떤 상한을 두든 언젠가 틀린다. 입력한 글자로 서버를 조회하는 품목 선택 컴포넌트를 만들어 교체했고, 서버 응답이 도착하는 시점에 다시 해석하도록 해서 이름을 다 치고 곧바로 조회를 눌러도 품목이 비지 않는다. | INV-05, UIX-02, BAS-01 | FIXED |
 | CR-23 | STEP 11 | 대시보드 위젯 배치의 '배치 저장 완료' 버튼이 실제로는 편집모드를 끄기만 하고 저장을 기다리지 않았다. 배치 변경은 바뀔 때마다 즉시 저장되지만 응답을 기다리지 않으므로, 완료를 누르고 곧바로 새로고침하면 저장이 요청보다 먼저 끝나지 않아 배치가 되돌아간다. 홈 화면에 대시보드 집계 조회가 붙으면서 실제로 재현됐다. 저장을 뜻하는 버튼이라면 저장을 보장해야 하므로, 편집 종료 시 저장 완료를 기다리고 그동안 '저장 중'을 표시하도록 했다. | UIX-01, RPT-06 | FIXED |
+| CR-24 | STEP 12 | 이관 미결(미수·미지급)은 이 시스템에 원천 전표가 없다. Receivable·Payable의 documentId를 선택항목으로 바꾸자 타입 검사가 전표를 당연히 있다고 가정한 자리 다섯 곳을 짚어냈다. 그대로 뒀다면 이관 미결이 있는 회사에서 미수 목록·수금 배분·드릴다운이 모두 죽었을 것이다. 원천 전표번호를 표시하는 공용 함수를 만들어 모든 화면이 같은 방식으로 처리하게 했다. | MIG-04, SLS-08, SLS-09, SLS-10, RPT-08 | FIXED |
+| CR-25 | STEP 12 | 거래처 이관 검증에서 사업자번호 판정을 뒤집어 썼다. 검증 함수는 실패 사유 문자열을 돌려주고 통과하면 null을 주는데, 참·거짓으로 읽어서 정상 번호를 오류로, 잘못된 번호를 정상으로 처리했다. 통합시험이 잡았다. 반환값을 사유로 다루도록 고쳤고, 오류 메시지도 함수가 준 사유를 그대로 보여준다. | MIG-02, BAS-04 | FIXED |
+| CR-26 | STEP 12 | tRPC 라우터에서 apply는 예약어라 빌드가 실패했다(Function.prototype.apply). 타입 검사와 단위시험은 통과했고 빌드에서만 드러났다. 프로시저 이름을 applyBatch로 바꿨다. | MIG-09 | FIXED |

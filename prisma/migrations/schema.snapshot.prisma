@@ -1727,8 +1727,11 @@ model PurchaseDocumentLine {
  */
 model Receivable {
   id            String   @id @default(cuid())
-  documentId    String   @unique
-  document      SalesDocument @relation(fields: [documentId], references: [id])
+  /** MIG-04: a migrated open item has no document here; the source system holds it */
+  documentId    String?  @unique
+  document      SalesDocument? @relation(fields: [documentId], references: [id])
+  /** MIG-04: the source system's document number, which is also the migration row key */
+  migrationDocNo String?
   partnerId     String
   partner       Partner  @relation(fields: [partnerId], references: [id])
   docDate       DateTime @db.Date
@@ -1744,12 +1747,16 @@ model Receivable {
 
   @@index([partnerId, status])
   @@index([docDate])
+  @@index([migrationDocNo])
 }
 
 model Payable {
   id            String   @id @default(cuid())
-  documentId    String   @unique
-  document      PurchaseDocument @relation(fields: [documentId], references: [id])
+  /** MIG-04: a migrated open item has no document here; the source system holds it */
+  documentId    String?  @unique
+  document      PurchaseDocument? @relation(fields: [documentId], references: [id])
+  /** MIG-04: the source system's document number, which is also the migration row key */
+  migrationDocNo String?
   partnerId     String
   partner       Partner  @relation(fields: [partnerId], references: [id])
   docDate       DateTime @db.Date
@@ -1764,6 +1771,7 @@ model Payable {
 
   @@index([partnerId, status])
   @@index([docDate])
+  @@index([migrationDocNo])
 }
 
 /** SLS-10: a receipt or payment, which is then allocated across open items. */
@@ -1836,4 +1844,65 @@ model TaxDocumentOutput {
   createdAt    DateTime @default(now())
 
   @@index([documentId, createdAt])
+}
+
+// ───────────────────────── Data migration (MIG) — STEP 12 ─────────────────────────
+
+/**
+ * MIG-01..09: one batch per uploaded source file, per target.
+ *
+ * A migration is not a bulk upload with a different name. A bulk upload creates master
+ * data that can be corrected afterwards; a migration writes the opening position of the
+ * books, and applying the same source row twice would double a stock quantity or a
+ * balance with nothing on screen to show it happened. That is why every applied row is
+ * recorded individually below.
+ */
+model MigrationBatch {
+  id              String   @id @default(cuid())
+  targetType      String
+  templateVersion Int      @default(1)
+  fileName        String?
+  /** the cut-over date the source file describes */
+  baselineDate    DateTime? @db.Date
+  totalRows       Int      @default(0)
+  validRows       Int      @default(0)
+  errorRows       Int      @default(0)
+  appliedRows     Int      @default(0)
+  skippedRows     Int      @default(0)
+  /** VALIDATED | APPLIED | FAILED */
+  status          String   @default("VALIDATED")
+  /** row-level errors, with sensitive values removed before they are stored (MIG-09) */
+  errors          Json?
+  note            String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+  appliedAt       DateTime?
+
+  rows MigrationRow[]
+
+  @@index([targetType, createdAt])
+}
+
+/**
+ * One row of a source file, once it has been applied.
+ *
+ * The unique key is (targetType, sourceKey), not (batchId, sourceKey): re-uploading the
+ * same file as a new batch is exactly the mistake this has to survive, and a key scoped to
+ * the batch would let the second upload apply everything again.
+ */
+model MigrationRow {
+  id         String   @id @default(cuid())
+  batchId    String
+  batch      MigrationBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  targetType String
+  /** the business key of the source row, e.g. warehouse+item or partner+document number */
+  sourceKey  String
+  rowNo      Int
+  /** what the row produced, so a migration can be traced back to its source line */
+  entityType String?
+  entityId   String?
+  createdAt  DateTime @default(now())
+
+  @@unique([targetType, sourceKey])
+  @@index([batchId])
 }

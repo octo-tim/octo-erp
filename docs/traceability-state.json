@@ -1483,6 +1483,38 @@
         "RPT-06"
       ],
       "status": "FIXED"
+    },
+    {
+      "id": "CR-24",
+      "step": "STEP 12",
+      "text": "이관 미결(미수·미지급)은 이 시스템에 원천 전표가 없다. Receivable·Payable의 documentId를 선택항목으로 바꾸자 타입 검사가 전표를 당연히 있다고 가정한 자리 다섯 곳을 짚어냈다. 그대로 뒀다면 이관 미결이 있는 회사에서 미수 목록·수금 배분·드릴다운이 모두 죽었을 것이다. 원천 전표번호를 표시하는 공용 함수를 만들어 모든 화면이 같은 방식으로 처리하게 했다.",
+      "related": [
+        "MIG-04",
+        "SLS-08",
+        "SLS-09",
+        "SLS-10",
+        "RPT-08"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-25",
+      "step": "STEP 12",
+      "text": "거래처 이관 검증에서 사업자번호 판정을 뒤집어 썼다. 검증 함수는 실패 사유 문자열을 돌려주고 통과하면 null을 주는데, 참·거짓으로 읽어서 정상 번호를 오류로, 잘못된 번호를 정상으로 처리했다. 통합시험이 잡았다. 반환값을 사유로 다루도록 고쳤고, 오류 메시지도 함수가 준 사유를 그대로 보여준다.",
+      "related": [
+        "MIG-02",
+        "BAS-04"
+      ],
+      "status": "FIXED"
+    },
+    {
+      "id": "CR-26",
+      "step": "STEP 12",
+      "text": "tRPC 라우터에서 apply는 예약어라 빌드가 실패했다(Function.prototype.apply). 타입 검사와 단위시험은 통과했고 빌드에서만 드러났다. 프로시저 이름을 applyBatch로 바꿨다.",
+      "related": [
+        "MIG-09"
+      ],
+      "status": "FIXED"
     }
   ],
   "BAS-01": {
@@ -2802,5 +2834,252 @@
     ],
     "manual": "node tools/seed-perf.mjs 로 1년치를 넣고 통합시험에서 측정값 확인",
     "notes": "매출현황 월별 75ms 일별 97ms, 품목순위 72ms, 거래처실적 22ms, 재고현황 118ms, 대시보드 59ms. 목표 5초"
+  },
+  "MIG-01": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/migration/targets.ts (itemHandler)",
+      "src/server/modules/migration/templates.ts",
+      "src/server/modules/migration/service.ts"
+    ],
+    "tables": [
+      "Item",
+      "MigrationBatch",
+      "MigrationRow"
+    ],
+    "manual": "양식을 내려받아 원천을 매핑하고, 오류 행이 행 번호와 함께 표시되는지 확인",
+    "api": [
+      "migration.template",
+      "migration.validate",
+      "migration.applyBatch",
+      "migration.reconcile",
+      "migration.batches"
+    ],
+    "screens": [
+      "src/app/(app)/system/migration/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/migration.test.ts",
+      "tests/e2e/migration.spec.ts"
+    ]
+  },
+  "MIG-02": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/migration/targets.ts (partnerHandler)",
+      "src/server/modules/migration/templates.ts",
+      "src/server/modules/migration/service.ts"
+    ],
+    "tables": [
+      "Partner",
+      "PartnerContact"
+    ],
+    "manual": "사업자번호 체크섬 오류가 검증 단계에서 잡히는지 확인",
+    "api": [
+      "migration.template",
+      "migration.validate",
+      "migration.applyBatch",
+      "migration.reconcile",
+      "migration.batches"
+    ],
+    "screens": [
+      "src/app/(app)/system/migration/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/migration.test.ts",
+      "tests/e2e/migration.spec.ts"
+    ]
+  },
+  "MIG-03": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/migration/targets.ts (openingStockHandler)",
+      "src/server/modules/migration/service.ts"
+    ],
+    "tables": [
+      "InventoryLedger(sourceType=OPENING)",
+      "StockSnapshot",
+      "SystemSetting(migration.baselineDate)"
+    ],
+    "manual": "기초재고가 기준일자 개시 원장으로 들어가고 원장·캐시 대조에 불일치가 없는지, 같은 파일을 다시 올려도 두 배가 되지 않는지 확인",
+    "notes": "INT-04에 따라 캐시가 아니라 원장에 기록한다. 기준일이 없으면 반영을 거부한다",
+    "api": [
+      "migration.template",
+      "migration.validate",
+      "migration.applyBatch",
+      "migration.reconcile",
+      "migration.batches"
+    ],
+    "screens": [
+      "src/app/(app)/system/migration/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/migration.test.ts",
+      "tests/e2e/migration.spec.ts"
+    ]
+  },
+  "MIG-04": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/migration/targets.ts (openItemHandler)",
+      "src/server/modules/migration/service.ts"
+    ],
+    "tables": [
+      "Receivable.migrationDocNo",
+      "Payable.migrationDocNo"
+    ],
+    "manual": "이관 미수가 연령분석·미수목록에 잡히고 원천 전표번호가 표시되는지 확인",
+    "notes": "이관 미결은 이 시스템에 원천 전표가 없으므로 documentId가 비고 migrationDocNo를 갖는다",
+    "api": [
+      "migration.template",
+      "migration.validate",
+      "migration.applyBatch",
+      "migration.reconcile",
+      "migration.batches"
+    ],
+    "screens": [
+      "src/app/(app)/system/migration/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/migration.test.ts",
+      "tests/e2e/migration.spec.ts"
+    ]
+  },
+  "MIG-05": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/migration/targets.ts (accountHandler, openingBalanceHandler)",
+      "src/server/modules/migration/service.ts"
+    ],
+    "tables": [
+      "Account",
+      "OpeningBalance(origin=MIGRATION)"
+    ],
+    "manual": "기초잔액 차대 차액이 반영 전 합계에 먼저 보이는지 확인",
+    "api": [
+      "migration.template",
+      "migration.validate",
+      "migration.applyBatch",
+      "migration.reconcile",
+      "migration.batches"
+    ],
+    "screens": [
+      "src/app/(app)/system/migration/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/migration.test.ts",
+      "tests/e2e/migration.spec.ts"
+    ]
+  },
+  "MIG-06": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/migration/targets.ts (departmentHandler, employeeHandler)",
+      "src/server/modules/migration/service.ts"
+    ],
+    "tables": [
+      "Department",
+      "Employee",
+      "EmployeeSensitive"
+    ],
+    "manual": "같은 파일 안의 상위 부서가 연결되는지, 퇴사자가 RESIGNED로 들어가는지, 주민번호가 암호화되고 오류파일·감사로그에 원문이 없는지 확인",
+    "notes": "NFR-SEC-06과 같은 경로로 암호화한다. 민감 항목 오류는 값을 표시하지 않는다",
+    "api": [
+      "migration.template",
+      "migration.validate",
+      "migration.applyBatch",
+      "migration.reconcile",
+      "migration.batches"
+    ],
+    "screens": [
+      "src/app/(app)/system/migration/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/migration.test.ts",
+      "tests/e2e/migration.spec.ts"
+    ]
+  },
+  "MIG-07": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/migration/targets.ts (leaveHandler)",
+      "src/server/modules/migration/service.ts"
+    ],
+    "tables": [
+      "LeaveGrant(sourceType=MIGRATION)",
+      "LeaveUsage(sourceType=MIGRATION)"
+    ],
+    "manual": "부여·사용·잔여 합계가 원천과 일치하는지 확인",
+    "notes": "사용일수는 개별 날짜를 만들어내지 않고 부여일자에 한 건으로 이관한다",
+    "api": [
+      "migration.template",
+      "migration.validate",
+      "migration.applyBatch",
+      "migration.reconcile",
+      "migration.batches"
+    ],
+    "screens": [
+      "src/app/(app)/system/migration/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/migration.test.ts",
+      "tests/e2e/migration.spec.ts"
+    ]
+  },
+  "MIG-08": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/migration/targets.ts (historicalSalesHandler)",
+      "src/server/modules/migration/service.ts"
+    ],
+    "tables": [
+      "SalesDocument(status=MIGRATED)",
+      "SalesDocumentLine"
+    ],
+    "manual": "과거전표가 재고·채권·분개를 만들지 않고 매출 보고서 집계에도 들어가지 않는지 확인",
+    "notes": "DEC-08 참조용 이관. 기초재고·기초잔액이 이미 그 결과를 담고 있어 다시 반영하면 이중계상이 된다",
+    "api": [
+      "migration.template",
+      "migration.validate",
+      "migration.applyBatch",
+      "migration.reconcile",
+      "migration.batches"
+    ],
+    "screens": [
+      "src/app/(app)/system/migration/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/migration.test.ts",
+      "tests/e2e/migration.spec.ts"
+    ]
+  },
+  "MIG-09": {
+    "status": "DONE",
+    "services": [
+      "src/server/modules/migration/service.ts (validate, apply, reconcile)"
+    ],
+    "docs": [
+      "docs/cutover-plan.md"
+    ],
+    "tables": [
+      "MigrationBatch",
+      "MigrationRow(targetType,sourceKey) UNIQUE"
+    ],
+    "manual": "대상별 대사 결과의 차이가 모두 0인지, 건수가 원천=정상+오류로 맞는지 확인 후 승인자 서명",
+    "notes": "차이가 1건이라도 있으면 완료로 보지 않는다. 운영 전환 계획은 docs/cutover-plan.md",
+    "api": [
+      "migration.template",
+      "migration.validate",
+      "migration.applyBatch",
+      "migration.reconcile",
+      "migration.batches"
+    ],
+    "screens": [
+      "src/app/(app)/system/migration/page.tsx"
+    ],
+    "tests": [
+      "tests/integration/migration.test.ts",
+      "tests/e2e/migration.spec.ts"
+    ]
   }
 }
