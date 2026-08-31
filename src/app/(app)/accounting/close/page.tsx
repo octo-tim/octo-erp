@@ -7,10 +7,26 @@ import { InternalNotice } from '@/components/accounting/internal-notice';
 import { fmt } from '@/lib/format';
 import { businessDate } from '@/lib/dates';
 
+const ACCOUNT_TYPE_LABEL: Record<string, string> = {
+  ASSET: '자산',
+  LIABILITY: '부채',
+  EQUITY: '자본',
+  REVENUE: '수익',
+  EXPENSE: '비용',
+};
+
 /**
  * ACC-08: month close locks a period; year close additionally transfers the year's result
  * to retained earnings and carries the balance sheet forward. The two are kept visibly
  * separate because they are different operations with different consequences.
+ *
+ * SLS-12 (전표 마감): this screen is the traceability-doc requirement's real home — a
+ * period exists only as the side effect of a dated entry (no create/update/delete
+ * procedure exists to wire), month close already blocks registration and confirmation
+ * dated inside it (assertOpen, enforced in journal.create/update/confirm), and reopening
+ * already requires the period.reopen permission and a written reason. A separate
+ * accounting/periods/page.tsx would have nothing left to add, so this screen was extended
+ * (기초잔액 조회) instead of creating a duplicate page.
  */
 export default function ClosePage() {
   const utils = api.useUtils();
@@ -24,8 +40,13 @@ export default function ClosePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // ACC-08: opening balances for a period — from year-end carry-forward or a migration
+  const [obPeriodKey, setObPeriodKey] = useState(today.slice(0, 7));
+  const [obApplied, setObApplied] = useState(obPeriodKey);
+
   const periods = api.accounting.periods.useQuery();
   const runs = api.accounting.closingRuns.useQuery();
+  const openingBalances = api.accounting.openingBalances.useQuery({ periodKey: obApplied });
   const preview = api.accounting.yearClosePreview.useQuery(
     { year: previewYear ?? year },
     { enabled: Boolean(previewYear) },
@@ -50,8 +71,10 @@ export default function ClosePage() {
       <header>
         <h1 className="text-lg font-semibold">결산·마감</h1>
         <p className="mt-0.5 text-sm text-slate-500">
-          월 마감은 해당 기간의 전표를 잠급니다. 연 마감은 손익을 이익잉여금으로 대체하고 재무상태 계정을 다음
-          연도 기초잔액으로 이월합니다.
+          회계기간은 전표가 등록되면 자동으로 생성되며, 별도로 만들거나 고치거나 지울 수 없습니다. 월 마감은
+          해당 기간의 전표 등록·확정을 차단하고, 마감 해제는 권한을 가진 사용자만 사유를 남기고 할 수 있습니다
+          (SLS-12). 연 마감은 손익을 이익잉여금으로 대체하고 재무상태 계정을 다음 연도 기초잔액으로
+          이월합니다.
         </p>
       </header>
 
@@ -145,6 +168,70 @@ export default function ClosePage() {
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      <Card title="기초잔액">
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setObApplied(obPeriodKey);
+          }}
+        >
+          <Field label="기간" htmlFor="ob-period" hint="YYYY-MM" required>
+            <Input
+              id="ob-period"
+              value={obPeriodKey}
+              onChange={(e) => setObPeriodKey(e.target.value)}
+              pattern="\d{4}-\d{2}"
+            />
+          </Field>
+          <Button type="submit" size="sm">
+            조회
+          </Button>
+        </form>
+
+        {openingBalances.isLoading ? (
+          <Spinner />
+        ) : openingBalances.error ? (
+          <EmptyState title="조회할 수 없습니다." description={openingBalances.error.message} />
+        ) : (openingBalances.data ?? []).length === 0 ? (
+          <EmptyState
+            title={`${obApplied} 기초잔액이 없습니다.`}
+            description="연 마감 이월이나 마이그레이션으로 생성됩니다."
+          />
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[32rem] text-sm">
+              <thead className="border-b border-slate-200 text-left text-slate-500">
+                <tr>
+                  <th className="px-2 py-1.5 font-medium">계정과목</th>
+                  <th className="px-2 py-1.5 font-medium">구분</th>
+                  <th className="px-2 py-1.5 text-right font-medium">차변</th>
+                  <th className="px-2 py-1.5 text-right font-medium">대변</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(openingBalances.data ?? []).map((b) => (
+                  <tr key={b.id} className="border-b border-slate-100">
+                    <td className="px-2 py-1.5">
+                      <span className="tabular text-slate-500">{b.account.code}</span> {b.account.name}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {ACCOUNT_TYPE_LABEL[b.account.accountType] ?? b.account.accountType}
+                    </td>
+                    <td className="tabular px-2 py-1.5 text-right">
+                      {b.debit.toString() === '0' ? '' : fmt.krw(b.debit as unknown as string)}
+                    </td>
+                    <td className="tabular px-2 py-1.5 text-right">
+                      {b.credit.toString() === '0' ? '' : fmt.krw(b.credit as unknown as string)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 

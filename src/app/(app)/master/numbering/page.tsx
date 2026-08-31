@@ -34,6 +34,7 @@ const PERIOD_LABEL: Record<string, string> = { NONE: '없음', YEAR: '연도', M
 export default function NumberingPage() {
   const rules = api.master.numberingRules.useQuery();
   const update = api.master.updateNumberingRule.useMutation();
+  const create = api.master.createNumberingRule.useMutation();
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState({
     prefix: '',
@@ -41,6 +42,16 @@ export default function NumberingPage() {
     seqLength: '4',
   });
   const [error, setError] = useState<string | null>(null);
+
+  // APV-13: a per-form approval sequence (docType APPROVAL:<양식코드>) has no row until
+  // one is created here — without this the approval module always fell back to APPROVAL.
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    docType: '',
+    prefix: '',
+    periodKind: 'MONTH' as 'NONE' | 'YEAR' | 'MONTH',
+    seqLength: '4',
+  });
 
   function example(prefix: string, periodKind: string, seqLength: number) {
     const seq = '1'.padStart(seqLength, '0');
@@ -50,18 +61,106 @@ export default function NumberingPage() {
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <header>
-        <h1 className="text-lg font-semibold">채번규칙</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          문서번호는 규칙과 데이터베이스 유일성 제약으로 생성되어 동시에 등록해도 중복되지 않습니다. 이미
-          발행된 번호는 바뀌지 않습니다.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold">채번규칙</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            문서번호는 규칙과 데이터베이스 유일성 제약으로 생성되어 동시에 등록해도 중복되지 않습니다. 이미
+            발행된 번호는 바뀌지 않습니다. 결재문서는 양식별로 <code>APPROVAL:양식코드</code> 규칙을 만들면 그
+            양식만 별도로 채번되고, 없으면 공통 APPROVAL 규칙을 씁니다.
+          </p>
+        </div>
+        <Button variant="primary" size="sm" onClick={() => setCreating((v) => !v)}>
+          {creating ? '닫기' : '규칙 추가'}
+        </Button>
       </header>
 
       {error ? (
         <p role="alert" className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </p>
+      ) : null}
+
+      {creating ? (
+        <Card title="채번규칙 추가">
+          <form
+            className="grid grid-cols-1 gap-3 sm:grid-cols-5"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setError(null);
+              try {
+                await create.mutateAsync({
+                  docType: createForm.docType.trim().toUpperCase(),
+                  prefix: createForm.prefix.trim().toUpperCase(),
+                  periodKind: createForm.periodKind,
+                  seqLength: Number(createForm.seqLength),
+                  requestId: newRequestId(),
+                });
+                setCreateForm({ docType: '', prefix: '', periodKind: 'MONTH', seqLength: '4' });
+                setCreating(false);
+                await rules.refetch();
+              } catch (err) {
+                setError((err as { message?: string }).message ?? '추가에 실패했습니다.');
+              }
+            }}
+          >
+            <div>
+              <label className="mb-1 block text-sm text-slate-600" htmlFor="nr-doctype">
+                문서유형 코드 <span className="text-red-600">*</span>
+              </label>
+              <Input
+                id="nr-doctype"
+                required
+                placeholder="APPROVAL:EXPENSE"
+                value={createForm.docType}
+                onChange={(e) => setCreateForm({ ...createForm, docType: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-600" htmlFor="nr-prefix">
+                접두어 <span className="text-red-600">*</span>
+              </label>
+              <Input
+                id="nr-prefix"
+                required
+                value={createForm.prefix}
+                onChange={(e) => setCreateForm({ ...createForm, prefix: e.target.value.toUpperCase() })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-600" htmlFor="nr-period">
+                기간구분
+              </label>
+              <Select
+                id="nr-period"
+                value={createForm.periodKind}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, periodKind: e.target.value as typeof createForm.periodKind })
+                }
+              >
+                <option value="NONE">없음</option>
+                <option value="YEAR">연도</option>
+                <option value="MONTH">연월</option>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-600" htmlFor="nr-seq">
+                자릿수
+              </label>
+              <Input
+                id="nr-seq"
+                className="tabular text-right"
+                value={createForm.seqLength}
+                onChange={(e) => setCreateForm({ ...createForm, seqLength: e.target.value })}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" variant="primary" size="sm" disabled={create.isPending}>
+                추가
+              </Button>
+            </div>
+          </form>
+        </Card>
       ) : null}
 
       <Card title="문서별 채번규칙">

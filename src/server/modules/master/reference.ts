@@ -250,6 +250,56 @@ export async function listNumberingRules(ctx: TransactionContext) {
   });
 }
 
+/**
+ * APV-13: the base `APPROVAL` rule (INT-11 default) is seeded, but a per-form sequence —
+ * docType `APPROVAL:<formCode>` — has no row until an admin creates one here. Without this,
+ * approval/service.ts's fallback to `APPROVAL` was the only numbering that could ever run.
+ */
+export async function createNumberingRule(
+  ctx: TransactionContext,
+  input: { docType: string; prefix: string; periodKind: 'NONE' | 'YEAR' | 'MONTH'; seqLength: number },
+) {
+  requirePermission(ctx.actor, 'admin.settings');
+  if (input.seqLength < 3 || input.seqLength > 10)
+    throw new AppError('VALIDATION', '일련번호 자릿수는 3~10 사이여야 합니다.');
+  if (!/^[A-Z0-9]{1,5}$/.test(input.prefix))
+    throw new AppError('VALIDATION', '접두어는 영문 대문자·숫자 5자 이내여야 합니다.');
+  if (!/^[A-Z][A-Z0-9_]*(:[A-Z][A-Z0-9_]*)?$/.test(input.docType)) {
+    throw new AppError('VALIDATION', '문서유형 코드는 대문자·숫자·밑줄이어야 합니다(예: APPROVAL:EXPENSE).');
+  }
+
+  const existing = await ctx.tx.numberingRule.findUnique({ where: { docType: input.docType } });
+  if (existing) throw new AppError('CONFLICT', `이미 등록된 문서유형입니다: ${input.docType}`);
+
+  try {
+    const rule = await ctx.tx.numberingRule.create({
+      data: {
+        docType: input.docType,
+        prefix: input.prefix,
+        periodKind: input.periodKind,
+        seqLength: input.seqLength,
+      },
+    });
+
+    await audit.record(ctx, {
+      action: 'numberingRule.create',
+      entityType: 'NumberingRule',
+      entityId: rule.id,
+      after: {
+        docType: rule.docType,
+        prefix: rule.prefix,
+        periodKind: rule.periodKind,
+        seqLength: rule.seqLength,
+      },
+    });
+    return rule;
+  } catch (e) {
+    if ((e as { code?: string }).code === 'P2002')
+      throw new AppError('CONFLICT', `이미 등록된 문서유형입니다: ${input.docType}`);
+    throw e;
+  }
+}
+
 export async function updateNumberingRule(
   ctx: TransactionContext,
   input: { docType: string; prefix: string; periodKind: 'NONE' | 'YEAR' | 'MONTH'; seqLength: number },

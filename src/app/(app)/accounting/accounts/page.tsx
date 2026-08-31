@@ -26,6 +26,8 @@ export default function AccountsPage() {
   const accounts = api.accounting.accounts.useQuery({ activeOnly: false });
   const create = api.accounting.createAccount.useMutation(refresh);
   const update = api.accounting.updateAccount.useMutation(refresh);
+  const remove = api.accounting.deleteAccount.useMutation(refresh);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const rows = (accounts.data ?? []).filter((a) => !q || a.code.includes(q) || a.name.includes(q));
   const parents = (accounts.data ?? []).filter((a) => a.level === 1);
@@ -182,23 +184,63 @@ export default function AccountsPage() {
                     <td className="px-2 py-1.5">{a.isPostable ? '가능' : '불가'}</td>
                     <td className="px-2 py-1.5">{a.isActive ? '사용' : '중지'}</td>
                     <td className="px-2 py-1.5 text-right">
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          run(
-                            () =>
-                              update.mutateAsync({
-                                id: a.id,
-                                version: a.version,
-                                isActive: !a.isActive,
-                                requestId: newRequestId(),
-                              }),
-                            a.isActive ? '사용중지 처리했습니다.' : '사용으로 되돌렸습니다.',
-                          )
-                        }
-                      >
-                        {a.isActive ? '사용중지' : '사용재개'}
-                      </Button>
+                      {deleting === a.id ? (
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                          <span className="text-xs text-red-700">
+                            &apos;{a.code} {a.name}&apos; 삭제할까요?
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() =>
+                              run(async () => {
+                                await remove.mutateAsync({ id: a.id, requestId: newRequestId() });
+                                setDeleting(null);
+                              }, `'${a.name}' 계정과목을 삭제했습니다.`)
+                            }
+                          >
+                            삭제 확정
+                          </Button>
+                          <Button size="sm" onClick={() => setDeleting(null)}>
+                            취소
+                          </Button>
+                        </span>
+                      ) : (
+                        <span className="inline-flex gap-1.5">
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              run(
+                                () =>
+                                  update.mutateAsync({
+                                    id: a.id,
+                                    version: a.version,
+                                    isActive: !a.isActive,
+                                    requestId: newRequestId(),
+                                  }),
+                                a.isActive ? '사용중지 처리했습니다.' : '사용으로 되돌렸습니다.',
+                              )
+                            }
+                          >
+                            {a.isActive ? '사용중지' : '사용재개'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={!a.canDelete}
+                            title={
+                              a.canDelete
+                                ? undefined
+                                : a.isStandard
+                                  ? '표준 계정과목은 삭제할 수 없습니다.'
+                                  : '사용 중인 계정과목은 삭제할 수 없습니다(분개·하위계정·자동분개 매핑). 사용중지로 처리하세요.'
+                            }
+                            onClick={() => setDeleting(a.id)}
+                          >
+                            삭제
+                          </Button>
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

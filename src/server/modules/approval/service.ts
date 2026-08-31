@@ -4,9 +4,38 @@ import { assertVersion } from '@/server/core/state-machine';
 import * as audit from '@/server/modules/audit/service';
 import * as notification from '@/server/modules/notification/service';
 import { has, requirePermission } from '@/server/modules/rbac/service';
+import { nextDocNo } from '@/server/modules/numbering/service';
 import { businessDate } from '@/lib/dates';
 import { buildLine, pendingStepNumbers, selectLineTemplate, type LineContext } from './line';
 import { resolveHandler, type ApprovalTarget } from './handlers';
+
+/**
+ * APV-13: each form gets its own numbering sequence — docType `APPROVAL:<formCode>` — so two
+ * different forms never share a counter. A form with no rule of its own falls back to the
+ * shared 'APPROVAL' rule rather than failing; that fallback is the expected path for most
+ * forms until an admin registers a dedicated rule for one (system > 채번규칙 currently only
+ * edits existing rules, so today every form uses the fallback — this only stops sharing a
+ * sequence once a per-form rule row exists).
+ */
+export async function nextApprovalDocNo(ctx: TransactionContext, formCode: string): Promise<string> {
+  try {
+    return await nextDocNo(ctx, `APPROVAL:${formCode}`);
+  } catch (e) {
+    if (e instanceof AppError && e.code === 'VALIDATION' && e.message.includes('채번규칙이 없습니다')) {
+      return nextDocNo(ctx, 'APPROVAL');
+    }
+    throw e;
+  }
+}
+
+/** APV-13: the form code behind an existing document — a cancellation document is numbered under the same per-form sequence as the document it cancels. */
+export async function documentFormCode(ctx: TransactionContext, documentId: string): Promise<string> {
+  const document = await ctx.tx.approvalDocument.findUniqueOrThrow({
+    where: { id: documentId },
+    include: { formVersion: { include: { form: true } } },
+  });
+  return document.formVersion.form.code;
+}
 
 /** APV-07: the document lifecycle (INT-02 shape, extended for approval-specific states). */
 export const ApprovalStatus = {
@@ -546,6 +575,20 @@ export async function releaseHold(ctx: TransactionContext, input: { documentId: 
   });
   assertVersion('결재문서', document.version, input.version);
   assertApprovalTransition(document.status as ApprovalStatus, 'IN_PROGRESS');
+
+  /**
+   * A hold is one approver saying they are not ready to decide. Anyone holding
+   * `approval.use` — which is nearly everyone — could previously lift someone else's hold and
+   * push the document back into the queue, which makes the hold meaningless. Only the
+   * approver who placed it, or an admin, may take it back off.
+   */
+  const held = document.steps.filter((s) => s.status === 'ON_HOLD');
+  if (held.length === 0) {
+    throw new AppError('INVALID_TRANSITION', '보류 중인 결재단계가 없습니다.');
+  }
+  if (!ctx.actor.isAdmin && !held.some((s) => s.approverId === ctx.actor.userId)) {
+    throw new AppError('FORBIDDEN', '보류를 건 결재자만 보류를 해제할 수 있습니다.');
+  }
 
   await ctx.tx.approvalStep.updateMany({
     where: { documentId: document.id, status: 'ON_HOLD' },

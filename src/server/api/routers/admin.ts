@@ -30,6 +30,11 @@ export const adminRouter = router({
           include: {
             roles: { include: { role: true } },
             employee: { select: { employeeNo: true, name: true } },
+            // updateUserAccess replaces both scope sets wholesale, so an editor that cannot
+            // read the current ones can only submit an empty list and silently strip a
+            // user's division and warehouse access while changing something unrelated.
+            divisionScopes: { select: { divisionId: true } },
+            warehouseScopes: { select: { warehouseId: true } },
           },
           orderBy: { username: 'asc' },
           ...skipTake(input),
@@ -46,6 +51,8 @@ export const adminRouter = router({
           lockedUntil: u.lockedUntil,
           lastLoginAt: u.lastLoginAt,
           roles: u.roles.map((r) => r.role.code),
+          divisionIds: u.divisionScopes.map((s) => s.divisionId),
+          warehouseIds: u.warehouseScopes.map((s) => s.warehouseId),
           employee: u.employee,
         })),
         total,

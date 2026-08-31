@@ -658,7 +658,7 @@ export async function detail(ctx: TransactionContext, id: string) {
   });
   if (!doc) throw new AppError('NOT_FOUND', '매출전표를 찾을 수 없습니다.');
 
-  const [req, receivable, entry, approvalInfo] = await Promise.all([
+  const [req, receivable, entry, approvalInfo, links] = await Promise.all([
     matrix.requirement(ctx, doc.docType, doc.totalAmount.toString(), doc.docDate.toISOString().slice(0, 10)),
     ctx.tx.receivable.findUnique({ where: { documentId: id }, include: { matches: true } }),
     ctx.tx.journalEntry.findFirst({
@@ -666,10 +666,25 @@ export async function detail(ctx: TransactionContext, id: string) {
       select: { id: true, entryNo: true, status: true },
     }),
     approvalState.approvalStateOf(ctx, 'SALES_DOCUMENT', id),
+    /**
+     * Which order line each document line consumes. The link lives only in
+     * DocumentConversion — SalesDocumentLine does not carry it — so without returning it
+     * here an editor has no way to send it back, and `update` releases the reservation
+     * without re-establishing it. The order's remaining quantity would then silently grow
+     * back and its status regress, which is exactly the arithmetic DocumentConversion
+     * exists to keep honest.
+     */
+    ctx.tx.documentConversion.findMany({
+      where: { targetType: 'SALES', targetId: id, canceledAt: null },
+      select: { targetLineId: true, sourceLineId: true },
+    }),
   ]);
+
+  const sourceByLine = new Map(links.map((l) => [l.targetLineId, l.sourceLineId]));
 
   return {
     ...doc,
+    lines: doc.lines.map((l) => ({ ...l, sourceLineId: sourceByLine.get(l.id) ?? null })),
     approvalRequired: req.required,
     approvalReason: req.reason,
     ...approvalInfo,

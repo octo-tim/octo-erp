@@ -2,12 +2,21 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/trpc';
+import { api, newRequestId } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { Button, Card, Field, Input, Select, StatusBadge } from '@/components/ui/primitives';
+import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-summary';
 import { PartnerSelect } from '@/components/sales/partner-select';
+import {
+  emptyTradeLine,
+  useItemResolver,
+  TradeLineEditor,
+  TradeTotals,
+  type TradeLine,
+} from '@/components/sales/trade-line-editor';
 import { fmt } from '@/lib/format';
+import { businessDate } from '@/lib/dates';
 
 /** SLS-03: sales orders. Created from a quotation, delivered by one or more sales documents. */
 interface Row {
@@ -30,11 +39,24 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function SalesOrdersPage() {
   const router = useRouter();
+  const utils = api.useUtils();
   const [filters, setFilters] = useState({ q: '', status: '', partnerId: '' });
   const [applied, setApplied] = useState(filters);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [creating, setCreating] = useState(false);
 
+  const [header, setHeader] = useState({
+    docDate: businessDate(new Date()),
+    deliveryDate: '',
+    partnerId: '',
+    note: '',
+  });
+  const [lines, setLines] = useState<TradeLine[]>([emptyTradeLine()]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
+
+  const resolveItems = useItemResolver();
+  const create = api.sales.createSalesOrder.useMutation({ onSuccess: () => utils.sales.invalidate() });
   const list = api.sales.salesOrders.useQuery({
     page,
     pageSize,
@@ -62,11 +84,68 @@ export default function SalesOrdersPage() {
     },
   ];
 
+  async function submit() {
+    setErrors([]);
+    const entered = lines.filter((l) => l.itemLabel.trim() || l.quantity.trim());
+    // CR-14: the server resolves what was typed, so items outside the suggestion list are found
+    const resolved = entered.length > 0 ? await resolveItems(entered.map((l) => l.itemLabel)) : null;
+    const prepared =
+      resolved && 'ids' in resolved
+        ? entered.map((line, i) => ({ index: i, itemId: resolved.ids[i]!, line }))
+        : [];
+
+    const problems: FieldError[] = [];
+    if (!header.partnerId)
+      problems.push({ field: 'so-partner', label: '거래처', message: '거래처를 선택하세요.' });
+    if (entered.length === 0) {
+      problems.push({ field: 'so-lines', label: '품목', message: '품목을 한 건 이상 입력하세요.' });
+    } else if (resolved && 'errors' in resolved) {
+      for (const message of resolved.errors) problems.push({ field: 'so-lines', label: '품목', message });
+    }
+    if (problems.length) {
+      setErrors(problems);
+      return;
+    }
+
+    try {
+      const order = await create.mutateAsync({
+        docDate: header.docDate,
+        ...(header.deliveryDate ? { deliveryDate: header.deliveryDate } : {}),
+        partnerId: header.partnerId,
+        ...(header.note ? { note: header.note } : {}),
+        lines: prepared.map((p) => ({
+          itemId: p.itemId,
+          ...(p.line.description ? { description: p.line.description } : {}),
+          quantity: p.line.quantity,
+          unitPrice: p.line.unitPrice,
+          taxType: (p.line.taxType || 'TAXABLE') as 'TAXABLE',
+        })),
+        requestId: newRequestId(),
+      });
+      setCreating(false);
+      setLines([emptyTradeLine()]);
+      router.push(`/sales/orders/${order.id}`);
+    } catch (err) {
+      setErrors([
+        {
+          field: 'so-date',
+          label: '저장',
+          message: (err as { message?: string }).message ?? '저장에 실패했습니다.',
+        },
+      ]);
+    }
+  }
+
   return (
     <StandardListPage
       title="주문서"
       description="주문은 분할 출고될 수 있고, 출고된 만큼 잔여수량이 줄어 상태가 자동으로 바뀝니다."
       filterKey="sales.orders"
+      actions={
+        <Button variant="primary" size="sm" onClick={() => setCreating((v) => !v)}>
+          {creating ? '닫기' : '주문 등록'}
+        </Button>
+      }
       filters={
         <>
           <Field label="검색어" htmlFor="sof-q" hint="주문번호·거래처명">
@@ -111,6 +190,59 @@ export default function SalesOrdersPage() {
         setApplied(empty);
       }}
     >
+      {creating ? (
+        <Card title="주문 등록" className="mb-4">
+          <FormErrorSummary errors={errors} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <Field label="주문일" htmlFor="so-date" required>
+              <Input
+                id="so-date"
+                type="date"
+                value={header.docDate}
+                onChange={(e) => setHeader({ ...header, docDate: e.target.value })}
+              />
+            </Field>
+            <Field label="거래처" htmlFor="so-partner" required>
+              <PartnerSelect
+                id="so-partner"
+                partnerType="CUSTOMER"
+                value={header.partnerId}
+                onChange={(v) => setHeader({ ...header, partnerId: v })}
+              />
+            </Field>
+            <Field label="납기일" htmlFor="so-delivery">
+              <Input
+                id="so-delivery"
+                type="date"
+                value={header.deliveryDate}
+                onChange={(e) => setHeader({ ...header, deliveryDate: e.target.value })}
+              />
+            </Field>
+            <Field label="비고" htmlFor="so-note">
+              <Input
+                id="so-note"
+                value={header.note}
+                onChange={(e) => setHeader({ ...header, note: e.target.value })}
+              />
+            </Field>
+          </div>
+
+          <div className="mt-4" id="so-lines">
+            <TradeLineEditor lines={lines} onChange={setLines} />
+          </div>
+          <TradeTotals lines={lines} />
+
+          <div className="mt-4 flex gap-1.5">
+            <Button variant="primary" size="sm" onClick={submit} disabled={create.isPending}>
+              {create.isPending ? '저장 중' : '저장'}
+            </Button>
+            <Button size="sm" onClick={() => setCreating(false)}>
+              취소
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
       <DataGrid<Row>
         gridKey="sales.orders"
         columns={columns}
@@ -129,7 +261,7 @@ export default function SalesOrdersPage() {
         }}
         onRowOpen={(r) => router.push(`/sales/orders/${r.id}`)}
         emptyTitle="주문서가 없습니다."
-        emptyDescription="견적서에서 '주문으로 전환'하면 여기에 나타납니다."
+        emptyDescription="견적서에서 '주문으로 전환'하거나 '주문 등록'으로 직접 생성할 수 있습니다."
       />
     </StandardListPage>
   );

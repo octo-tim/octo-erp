@@ -3,7 +3,6 @@ import { permissionProcedure, readTx, router, tx } from '@/server/api/trpc';
 import * as approval from '@/server/modules/approval/service';
 import * as form from '@/server/modules/approval/form';
 import { registeredTargetTypes } from '@/server/modules/approval/handlers';
-import { nextDocNo } from '@/server/modules/numbering/service';
 import { amountString, cuid, dateString, paging, requestId, skipTake } from '@/server/api/schemas/common';
 
 const targetInput = z.object({
@@ -64,7 +63,7 @@ export const approvalRouter = router({
       tx(
         ctx,
         async (t) => {
-          const docNo = await nextDocNo(t, 'APPROVAL');
+          const docNo = await approval.nextApprovalDocNo(t, input.formCode);
           const { requestId: _rid, ...data } = input;
           return approval.draft(t, { docNo, ...data });
         },
@@ -193,7 +192,8 @@ export const approvalRouter = router({
       tx(
         ctx,
         async (t) => {
-          const docNo = await nextDocNo(t, 'APPROVAL');
+          const formCode = await approval.documentFormCode(t, input.documentId);
+          const docNo = await approval.nextApprovalDocNo(t, formCode);
           return approval.requestCancel(t, { docNo, documentId: input.documentId, reason: input.reason });
         },
         input.requestId,

@@ -77,6 +77,9 @@ export default function ItemListPage() {
       filterKey="master.items"
       actions={
         <>
+          <Button size="sm" onClick={() => router.push('/master/categories')}>
+            품목분류
+          </Button>
           <Button size="sm" onClick={() => router.push('/master/items/bulk')}>
             일괄등록
           </Button>

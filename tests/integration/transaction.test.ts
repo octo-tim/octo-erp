@@ -8,6 +8,7 @@ import * as audit from '@/server/modules/audit/service';
 import * as outbox from '@/server/modules/outbox/service';
 import * as notification from '@/server/modules/notification/service';
 import { nextDocNo } from '@/server/modules/numbering/service';
+import * as approval from '@/server/modules/approval/service';
 import { AppError } from '@/server/core/errors';
 import type { Actor } from '@/server/core/context';
 
@@ -209,6 +210,30 @@ describe('numbering (BAS-01, APV-13, B-10)', () => {
 
   it('fails clearly when no numbering rule exists', async () => {
     await expect(runTx(admin, (t) => nextDocNo(t, 'NO_SUCH_TYPE'))).rejects.toThrow(/채번규칙이 없습니다/);
+  });
+
+  it('APV-13: approval falls back to the shared APPROVAL rule when a form has no rule of its own', async () => {
+    const first = await runTx(admin, (t) => approval.nextApprovalDocNo(t, 'EXPENSE'));
+    const second = await runTx(admin, (t) => approval.nextApprovalDocNo(t, 'PROPOSAL'));
+    // neither EXPENSE nor PROPOSAL has its own rule, so both share the fallback counter
+    expect(first).toMatch(/^AP-\d{6}-0001$/);
+    expect(second).toMatch(/^AP-\d{6}-0002$/);
+  });
+
+  it('APV-13: a form with its own numbering rule gets its own sequence, not the shared one', async () => {
+    await prisma.numberingRule.create({
+      data: { docType: 'APPROVAL:EXPENSE', prefix: 'APEX', periodKind: 'MONTH', seqLength: 4 },
+    });
+    try {
+      const expenseNo = await runTx(admin, (t) => approval.nextApprovalDocNo(t, 'EXPENSE'));
+      const proposalNo = await runTx(admin, (t) => approval.nextApprovalDocNo(t, 'PROPOSAL'));
+      expect(expenseNo).toMatch(/^APEX-\d{6}-0001$/);
+      // PROPOSAL still has no rule of its own, so it keeps using the shared fallback,
+      // unaffected by EXPENSE now having a dedicated counter
+      expect(proposalNo).toMatch(/^AP-\d{6}-0001$/);
+    } finally {
+      await prisma.numberingRule.delete({ where: { docType: 'APPROVAL:EXPENSE' } });
+    }
   });
 });
 

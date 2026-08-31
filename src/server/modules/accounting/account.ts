@@ -34,7 +34,7 @@ export function isProfitAndLoss(type: string): boolean {
 
 export async function list(ctx: TransactionContext, input: { q?: string; activeOnly?: boolean } = {}) {
   requirePermission(ctx.actor, 'accounting.read');
-  return ctx.tx.account.findMany({
+  const rows = await ctx.tx.account.findMany({
     where: {
       ...(input.activeOnly ? { isActive: true } : {}),
       ...(input.q
@@ -48,6 +48,32 @@ export async function list(ctx: TransactionContext, input: { q?: string; activeO
     },
     orderBy: { code: 'asc' },
   });
+
+  // ACC-01: the delete button must be disabled up front rather than let an operator
+  // click into a server rejection, so the same three counts `remove()` enforces are
+  // computed here for every row (in three grouped queries, not one per row).
+  const ids = rows.map((r) => r.id);
+  const [postedGroups, childGroups, mappedGroups] = await Promise.all([
+    ctx.tx.journalLine.groupBy({
+      by: ['accountId'],
+      where: { accountId: { in: ids } },
+      _count: { _all: true },
+    }),
+    ctx.tx.account.groupBy({ by: ['parentId'], where: { parentId: { in: ids } }, _count: { _all: true } }),
+    ctx.tx.accountMapping.groupBy({
+      by: ['accountId'],
+      where: { accountId: { in: ids } },
+      _count: { _all: true },
+    }),
+  ]);
+  const postedMap = new Map(postedGroups.map((g) => [g.accountId, g._count._all]));
+  const childMap = new Map(childGroups.map((g) => [g.parentId, g._count._all]));
+  const mappedMap = new Map(mappedGroups.map((g) => [g.accountId, g._count._all]));
+
+  return rows.map((r) => ({
+    ...r,
+    canDelete: !r.isStandard && !postedMap.get(r.id) && !childMap.get(r.id) && !mappedMap.get(r.id),
+  }));
 }
 
 export async function postable(ctx: TransactionContext) {

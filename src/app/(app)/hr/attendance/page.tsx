@@ -16,7 +16,7 @@ import { FormErrorSummary, type FieldError } from '@/components/ui/form-error-su
 import { fmt } from '@/lib/format';
 import { businessDate } from '@/lib/dates';
 
-/** HRM-04 / HRM-07: monthly attendance with correction requests. */
+/** HRM-04 / HRM-07: monthly attendance, correction requests and (HR) bulk excel upload. */
 const STATUS_LABEL: Record<string, string> = {
   NORMAL: '정상',
   LATE: '지각',
@@ -27,11 +27,15 @@ const STATUS_LABEL: Record<string, string> = {
   HOLIDAY: '휴일',
   BUSINESS_TRIP: '출장',
 };
+const ATTENDANCE_STATUS_VALUES = new Set(Object.keys(STATUS_LABEL));
+const TIME_RE = /^\d{2}:\d{2}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default function AttendancePage() {
   const today = businessDate();
   const [month, setMonth] = useState(today.slice(0, 7));
   const me = api.hrm.me.useQuery(undefined, { retry: false });
+  const auth = api.auth.me.useQuery();
   const from = `${month}-01`;
   const to = `${month}-31`;
 
@@ -41,6 +45,7 @@ export default function AttendancePage() {
   );
   const corrections = api.hrm.listCorrections.useQuery({ page: 1, pageSize: 50, sortDir: 'desc' });
   const [correcting, setCorrecting] = useState<string | null>(null);
+  const canUpload = !!auth.data?.isAdmin || !!auth.data?.permissions.includes('hr.attendance');
 
   if (me.isLoading) return <Spinner />;
   if (me.error) return <EmptyState title="근태를 조회할 수 없습니다." description={me.error.message} />;
@@ -185,7 +190,284 @@ export default function AttendancePage() {
           </ul>
         )}
       </Card>
+
+      {canUpload ? <AttendanceUploadPanel /> : null}
     </div>
+  );
+}
+
+type AttendanceStatusValue =
+  'NORMAL' | 'LATE' | 'EARLY_LEAVE' | 'ABSENT' | 'LEAVE' | 'HALF_LEAVE' | 'HOLIDAY' | 'BUSINESS_TRIP';
+
+interface AttendanceCsvRow {
+  originalRow: number;
+  employeeNo: string;
+  workDate: string;
+  checkIn?: string;
+  checkOut?: string;
+  status?: AttendanceStatusValue;
+  note?: string;
+}
+interface CsvRowError {
+  row: number;
+  message: string;
+}
+
+/** Parses the pasted/uploaded CSV client-side: required columns, time/status format —
+ *  anything the service itself would validate per row (사번 존재, 근무일 범위 등) is left
+ *  to attendanceUpload so its message is shown, not duplicated here. */
+function parseAttendanceCsv(text: string): {
+  rows: AttendanceCsvRow[];
+  clientErrors: CsvRowError[];
+  parseError: string | null;
+} {
+  const lines = text
+    .replace(/^﻿/, '')
+    .split(/\r?\n/)
+    .filter((l) => l.trim().length > 0);
+  if (lines.length < 2) {
+    return {
+      rows: [],
+      clientErrors: [],
+      parseError: '데이터 행이 없습니다. 첫 행에 열 이름을, 그 아래에 데이터를 입력하세요.',
+    };
+  }
+  const header = (lines[0] ?? '').split(',').map((s) => s.trim());
+  if (!header.includes('employeeNo') || !header.includes('workDate')) {
+    return {
+      rows: [],
+      clientErrors: [],
+      parseError:
+        '헤더에 employeeNo, workDate 열이 있어야 합니다. 예: employeeNo,workDate,checkIn,checkOut,status,note',
+    };
+  }
+
+  const rows: AttendanceCsvRow[] = [];
+  const clientErrors: CsvRowError[] = [];
+  lines.slice(1).forEach((line, idx) => {
+    const originalRow = idx + 1;
+    const cells = line.split(',').map((s) => s.trim());
+    const cell: Record<string, string> = {};
+    header.forEach((key, i) => {
+      cell[key] = cells[i] ?? '';
+    });
+    const employeeNo = cell['employeeNo'] ?? '';
+    const workDate = cell['workDate'] ?? '';
+    if (!employeeNo || !workDate) {
+      clientErrors.push({ row: originalRow, message: '사번과 근무일은 필수입니다.' });
+      return;
+    }
+    if (!DATE_RE.test(workDate)) {
+      clientErrors.push({ row: originalRow, message: '근무일은 YYYY-MM-DD 형식이어야 합니다.' });
+      return;
+    }
+    const checkIn = cell['checkIn'] ?? '';
+    const checkOut = cell['checkOut'] ?? '';
+    if (checkIn && !TIME_RE.test(checkIn)) {
+      clientErrors.push({
+        row: originalRow,
+        message: `출근시각 형식이 올바르지 않습니다(HH:MM): ${checkIn}`,
+      });
+      return;
+    }
+    if (checkOut && !TIME_RE.test(checkOut)) {
+      clientErrors.push({
+        row: originalRow,
+        message: `퇴근시각 형식이 올바르지 않습니다(HH:MM): ${checkOut}`,
+      });
+      return;
+    }
+    const status = cell['status'] ?? '';
+    if (status && !ATTENDANCE_STATUS_VALUES.has(status)) {
+      clientErrors.push({
+        row: originalRow,
+        message: `상태 값이 올바르지 않습니다: ${status} (허용: ${[...ATTENDANCE_STATUS_VALUES].join(', ')})`,
+      });
+      return;
+    }
+    rows.push({
+      originalRow,
+      employeeNo,
+      workDate,
+      ...(checkIn ? { checkIn } : {}),
+      ...(checkOut ? { checkOut } : {}),
+      ...(status ? { status: status as AttendanceStatusValue } : {}),
+      ...(cell['note'] ? { note: cell['note'] } : {}),
+    });
+  });
+  return { rows, clientErrors, parseError: null };
+}
+
+/** HRM-04: "웹·모바일 체크인 또는 엑셀 업로드" — the upload path. Validates every row and
+ *  applies only the valid ones; nothing is written until 업로드 실행 is pressed. */
+function AttendanceUploadPanel() {
+  const upload = api.hrm.attendanceUpload.useMutation();
+  const [text, setText] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [parsed, setParsed] = useState<AttendanceCsvRow[]>([]);
+  const [clientErrors, setClientErrors] = useState<CsvRowError[]>([]);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ total: number; applied: number; errors: CsvRowError[] } | null>(
+    null,
+  );
+
+  function runParse(raw: string) {
+    setResult(null);
+    const { rows, clientErrors: ce, parseError: pe } = parseAttendanceCsv(raw);
+    setParsed(rows);
+    setClientErrors(ce);
+    setParseError(pe);
+  }
+
+  async function onFile(ev: React.ChangeEvent<HTMLInputElement>) {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    const raw = await file.text();
+    setText(raw);
+    setFileName(file.name);
+    runParse(raw);
+    ev.target.value = '';
+  }
+
+  async function apply() {
+    if (parsed.length === 0) return;
+    setResult(null);
+    try {
+      const res = await upload.mutateAsync({
+        rows: parsed.map(({ originalRow: _originalRow, ...row }) => row),
+        requestId: newRequestId(),
+      });
+      // Map the service's per-row index (position within the submitted rows) back to the
+      // original CSV line number so the two error lists line up for the user.
+      const mappedErrors = res.errors.map((e) => ({
+        row: parsed[e.row - 1]?.originalRow ?? e.row,
+        message: e.message,
+      }));
+      setResult({ total: res.total, applied: res.applied, errors: mappedErrors });
+    } catch (err) {
+      setResult(null);
+      setParseError((err as { message?: string }).message ?? '업로드에 실패했습니다.');
+    }
+  }
+
+  const allErrors = [...clientErrors, ...(result?.errors ?? [])].sort((a, b) => a.row - b.row);
+
+  return (
+    <Card title="근태 엑셀 업로드 (관리자)">
+      <p className="mb-3 text-xs text-slate-500">
+        열: employeeNo, workDate(YYYY-MM-DD), checkIn(HH:MM, 선택), checkOut(HH:MM, 선택), status(선택),
+        note(선택). 첫 행은 열 이름이며, 형식 오류가 있는 행은 반영되지 않고 오류로 표시됩니다.
+      </p>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="inline-flex">
+          <input type="file" accept=".csv,text/csv" className="sr-only" onChange={onFile} />
+          <span className="inline-flex h-9 cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 text-sm">
+            파일 올리기
+          </span>
+        </label>
+        {fileName ? <span className="text-sm text-slate-500">{fileName}</span> : null}
+      </div>
+
+      <Field label="또는 직접 붙여넣기" htmlFor="att-csv-text" className="mt-3">
+        <textarea
+          id="att-csv-text"
+          value={text}
+          onChange={(ev) => {
+            setText(ev.target.value);
+            setFileName('');
+          }}
+          rows={5}
+          placeholder={'employeeNo,workDate,checkIn,checkOut,status,note\n2024001,2026-08-01,09:00,18:00,,'}
+          className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 font-mono text-xs"
+        />
+      </Field>
+      <div className="mt-2 flex justify-end gap-1.5">
+        <Button size="sm" onClick={() => runParse(text)} disabled={!text.trim()}>
+          구문분석
+        </Button>
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => void apply()}
+          disabled={parsed.length === 0 || upload.isPending}
+        >
+          {upload.isPending ? '업로드 중…' : `업로드 실행 (${parsed.length}행)`}
+        </Button>
+      </div>
+
+      {parseError ? (
+        <p role="alert" className="mt-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+          {parseError}
+        </p>
+      ) : null}
+
+      {result ? (
+        <p role="status" className="mt-3 rounded bg-green-50 px-3 py-2 text-sm text-green-800">
+          전체 {result.total}행 중 {result.applied}행 반영, {result.errors.length}행 오류.
+        </p>
+      ) : null}
+
+      {parsed.length > 0 || allErrors.length > 0 ? (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-max text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th scope="col" className="px-3 py-2 text-left font-semibold">
+                  행
+                </th>
+                <th scope="col" className="px-3 py-2 text-left font-semibold">
+                  사번
+                </th>
+                <th scope="col" className="px-3 py-2 text-left font-semibold">
+                  근무일
+                </th>
+                <th scope="col" className="px-3 py-2 text-left font-semibold">
+                  출근
+                </th>
+                <th scope="col" className="px-3 py-2 text-left font-semibold">
+                  퇴근
+                </th>
+                <th scope="col" className="px-3 py-2 text-left font-semibold">
+                  오류
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {parsed.map((r) => {
+                const rowErrors = allErrors.filter((e) => e.row === r.originalRow);
+                return (
+                  <tr
+                    key={r.originalRow}
+                    className={rowErrors.length ? 'bg-red-50/60' : 'border-b border-slate-100 last:border-0'}
+                  >
+                    <td className="px-3 py-1.5 tabular">{r.originalRow}</td>
+                    <td className="px-3 py-1.5">{r.employeeNo}</td>
+                    <td className="px-3 py-1.5">{r.workDate}</td>
+                    <td className="px-3 py-1.5">{r.checkIn ?? '-'}</td>
+                    <td className="px-3 py-1.5">{r.checkOut ?? '-'}</td>
+                    <td className="px-3 py-1.5 text-red-700">
+                      {rowErrors.map((e) => e.message).join(' / ')}
+                    </td>
+                  </tr>
+                );
+              })}
+              {clientErrors
+                .filter((e) => !parsed.some((r) => r.originalRow === e.row))
+                .map((e) => (
+                  <tr key={`ce-${e.row}`} className="bg-red-50/60">
+                    <td className="px-3 py-1.5 tabular">{e.row}</td>
+                    <td className="px-3 py-1.5" colSpan={4}>
+                      (형식 오류로 제외됨)
+                    </td>
+                    <td className="px-3 py-1.5 text-red-700">{e.message}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </Card>
   );
 }
 

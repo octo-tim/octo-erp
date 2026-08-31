@@ -19,13 +19,20 @@ export default function LoginPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-    const data = (await res.json()) as { ok?: boolean; message?: string };
+    const data = (await res.json()) as {
+      ok?: boolean;
+      message?: string;
+      mustChangePassword?: boolean;
+    };
     setBusy(false);
     if (!res.ok) {
       setError(data.message ?? '로그인에 실패했습니다.');
       return;
     }
-    router.push('/home');
+    // A temporary password must be replaced before the user goes anywhere else. The login
+    // response has always carried this flag and nothing read it, so an admin reset left the
+    // user on a password the admin knows, with no screen to change it.
+    router.push(data.mustChangePassword ? '/account?force=1' : '/home');
     router.refresh();
   }
 

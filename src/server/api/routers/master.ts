@@ -397,6 +397,27 @@ export const masterRouter = router({
     readTx(ctx, (t) => reference.listNumberingRules(t)),
   ),
 
+  createNumberingRule: permissionProcedure('admin.settings')
+    .input(
+      z.object({
+        docType: z.string().min(1).max(40),
+        prefix: z.string().min(1).max(5),
+        periodKind: z.enum(['NONE', 'YEAR', 'MONTH']),
+        seqLength: z.number().int().min(3).max(10),
+        requestId,
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      tx(
+        ctx,
+        (t) => {
+          const { requestId: _rid, ...data } = input;
+          return reference.createNumberingRule(t, data);
+        },
+        input.requestId,
+      ),
+    ),
+
   updateNumberingRule: permissionProcedure('admin.settings')
     .input(
       z.object({

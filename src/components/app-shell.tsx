@@ -129,6 +129,13 @@ export const NAV: NavGroup[] = [
       { href: '/system/migration', label: '데이터 이관', permission: 'admin.migration' },
     ],
   },
+  {
+    label: '내 설정',
+    items: [
+      { href: '/account', label: '내 계정' },
+      { href: '/master/preferences', label: '저장한 조회조건' },
+    ],
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -141,6 +148,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!me.data) {
     if (typeof window !== 'undefined') router.replace('/login');
     return <Spinner label="로그인 화면으로 이동 중" />;
+  }
+
+  /**
+   * A temporary password issued by an admin is not a password the user chose, and it is one
+   * the admin still knows. Until it is replaced the only reachable screen is the one that
+   * replaces it — otherwise the flag is set, nothing acts on it, and the account keeps
+   * running on a shared secret indefinitely.
+   */
+  if (me.data.mustChangePassword && pathname !== '/account') {
+    if (typeof window !== 'undefined') router.replace('/account?force=1');
+    return <Spinner label="비밀번호 변경 화면으로 이동 중" />;
   }
 
   const permissions = new Set(me.data.permissions);

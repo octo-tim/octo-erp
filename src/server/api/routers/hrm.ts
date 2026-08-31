@@ -502,4 +502,19 @@ export const hrmRouter = router({
         input.requestId,
       ),
     ),
+
+  certificateHistory: permissionProcedure('hr.self')
+    .input(z.object({ employeeId: cuid.optional(), take: z.number().int().min(1).max(200).optional() }))
+    .query(({ ctx, input }) =>
+      tx(ctx, (t) =>
+        employee.certificateHistory(t, {
+          ...(input.employeeId ? { employeeId: input.employeeId } : {}),
+          ...(input.take ? { take: input.take } : {}),
+        }),
+      ),
+    ),
+
+  pendingChangeRequests: permissionProcedure('hr.write')
+    .input(z.object({ status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING') }))
+    .query(({ ctx, input }) => tx(ctx, (t) => employee.pendingChangeRequests(t, input.status))),
 });

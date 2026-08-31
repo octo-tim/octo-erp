@@ -39,60 +39,28 @@ function LedgerBook() {
     },
     { enabled: Boolean(applied.itemId) },
   );
+  // INV-05: the export is the server's own CSV, not a client-side rebuild of the same
+  // rows — one formatter, so the download can never drift from what the screen shows.
+  const bookCsv = api.inventory.bookCsv.useQuery(
+    {
+      itemId: applied.itemId,
+      from: applied.from,
+      to: applied.to,
+      ...(applied.warehouseId ? { warehouseId: applied.warehouseId } : {}),
+    },
+    { enabled: false },
+  );
 
-  function downloadCsv() {
+  async function downloadCsv() {
     if (!book.data) return;
-    const rows = [
-      [
-        '일자',
-        '전표번호',
-        '구분',
-        '창고',
-        '사유',
-        '입고수량',
-        '출고수량',
-        '입고금액',
-        '출고금액',
-        '재고수량',
-        '재고금액',
-      ],
-      ['', '', '기초', '', '', '', '', '', '', book.data.opening.quantity, book.data.opening.amount],
-      ...book.data.rows.map((r) => [
-        r.occurredAt,
-        r.docNo ?? r.sourceType,
-        r.docType ?? '',
-        r.warehouseName,
-        r.reason ?? '',
-        r.inQty,
-        r.outQty,
-        r.inAmount,
-        r.outAmount,
-        r.balanceQty,
-        r.balanceAmount,
-      ]),
-      [
-        '',
-        '',
-        '기말',
-        '',
-        '',
-        book.data.totals.inQty,
-        book.data.totals.outQty,
-        book.data.totals.inAmount,
-        book.data.totals.outAmount,
-        book.data.closing.quantity,
-        book.data.closing.amount,
-      ],
-    ];
-    const csv = rows
-      .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(','))
-      .join('\n');
+    const result = await bookCsv.refetch();
+    if (!result.data) return;
     // BOM so Excel opens the Korean headers in UTF-8
-    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([`﻿${result.data.csv}`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `수불부_${applied.from}_${applied.to}.csv`;
+    a.download = `수불부_${book.data.itemLabel.replace(/[\\/:*?"<>|]/g, '')}_${applied.from}_${applied.to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

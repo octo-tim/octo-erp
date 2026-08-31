@@ -49,6 +49,10 @@ export default function LedgerPage() {
     { from: applied.from, to: applied.to },
     { enabled: false },
   );
+  const ledgerCsv = api.accounting.accountLedgerCsv.useQuery(
+    { accountId: applied.accountId, from: applied.from, to: applied.to },
+    { enabled: false },
+  );
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -123,7 +127,25 @@ export default function LedgerPage() {
         ) : ledger.error ? (
           <EmptyState title="조회할 수 없습니다." description={ledger.error.message} />
         ) : (
-          <Card title={`${ledger.data!.accountCode} ${ledger.data!.accountName} 계정별원장`}>
+          <Card
+            title={`${ledger.data!.accountCode} ${ledger.data!.accountName} 계정별원장`}
+            actions={
+              <Button
+                size="sm"
+                onClick={async () => {
+                  const result = await ledgerCsv.refetch();
+                  if (result.data) {
+                    download(
+                      result.data.csv,
+                      `계정별원장_${ledger.data!.accountCode}_${applied.from}_${applied.to}.csv`,
+                    );
+                  }
+                }}
+              >
+                엑셀 내려받기
+              </Button>
+            }
+          >
             <div className="overflow-x-auto">
               <table className="w-full min-w-[52rem] text-sm">
                 <thead className="border-b border-slate-200 text-left text-slate-500">

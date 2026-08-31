@@ -15,11 +15,18 @@ const RESOLVE_LABEL: Record<string, string> = {
 
 export default function ApprovalLinesPage() {
   const templates = api.approval.lineTemplates.useQuery();
+  const forms = api.approval.forms.useQuery();
+  const rules = api.approval.rules.useQuery(undefined, { retry: false });
   const delegations = api.approval.listDelegations.useQuery();
   const users = api.admin.listUsers.useQuery(
     { page: 1, pageSize: 100, sortDir: 'asc', activeOnly: true },
     { retry: false },
   );
+
+  const templateLabelById = new Map(
+    (templates.data ?? []).map((t) => [t.id, `${t.name} (${t.code})`] as const),
+  );
+  const formLabelById = new Map((forms.data ?? []).map((f) => [f.id, `${f.name} (${f.code})`] as const));
   const setDelegation = api.approval.setDelegation.useMutation();
   const endDelegation = api.approval.endDelegation.useMutation();
 
@@ -86,6 +93,75 @@ export default function ApprovalLinesPage() {
           ))
         )}
       </Card>
+
+      {rules.data ? (
+        <Card title="결재선 규칙">
+          {rules.data.length === 0 ? (
+            <EmptyState
+              title="등록된 결재선 규칙이 없습니다."
+              description="규칙이 없으면 상신할 때 결재선을 정할 수 없습니다."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-max text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 text-left font-semibold">
+                      코드
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-left font-semibold">
+                      이름
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-left font-semibold">
+                      적용 양식
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right font-semibold">
+                      최소금액
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right font-semibold">
+                      최대금액
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-left font-semibold">
+                      결재선
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right font-semibold">
+                      우선순위
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rules.data
+                    .slice()
+                    .sort((a, b) => b.priority - a.priority)
+                    .map((r) => (
+                      <tr key={r.id} className="border-b border-slate-100 last:border-0">
+                        <td className="px-3 py-1.5 font-mono text-xs">{r.code}</td>
+                        <td className="px-3 py-1.5">{r.name}</td>
+                        <td className="px-3 py-1.5">
+                          {r.formId ? (formLabelById.get(r.formId) ?? r.formId) : '전체 양식'}
+                        </td>
+                        <td className="px-3 py-1.5 tabular text-right">
+                          {r.minAmount ? fmt.krw(r.minAmount as unknown as string) : '-'}
+                        </td>
+                        <td className="px-3 py-1.5 tabular text-right">
+                          {r.maxAmount ? fmt.krw(r.maxAmount as unknown as string) : '-'}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          {templateLabelById.get(r.lineTemplateId) ?? r.lineTemplateId}
+                        </td>
+                        <td className="px-3 py-1.5 tabular text-right">{r.priority}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="mt-2 text-xs text-slate-500">
+            상신 시 적용 양식·부서·금액 조건이 모두 맞는 규칙 중 우선순위가 가장 높은 것으로 결재선이
+            정해집니다.
+          </p>
+        </Card>
+      ) : null}
 
       <Card title="대결 설정">
         <form

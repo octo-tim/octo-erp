@@ -40,10 +40,13 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
   const terms = api.master.codes.useQuery({ groupCode: 'PAYMENT_TERMS', activeOnly: true });
   const update = api.master.updatePartner.useMutation(refresh);
   const setActive = api.master.setPartnerActive.useMutation(refresh);
+  const remove = api.master.deletePartner.useMutation();
 
   const [editing, setEditing] = useState(false);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (detail.isLoading) return <Spinner />;
   if (detail.error)
@@ -66,15 +69,6 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
           <StatusBadge status={p.isActive ? 'CONFIRMED' : 'CANCELED'} label={p.isActive ? '사용' : '중지'} />
           <Button size="sm" onClick={() => setEditing((v) => !v)}>
             {editing ? '취소' : '수정'}
-          </Button>
-          <Button
-            size="sm"
-            onClick={async () => {
-              await setActive.mutateAsync({ id, isActive: !p.isActive, requestId: newRequestId() });
-              setMessage(p.isActive ? '사용중지 처리했습니다.' : '사용으로 되돌렸습니다.');
-            }}
-          >
-            {p.isActive ? '사용중지' : '사용재개'}
           </Button>
         </div>
       </header>
@@ -154,6 +148,67 @@ export default function PartnerDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </>
       )}
+
+      <Card title="사용 정책">
+        <p className="mb-3 text-sm text-slate-600">
+          관련 자료 {p.usageCount}건. 사용된 거래처는 삭제할 수 없고 사용중지로만 처리합니다.
+        </p>
+        {deleteError ? (
+          <p role="alert" className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+            {deleteError}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button
+            size="sm"
+            onClick={async () => {
+              await setActive.mutateAsync({ id, isActive: !p.isActive, requestId: newRequestId() });
+              setMessage(p.isActive ? '사용중지 처리했습니다.' : '사용으로 되돌렸습니다.');
+            }}
+          >
+            {p.isActive ? '사용중지' : '사용재개'}
+          </Button>
+          {!confirmDelete ? (
+            <Button
+              size="sm"
+              variant="danger"
+              disabled={p.usageCount > 0}
+              title={p.usageCount > 0 ? '사용 이력이 있어 삭제할 수 없습니다.' : undefined}
+              onClick={() => {
+                setDeleteError(null);
+                setConfirmDelete(true);
+              }}
+            >
+              삭제
+            </Button>
+          ) : (
+            <>
+              <span className="text-sm text-red-700">
+                &apos;{p.name}&apos; 거래처를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+              </span>
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={remove.isPending}
+                onClick={async () => {
+                  try {
+                    await remove.mutateAsync({ id, requestId: newRequestId() });
+                    window.location.href = '/master/partners';
+                  } catch (err) {
+                    setDeleteError((err as { message?: string }).message ?? '삭제에 실패했습니다.');
+                    setConfirmDelete(false);
+                  }
+                }}
+              >
+                확인 삭제
+              </Button>
+              <Button size="sm" onClick={() => setConfirmDelete(false)}>
+                취소
+              </Button>
+            </>
+          )}
+        </div>
+      </Card>
 
       <AttachmentPanel ownerType="PARTNER" ownerId={id} />
       <ChangeHistory entityType="Partner" entityId={id} />

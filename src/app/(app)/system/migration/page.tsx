@@ -24,12 +24,17 @@ export default function MigrationPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reconcileBatchId, setReconcileBatchId] = useState<string | null>(null);
 
   const utils = api.useUtils();
   const templateQuery = api.migration.template.useQuery({ target });
   const batches = api.migration.batches.useQuery({ target, take: 10 });
   const validate = api.migration.validate.useMutation();
   const apply = api.migration.applyBatch.useMutation();
+  const reconcileQuery = api.migration.reconcile.useQuery(
+    { batchId: reconcileBatchId ?? '' },
+    { enabled: reconcileBatchId !== null },
+  );
 
   const validated = validate.data;
   const applied = apply.data;
@@ -318,6 +323,7 @@ export default function MigrationPage() {
                   <th className="px-2 py-1.5 text-right font-medium">오류</th>
                   <th className="px-2 py-1.5 text-right font-medium">반영</th>
                   <th className="px-2 py-1.5 font-medium">상태</th>
+                  <th className="px-2 py-1.5 font-medium">작업</th>
                 </tr>
               </thead>
               <tbody>
@@ -335,6 +341,15 @@ export default function MigrationPage() {
                     <td className="tabular px-2 py-1.5 text-right">{b.errorRows}</td>
                     <td className="tabular px-2 py-1.5 text-right">{b.appliedRows}</td>
                     <td className="px-2 py-1.5">{b.status}</td>
+                    <td className="px-2 py-1.5">
+                      {b.status === 'APPLIED' ? (
+                        <Button size="sm" onClick={() => setReconcileBatchId(b.id)}>
+                          대사
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-slate-400">-</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -342,6 +357,65 @@ export default function MigrationPage() {
           </div>
         )}
       </Card>
+
+      {reconcileBatchId ? (
+        <Card
+          title="이관 대사 (MIG-09)"
+          actions={
+            <Button size="sm" onClick={() => setReconcileBatchId(null)}>
+              닫기
+            </Button>
+          }
+        >
+          {reconcileQuery.isLoading ? (
+            <Spinner />
+          ) : reconcileQuery.error ? (
+            <p role="alert" className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+              {reconcileQuery.error.message}
+            </p>
+          ) : reconcileQuery.data ? (
+            <>
+              <p className="text-sm text-slate-600">
+                {reconcileQuery.data.targetLabel} · {reconcileQuery.data.fileName ?? '파일명 없음'}
+                {reconcileQuery.data.baselineDate ? ` · 기준일 ${reconcileQuery.data.baselineDate}` : ''}
+              </p>
+
+              <h3 className="mt-4 text-sm font-semibold">원천 대비 건수</h3>
+              <dl className="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+                <Stat label="원천" value={reconcileQuery.data.counts.source} />
+                <Stat label="정상" value={reconcileQuery.data.counts.valid} />
+                <Stat
+                  label="오류"
+                  value={reconcileQuery.data.counts.error}
+                  alert={reconcileQuery.data.counts.error > 0}
+                />
+                <Stat label="반영" value={reconcileQuery.data.counts.applied} />
+                <Stat label="건너뜀" value={reconcileQuery.data.counts.skipped} />
+              </dl>
+              <p
+                className={`mt-3 rounded px-3 py-2 text-sm ${
+                  reconcileQuery.data.countsBalance ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'
+                }`}
+                role={reconcileQuery.data.countsBalance ? 'status' : 'alert'}
+              >
+                {reconcileQuery.data.countsBalance
+                  ? '원천 건수와 정상·오류 건수의 합이 일치합니다.'
+                  : '원천 건수와 정상·오류 건수의 합이 일치하지 않습니다. 이관이 정상적으로 끝나지 않았을 수 있습니다.'}
+              </p>
+
+              <h3 className="mt-4 text-sm font-semibold">대상별 반영 합계 (원천 대비)</h3>
+              <dl className="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                {reconcileQuery.data.summary.map((s) => (
+                  <div key={s.label}>
+                    <dt className="text-slate-500">{s.label}</dt>
+                    <dd className="tabular font-medium">{s.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          ) : null}
+        </Card>
+      ) : null}
     </div>
   );
 }

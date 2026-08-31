@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/trpc';
 import { StandardListPage } from '@/components/ui/standard-list-page';
 import { DataGrid, type Column } from '@/components/ui/data-grid';
-import { Field, Input, Select } from '@/components/ui/primitives';
+import { Card, Field, Input, Select } from '@/components/ui/primitives';
+import { fmt } from '@/lib/format';
 
 /**
  * INV-04 / INV-07: stock on hand by item and warehouse, with the safety-stock shortfall
@@ -42,6 +43,9 @@ export default function StockStatusPage() {
 
   const warehouses = api.master.warehouses.useQuery({ activeOnly: true });
   const categories = api.master.itemCategories.useQuery();
+  // INV-07: every item below its safety stock, aggregated across warehouses — the
+  // per-row 안전재고 column below only marks a warehouse's share of the same shortage.
+  const shortfalls = api.inventory.safetyStock.useQuery();
   const list = api.inventory.onHand.useQuery({
     hideZero: applied.hideZero,
     belowSafetyOnly: applied.belowSafetyOnly,
@@ -153,6 +157,49 @@ export default function StockStatusPage() {
         setApplied(empty);
       }}
     >
+      {(shortfalls.data ?? []).length > 0 ? (
+        <Card title={`안전재고 미달 품목 (${shortfalls.data!.length}건)`} className="mb-4">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[36rem] text-sm">
+              <thead className="border-b border-slate-200 text-left text-slate-500">
+                <tr>
+                  <th className="px-2 py-1.5 font-medium">품목코드</th>
+                  <th className="px-2 py-1.5 font-medium">품목명</th>
+                  <th className="px-2 py-1.5 text-right font-medium">현재고</th>
+                  <th className="px-2 py-1.5 text-right font-medium">안전재고</th>
+                  <th className="px-2 py-1.5 text-right font-medium">부족수량</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shortfalls.data!.map((r) => (
+                  <tr key={r.itemId} className="border-b border-slate-100">
+                    <td className="tabular px-2 py-1.5 text-slate-500">{r.code}</td>
+                    <td className="px-2 py-1.5">
+                      <button
+                        type="button"
+                        className="text-blue-700 hover:underline"
+                        onClick={() => router.push(`/inventory/ledger?itemId=${r.itemId}`)}
+                      >
+                        {r.name}
+                      </button>
+                    </td>
+                    <td className="tabular px-2 py-1.5 text-right">
+                      {fmt.qty(r.onHand)} {r.unitCode}
+                    </td>
+                    <td className="tabular px-2 py-1.5 text-right">
+                      {fmt.qty(r.safetyStock)} {r.unitCode}
+                    </td>
+                    <td className="tabular px-2 py-1.5 text-right font-medium text-red-700">
+                      {fmt.qty(r.shortage)} {r.unitCode}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : null}
+
       <DataGrid<Row>
         gridKey="inventory.status"
         columns={columns}

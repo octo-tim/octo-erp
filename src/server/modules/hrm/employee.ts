@@ -507,3 +507,43 @@ export async function issueCertificate(
     },
   };
 }
+
+/**
+ * HRM-09 발급이력. Issuing a certificate persisted a row from the start, but nothing could
+ * read it back, so the screen could only show what it had issued in the current browser
+ * session — and a 발급이력 that forgets on refresh is not a 발급이력.
+ */
+export async function certificateHistory(
+  ctx: TransactionContext,
+  input: { employeeId?: string; take?: number },
+) {
+  if (input.employeeId) {
+    assertHrScope(ctx.actor, input.employeeId);
+  } else if (!has(ctx.actor, 'hr.read') && !ctx.actor.isAdmin) {
+    // Without hr.read the only history anyone may see is their own.
+    if (!ctx.actor.employeeId) throw new AppError('FORBIDDEN', '조회할 수 있는 발급이력이 없습니다.');
+    input = { ...input, employeeId: ctx.actor.employeeId };
+  }
+
+  return ctx.tx.certificateIssue.findMany({
+    where: input.employeeId ? { employeeId: input.employeeId } : {},
+    include: { employee: { select: { employeeNo: true, name: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: Math.min(input.take ?? 50, 200),
+  });
+}
+
+/**
+ * HRM-13 변경신청 대기열. `reviewChange` existed with no way to find a request to review, so
+ * the round trip the requirement describes never closed: an employee could submit a change
+ * and nobody would ever see it.
+ */
+export async function pendingChangeRequests(ctx: TransactionContext, status = 'PENDING') {
+  requirePermission(ctx.actor, 'hr.write');
+  return ctx.tx.employeeChangeRequest.findMany({
+    where: { status },
+    include: { employee: { select: { id: true, employeeNo: true, name: true } } },
+    orderBy: { createdAt: 'asc' },
+    take: 200,
+  });
+}

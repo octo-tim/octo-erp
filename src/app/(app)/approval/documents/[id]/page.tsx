@@ -2,11 +2,20 @@
 
 import { use, useState } from 'react';
 import { api, newRequestId } from '@/lib/trpc';
-import { Button, Card, EmptyState, Field, Input, Spinner, StatusBadge } from '@/components/ui/primitives';
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  Select,
+  Spinner,
+  StatusBadge,
+} from '@/components/ui/primitives';
 import { AttachmentPanel } from '@/components/ui/attachment-panel';
 import { fmt } from '@/lib/format';
 
-/** APV-07/APV-14/APV-15: document view, approve/reject/hold, and print. */
+/** APV-07/APV-14/APV-15: document view, approve/reject/hold/release/resubmit, and print. */
 const STEP_ROLE_LABEL: Record<string, string> = { APPROVE: '결재', AGREE: '합의', REFERENCE: '참조' };
 const STEP_STATUS_LABEL: Record<string, string> = {
   PENDING: '대기',
@@ -29,22 +38,31 @@ const ACTION_LABEL: Record<string, string> = {
 interface SchemaField {
   key: string;
   label: string;
-  type: string;
+  type: 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'checkbox';
+  required?: boolean;
+  options?: { value: string; label: string }[];
+  max?: number;
 }
 
 export default function ApprovalDocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const detail = api.approval.detail.useQuery({ documentId: id });
+  const me = api.auth.me.useQuery();
   const approve = api.approval.approve.useMutation();
   const reject = api.approval.reject.useMutation();
   const hold = api.approval.hold.useMutation();
+  const releaseHold = api.approval.releaseHold.useMutation();
   const withdraw = api.approval.withdraw.useMutation();
   const submit = api.approval.submit.useMutation();
+  const resubmit = api.approval.resubmit.useMutation();
   const requestCancel = api.approval.requestCancel.useMutation();
 
   const [comment, setComment] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [resubmitOpen, setResubmitOpen] = useState(false);
+  const [resubmitTitle, setResubmitTitle] = useState('');
+  const [resubmitContent, setResubmitContent] = useState<Record<string, string>>({});
 
   if (detail.isLoading) return <Spinner />;
   if (detail.error)
@@ -56,6 +74,15 @@ export default function ApprovalDocumentPage({ params }: { params: Promise<{ id:
     fieldSchema: SchemaField[];
   };
   const content = doc.content as Record<string, string>;
+  const amountFieldKey = snapshot.fieldSchema.find((f) => f.type === 'money' && f.key === 'amount')?.key;
+  // APV-07: the step this actor put on hold — releasing it is offered to them specifically,
+  // since a held step's status is ON_HOLD (not PENDING) and so falls outside doc.canAct.
+  const heldStepForMe = doc.steps.some(
+    (s) =>
+      s.status === 'ON_HOLD' &&
+      me.data &&
+      (s.approverId === me.data.userId || s.actedByUserId === me.data.userId),
+  );
 
   async function act(fn: () => Promise<unknown>, ok: string) {
     setError(null);
@@ -170,6 +197,32 @@ export default function ApprovalDocumentPage({ params }: { params: Promise<{ id:
         )}
       </Card>
 
+      {doc.status === 'ON_HOLD' && heldStepForMe ? (
+        <Card title="보류 해제" className="no-print">
+          <p className="mb-3 text-sm text-slate-600">
+            이 문서를 보류시켰습니다. 해제하면 다시 결재 대기 상태로 돌아가 정상적으로 승인·반려할 수
+            있습니다.
+          </p>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() =>
+              act(
+                () =>
+                  releaseHold.mutateAsync({
+                    documentId: id,
+                    version: doc.version,
+                    requestId: newRequestId(),
+                  }),
+                '보류를 해제했습니다.',
+              )
+            }
+          >
+            보류 해제
+          </Button>
+        </Card>
+      ) : null}
+
       {doc.canAct ? (
         <Card title="결재 처리" className="no-print">
           <div className="flex flex-col gap-3">
@@ -273,6 +326,19 @@ export default function ApprovalDocumentPage({ params }: { params: Promise<{ id:
                 회수
               </Button>
             ) : null}
+            {(doc.status === 'REJECTED' || doc.status === 'WITHDRAWN') && !resubmitOpen ? (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setResubmitTitle(doc.title);
+                  setResubmitContent({ ...content });
+                  setResubmitOpen(true);
+                }}
+              >
+                재상신 작성
+              </Button>
+            ) : null}
             {doc.status === 'APPROVED' ? (
               <Button
                 variant="danger"
@@ -299,6 +365,94 @@ export default function ApprovalDocumentPage({ params }: { params: Promise<{ id:
               완료된 문서는 수정할 수 없습니다. 취소는 별도 취소 문서의 결재로만 처리됩니다. 취소 사유를 위
               의견란에 입력하세요.
             </p>
+          ) : null}
+
+          {resubmitOpen ? (
+            <div className="mt-3 flex flex-col gap-3 border-t border-slate-200 pt-3">
+              <p className="text-xs text-slate-500">
+                내용을 고쳐 다시 초안으로 저장합니다. 저장 후 목록의 상신 버튼으로 결재선을 새로 받으세요.
+              </p>
+              <Field label="제목" htmlFor="rs-title" required>
+                <Input
+                  id="rs-title"
+                  value={resubmitTitle}
+                  onChange={(e) => setResubmitTitle(e.target.value)}
+                />
+              </Field>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {snapshot.fieldSchema.map((f) => (
+                  <Field
+                    key={f.key}
+                    label={f.label}
+                    htmlFor={`rs-${f.key}`}
+                    required={f.required}
+                    className={f.type === 'textarea' ? 'sm:col-span-2' : undefined}
+                  >
+                    {f.type === 'textarea' ? (
+                      <textarea
+                        id={`rs-${f.key}`}
+                        rows={4}
+                        maxLength={f.max}
+                        className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+                        value={resubmitContent[f.key] ?? ''}
+                        onChange={(e) => setResubmitContent({ ...resubmitContent, [f.key]: e.target.value })}
+                      />
+                    ) : f.type === 'select' ? (
+                      <Select
+                        id={`rs-${f.key}`}
+                        value={resubmitContent[f.key] ?? ''}
+                        onChange={(e) => setResubmitContent({ ...resubmitContent, [f.key]: e.target.value })}
+                      >
+                        <option value="">선택</option>
+                        {(f.options ?? []).map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Input
+                        id={`rs-${f.key}`}
+                        type={f.type === 'date' ? 'date' : 'text'}
+                        inputMode={f.type === 'money' || f.type === 'number' ? 'numeric' : undefined}
+                        maxLength={f.max}
+                        className={
+                          f.type === 'money' || f.type === 'number' ? 'tabular text-right' : undefined
+                        }
+                        value={resubmitContent[f.key] ?? ''}
+                        onChange={(e) => setResubmitContent({ ...resubmitContent, [f.key]: e.target.value })}
+                      />
+                    )}
+                  </Field>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={!resubmitTitle.trim() || resubmit.isPending}
+                  onClick={() => {
+                    const amountValue = amountFieldKey ? resubmitContent[amountFieldKey] : undefined;
+                    return act(async () => {
+                      await resubmit.mutateAsync({
+                        documentId: id,
+                        version: doc.version,
+                        title: resubmitTitle.trim(),
+                        content: resubmitContent,
+                        ...(amountValue ? { amount: amountValue } : {}),
+                        requestId: newRequestId(),
+                      });
+                      setResubmitOpen(false);
+                    }, '재상신했습니다. 상신 버튼을 눌러 다시 결재를 올리세요.');
+                  }}
+                >
+                  재상신
+                </Button>
+                <Button size="sm" onClick={() => setResubmitOpen(false)}>
+                  취소
+                </Button>
+              </div>
+            </div>
           ) : null}
         </Card>
       ) : null}
