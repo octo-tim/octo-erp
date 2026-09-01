@@ -1,0 +1,4 @@
+Next.js serves static files from this directory, and the Dockerfile copies it into the
+runtime image. Git cannot store an empty directory, so without this file a clean checkout
+has no public/ at all and the image build fails on COPY — which is invisible locally,
+where the directory happens to exist.
