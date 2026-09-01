@@ -175,7 +175,14 @@ export default function PartnerListPage() {
         }}
         onRowOpen={(r) => router.push(`/master/partners/${r.id}`)}
         emptyTitle="등록된 거래처가 없습니다."
-        emptyDescription="'거래처 등록'으로 매출처·매입처를 추가하세요."
+        emptyDescription="매출처·매입처를 등록하면 견적·주문·매입전표에서 바로 선택할 수 있습니다."
+        emptyAction={
+          !creating ? (
+            <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
+              지금 등록하기
+            </Button>
+          ) : undefined
+        }
         onExport={(list.data?.total ?? 0) > 0 ? exportCsv : undefined}
       />
     </StandardListPage>

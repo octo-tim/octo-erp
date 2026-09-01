@@ -45,6 +45,12 @@ export interface DataGridProps<T> {
   onRowOpen?: (row: T) => void;
   emptyTitle?: string;
   emptyDescription?: string;
+  /**
+   * NFR-UX-02: 빈 목록에서 다음 할 일이 버튼으로 바로 있어야 한다. 안내문만 있으면
+   * 사용자는 화면 어딘가에 있을 등록 버튼을 찾아 헤매고, 실제로 못 찾으면 그 기능은
+   * 없는 것과 같다.
+   */
+  emptyAction?: React.ReactNode;
   onExport?: () => void;
   onRetry?: () => void;
 }
@@ -98,6 +104,7 @@ export function DataGrid<T>({
   onRowOpen,
   emptyTitle = '조회된 자료가 없습니다.',
   emptyDescription = '조회조건을 바꾸거나 기간을 넓혀 다시 조회하세요.',
+  emptyAction,
   onExport,
   onRetry,
 }: DataGridProps<T>) {
@@ -235,7 +242,7 @@ export function DataGrid<T>({
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={visible.length + (selectable ? 1 : 0)}>
-                  <EmptyState title={emptyTitle} description={emptyDescription} />
+                  <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
                 </td>
               </tr>
             ) : (

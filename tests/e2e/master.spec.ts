@@ -129,7 +129,8 @@ test('BAS-03: 일괄등록 화면이 양식과 검증 절차를 안내한다', a
 });
 
 test('BAS-06: 창고를 등록하고 사용중지할 수 있다', async ({ page }) => {
-  const code = `W${Date.now().toString().slice(-3)}`;
+  // 3자리는 1000개뿐이라 반복 실행하면 이전 회차가 만든 코드와 부딪힌다 — 실제로 부딪혔다
+  const code = `W${Date.now().toString().slice(-6)}`;
   await page.goto('/master/warehouses');
   await page.getByLabel('창고코드').fill(code);
   await page.getByLabel('창고명').fill('시험창고');
@@ -182,4 +183,52 @@ test('채번규칙 화면이 예시와 최근 발행 번호를 보여준다', as
   const salesRow = page.locator('tbody tr', { hasText: '매출전표' });
   await expect(salesRow).toContainText('SL');
   await expect(salesRow).toContainText('SL-202609-0001');
+});
+
+/**
+ * BAS-01: 품목분류는 화면이 있었는데도 메뉴에 없어 운영에서 등록할 방법이 없었다.
+ * 그래서 이 시험은 폼만 확인하지 않고 메뉴를 눌러 들어가는 경로 자체를 확인한다.
+ */
+test('BAS-01: 메뉴에서 품목분류로 들어가 대분류-중분류-소분류를 등록한다', async ({ page }) => {
+  const stamp = Date.now().toString().slice(-6);
+  await page.goto('/home');
+  await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: '품목분류' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('품목분류');
+
+  const columns = ['대분류', '중분류', '소분류 (품목 등록 가능)'];
+  const labels = ['대분류', '중분류', '소분류'];
+  for (let level = 0; level < 3; level++) {
+    // Card는 <section>이라 제목 heading으로 열을 특정할 수 있다
+    const card = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: columns[level]!, exact: true }) });
+    const name = `시험${labels[level]}${stamp}`;
+    await card.getByRole('button', { name: '추가', exact: true }).click();
+    await card.getByLabel('분류코드').fill(`C${stamp}${level}`);
+    await card.getByLabel('분류명').fill(name);
+    await card.getByRole('button', { name: `${labels[level]} 추가` }).click();
+    await expect(card.getByText(name)).toBeVisible();
+    // 다음 단계는 상위 분류를 고른 뒤에야 열린다
+    if (level < 2) await card.getByRole('button', { name: new RegExp(name) }).click();
+  }
+
+  // 등록한 소분류가 품목 등록 화면의 분류 선택에 실제로 나타난다
+  await page.goto('/master/items');
+  await page.getByRole('button', { name: '품목 등록' }).click();
+  await expect(page.getByLabel('분류', { exact: true }).last()).toContainText(`시험소분류${stamp}`);
+});
+
+/**
+ * NFR-UX-02: 빈 목록에서 등록 버튼이 목록 안에도 있어야 한다. 안내문만 두면 사용자는
+ * 헤더 구석의 버튼을 못 찾고 "등록이 안 된다"고 판단한다 — 실제로 그렇게 보고됐다.
+ */
+test('BAS-04: 거래처 목록이 비면 목록 안에서 바로 등록할 수 있다', async ({ page }) => {
+  await page.goto('/master/partners');
+  await page.getByLabel('검색어').fill(`없는거래처${Date.now()}`);
+  await page.getByRole('button', { name: '조회' }).click();
+
+  await expect(page.getByText('등록된 거래처가 없습니다.')).toBeVisible();
+  await page.getByRole('button', { name: '지금 등록하기' }).click();
+  await expect(page.getByRole('heading', { name: '거래처 등록' })).toBeVisible();
+  await expect(page.getByLabel('거래처명')).toBeVisible();
 });
