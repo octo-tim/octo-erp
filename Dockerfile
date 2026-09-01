@@ -30,6 +30,11 @@ COPY --from=builder --chown=erp:erp /app/package.json ./package.json
 # outbox is never drained: no notifications, no contract-expiry reminders, no retention run.
 COPY --from=builder --chown=erp:erp /app/src ./src
 COPY --from=builder --chown=erp:erp /app/tsconfig.json ./tsconfig.json
+# schema.prisma deliberately carries no datasource url; prisma.config.ts supplies it from
+# DATABASE_URL. Without this file `prisma migrate deploy` starts, finds no config, and stops
+# with "datasource.url is required" — which never showed up locally, where migrations run
+# through tools/migrate.mjs instead of the Prisma CLI.
+COPY --from=builder --chown=erp:erp /app/prisma.config.ts ./prisma.config.ts
 COPY --chown=root:root docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Deliberately no `USER erp` here: the entrypoint needs root to chown the mounted volume and
