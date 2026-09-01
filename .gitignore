@@ -6,7 +6,12 @@ node_modules
 coverage
 playwright-report
 test-results
-storage/
+# Anchored with a leading slash on purpose: a bare `storage/` matches a directory of
+# that name at ANY depth, which silently excluded src/server/modules/storage from the
+# repository. The build passed locally off the working tree and failed only once a clean
+# checkout was built. This pattern is meant to exclude the local attachment directory at
+# the project root, nothing else.
+/storage/
 *.log
 .DS_Store
 src/generated/
